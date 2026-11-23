@@ -1688,6 +1688,22 @@ function printDoc(key) {
   h += `<footer class="pr-foot">${CREDIT}</footer></div>`;
   return h;
 }
+
+/* Printing / Save as PDF. Inside an embed (Google Sites, previews) the browser blocks window.print(), so we open a
+   printable copy in a new tab instead; if even that print is blocked there, the tab tells students to press Ctrl + P. */
+function inEmbed() { try { return window.self !== window.top; } catch (e) { return true; } }
+function printCopy(innerHtml, title, bodyClass) {
+  const css = [...document.querySelectorAll("style")].map((x) => x.textContent).join("\n");
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title><style>${css}</style>
+<style>body{background:#fff !important;margin:0} .printhead{display:block !important} .pc-tip{font:600 16px system-ui,sans-serif;background:#fff4d6;border-bottom:2px solid #e0b100;padding:10px 16px;text-align:center}
+@media print{.pc-tip{display:none}}</style></head><body class="${bodyClass || ""}"><div class="pc-tip">If the print window doesn't open, press <b>Ctrl + P</b> and choose <b>Save as PDF</b>.</div>${innerHtml}
+<script>window.addEventListener("load",function(){setTimeout(function(){try{window.print()}catch(e){}},400)});<\/script></body></html>`;
+  let w = null;
+  try { w = window.open(URL.createObjectURL(new Blob([html], { type: "text/html" })), "_blank"); } catch (e) {}
+  if (!w) { try { w = window.open("", "_blank"); if (w) { w.document.open(); w.document.write(html); w.document.close(); } } catch (e) { w = null; } }
+  return !!w;
+}
+
 function openPrint() {
   if (document.querySelector(".pr-wrap")) return;
   const w = document.createElement("div"); w.className = "pr-wrap";
@@ -1698,7 +1714,11 @@ function openPrint() {
   w.addEventListener("click", (e) => {
     const b = e.target.closest("button"); if (!b) return;
     if (b.dataset.k !== undefined) render(+b.dataset.k);
-    if (b.classList.contains("pr-go")) { try { window.print(); } catch (err) { /* printing blocked here */ } }
+    if (b.classList.contains("pr-go")) {
+      if (!inEmbed()) { try { window.print(); } catch (err) { /* printing blocked here */ } }
+      else if (!printCopy(`<div class="pr-wrap" style="position:static;display:block"><div class="pr-page">${page.innerHTML}</div></div>`, document.title, "printing"))
+        alert("Printing is blocked here. Open the lesson in its own tab and press Ctrl + P.");
+    }
     if (b.classList.contains("pr-x")) { w.remove(); document.body.classList.remove("printing"); }
   });
 }
@@ -3582,7 +3602,13 @@ function handinSection() {
   nm.oninput = cl.oninput = () => { state.name = nm.value; state.cls = cl.value; save(); render(); };
   d.querySelector("[data-send]").onclick = (e) => { if (!(nm.value.trim() && cl.value.trim())) { e.preventDefault(); nm.focus(); } else { state.sent = Date.now(); save(); } };
   const msg = (t) => { d.querySelector("[data-msg]").textContent = t; };
-  d.querySelector("[data-pdf]").onclick = () => { if (!nm.value.trim()) { msg("Type your name first."); nm.focus(); return; } render(); try { window.print(); } catch (e) { msg("Printing is blocked here: take a screenshot of your results instead."); } };
+  d.querySelector("[data-pdf]").onclick = () => {
+    if (!nm.value.trim()) { msg("Type your name first."); nm.focus(); return; } render();
+    if (!inEmbed()) { try { window.print(); } catch (e) { msg("Printing is blocked here: take a screenshot of your results instead."); } return; }
+    const sheet = document.getElementById("handinSheet");
+    if (sheet && printCopy(sheet.outerHTML, `${L.id} ${nm.value.trim()}`, "")) msg("Your results opened in a new tab. Choose Save as PDF there.");
+    else msg("Saving is blocked here: take a screenshot of your results instead.");
+  };
   d.querySelector("[data-copy]").onclick = async () => { render(); try { await navigator.clipboard.writeText(d._text); msg("Copied. Paste it where your teacher asks."); } catch (e) { msg("Copying is blocked here: use Save as PDF or a screenshot."); } };
   const clr = d.querySelector("[data-clear]");
   clr.onclick = () => {

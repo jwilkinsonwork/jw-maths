@@ -1082,7 +1082,24 @@ function tex(str) {
 }
 
 // ---------- graphs as SVG ----------
+// Venn diagram of two lines: {a, b: equation labels; left, right, mid, out: items as text; empty: text for an empty middle}
+function venn(v, px = 300) {
+  const W = px, H = Math.round(px * 0.68), fs = Math.max(11, px / 19), r = H * 0.37, cy = H * 0.57, c1 = W * 0.36, c2 = W * 0.64;
+  const t = (x, y, s, o = {}) => `<text x="${x}" y="${y}" font-size="${(o.size || 1) * fs}" text-anchor="${o.anchor || "middle"}" font-weight="${o.w || 700}" fill="${o.fill || "#23264A"}" font-family="Nunito,sans-serif" stroke="#fff" stroke-width="3" paint-order="stroke">${esc(String(s).replace(/-/g, "−"))}</text>`;
+  let g = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Venn diagram for ${esc(v.a)} and ${esc(v.b)}"><rect x="2" y="2" width="${W - 4}" height="${H - 4}" rx="10" fill="#fff" stroke="#C9D0E0" stroke-width="2"/>`;
+  g += `<circle cx="${c1}" cy="${cy}" r="${r}" fill="var(--coral)" fill-opacity=".13" stroke="var(--coral)" stroke-width="2.5"/><circle cx="${c2}" cy="${cy}" r="${r}" fill="var(--blue)" fill-opacity=".13" stroke="var(--blue)" stroke-width="2.5"/>`;
+  const ly = cy - r - fs * 0.45, mx = (c1 + c2) / 2;
+  g += t(mx - fs * 0.5, ly, v.a, { fill: "var(--coral)", w: 800, size: 1.05, anchor: "end" }) + t(mx + fs * 0.5, ly, v.b, { fill: "var(--blue)", w: 800, size: 1.05, anchor: "start" });
+  const col = (items, x, y0) => { const n = items.length, step = fs * 1.3; return items.map((s, i) => t(x, y0 - ((n - 1) * step) / 2 + i * step + fs / 3, s)).join(""); };
+  g += col(v.left || [], c1 - r * 0.48, cy) + col(v.right || [], c2 + r * 0.48, cy);
+  if ((v.mid || []).length) g += col(v.mid, (c1 + c2) / 2, cy);
+  else if (v.empty) g += t((c1 + c2) / 2, cy + fs / 3, v.empty, { size: 0.8, fill: "#6B7194" });
+  const out = v.out || [];
+  out.forEach((s, i) => { g += t(i % 2 ? W - fs * 0.6 : fs * 0.6, H - fs * 0.7 - Math.floor(i / 2) * fs * 1.3, s, { anchor: i % 2 ? "end" : "start" }); });
+  return g + `</svg>`;
+}
 function graph(spec = {}, px = 300) {
+  if (spec.venn) return venn(spec.venn, px);
   const [x0, x1, xs] = spec.xr || [-5, 5, 1], [y0, y1, ys] = spec.yr || [-5, 5, 1];
   const pad = 26, W = px, H = px, iw = W - 2 * pad, ih = H - 2 * pad;
   const X = (x) => pad + ((x - x0) / (x1 - x0)) * iw, Y = (y) => H - pad - ((y - y0) / (y1 - y0)) * ih;
@@ -1669,6 +1686,22 @@ function printDoc(key) {
   h += `<footer class="pr-foot">${CREDIT}</footer></div>`;
   return h;
 }
+
+/* Printing / Save as PDF. Inside an embed (Google Sites, previews) the browser blocks window.print(), so we open a
+   printable copy in a new tab instead; if even that print is blocked there, the tab tells students to press Ctrl + P. */
+function inEmbed() { try { return window.self !== window.top; } catch (e) { return true; } }
+function printCopy(innerHtml, title, bodyClass) {
+  const css = [...document.querySelectorAll("style")].map((x) => x.textContent).join("\n");
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title><style>${css}</style>
+<style>body{background:#fff !important;margin:0} .printhead{display:block !important} .pc-tip{font:600 16px system-ui,sans-serif;background:#fff4d6;border-bottom:2px solid #e0b100;padding:10px 16px;text-align:center}
+@media print{.pc-tip{display:none}}</style></head><body class="${bodyClass || ""}"><div class="pc-tip">If the print window doesn't open, press <b>Ctrl + P</b> and choose <b>Save as PDF</b>.</div>${innerHtml}
+<script>window.addEventListener("load",function(){setTimeout(function(){try{window.print()}catch(e){}},400)});<\/script></body></html>`;
+  let w = null;
+  try { w = window.open(URL.createObjectURL(new Blob([html], { type: "text/html" })), "_blank"); } catch (e) {}
+  if (!w) { try { w = window.open("", "_blank"); if (w) { w.document.open(); w.document.write(html); w.document.close(); } } catch (e) { w = null; } }
+  return !!w;
+}
+
 function openPrint() {
   if (document.querySelector(".pr-wrap")) return;
   const w = document.createElement("div"); w.className = "pr-wrap";
@@ -1679,7 +1712,11 @@ function openPrint() {
   w.addEventListener("click", (e) => {
     const b = e.target.closest("button"); if (!b) return;
     if (b.dataset.k !== undefined) render(+b.dataset.k);
-    if (b.classList.contains("pr-go")) { try { window.print(); } catch (err) { /* printing blocked here */ } }
+    if (b.classList.contains("pr-go")) {
+      if (!inEmbed()) { try { window.print(); } catch (err) { /* printing blocked here */ } }
+      else if (!printCopy(`<div class="pr-wrap" style="position:static;display:block"><div class="pr-page">${page.innerHTML}</div></div>`, document.title, "printing"))
+        alert("Printing is blocked here. Open the lesson in its own tab and press Ctrl + P.");
+    }
     if (b.classList.contains("pr-x")) { w.remove(); document.body.classList.remove("printing"); }
   });
 }
@@ -1967,7 +2004,7 @@ function fitSlides() {
     const wasActive = sl.classList.contains("active"), wasRev = sl.classList.contains("revealed");
     sl.style.display = "flex"; sl.classList.add("revealed");
     if (!sl.clientHeight) { sl.style.display = ""; if (!wasRev) sl.classList.remove("revealed"); return; } // not on screen yet
-    let lo = 14, hi = 30;
+    let lo = 14, hi = sl.querySelector(".svgwrap") ? 30 : 38; // text-only slides may use bigger text
     while (hi - lo > 0.4) { const mid = (lo + hi) / 2; fits.forEach((f) => (f.style.fontSize = mid + "px")); if (sl.scrollHeight > sl.clientHeight + 1 || [...fits].some((f) => f.scrollHeight > f.clientHeight + 1) || [...sl.querySelectorAll(".sbody > .col")].some((c) => c.scrollHeight > c.clientHeight + 1)) hi = mid; else lo = mid; }
     fits.forEach((f) => (f.style.fontSize = Math.max(14, lo - 0.5) + "px"));
     sl.style.display = ""; if (!wasRev) sl.classList.remove("revealed"); if (wasActive) sl.classList.add("active");
@@ -2105,9 +2142,19 @@ function checkPart(spec, val) {
     case "text": { const t = String(val).toLowerCase().replace(/\s+/g, "").replace(/[−–]/g, "-"); return spec.v.includes(t); }
     case "coords": {
       const rule = parseLine(spec.rule), pts = [...String(val).replace(/[−–]/g, "-").matchAll(/\(\s*(-?\d*\.?\d+)\s*,\s*(-?\d*\.?\d+)\s*\)/g)].map((m) => [+m[1], +m[2]]);
-      const good = pts.filter(([x, y]) => Math.abs(rule.A * x + rule.B * y - rule.C) < 1e-9 && !(spec.exclude || []).some(([ex, ey]) => ex === x && ey === y));
+      const also = spec.both ? parseLine(spec.both) : null; // optional second line every point must also be on
+      const good = pts.filter(([x, y]) => Math.abs(rule.A * x + rule.B * y - rule.C) < 1e-9 && (!also || Math.abs(also.A * x + also.B * y - also.C) < 1e-9) && !(spec.exclude || []).some(([ex, ey]) => ex === x && ey === y));
       const uniq = new Set(good.map((p) => p.join(",")));
       return uniq.size >= (spec.min || 1) && good.length === pts.length;
+    }
+    case "lines2": {
+      // a line compared with a base line: "only" must share only the point pt; "none" must share no points (parallel, different)
+      const r = parseLine(val), b = parseLine(spec.base); if (r.error) return false;
+      if (sameLine(r, b)) return false;
+      const parallel = Math.abs(r.A * b.B - b.A * r.B) < 1e-9;
+      if (spec.mode === "none") return parallel;
+      if (spec.mode === "only") { const [px, py] = spec.pt || [0, 3]; return !parallel && Math.abs(r.A * px + r.B * py - r.C) < 1e-9; }
+      return null;
     }
   }
   return null;
@@ -2133,7 +2180,7 @@ function qCard(key, num, numCol, qText, model, parts, extra = "", retry = null) 
     const lab = p.label ? `<label>${esc(p.label)}</label>` : "";
     if (p.t === "yn") return `<div class="part" data-p="${i}">${lab}<button data-val="true">Yes</button><button data-val="false">No</button><span class="res"></span></div>`;
     if (p.t === "choice") return `<div class="part" data-p="${i}">${lab}${p.opts.map((o, k) => `<button data-val="${k}">${tex(o)}</button>`).join("")}<span class="res"></span></div>`;
-    const ph = { num: "e.g. −1/2", eq: "e.g. y = 2x + 1", coords: "e.g. (1, 4), (2, 5)", text: "" }[p.t];
+    const ph = { num: "e.g. −1/2", eq: "e.g. y = 2x + 1", lines2: "e.g. y = 2x + 1", coords: "e.g. (1, 4), (2, 5)", text: "" }[p.t] || "";
     return `<div class="part" data-p="${i}">${lab}<input type="text" placeholder="${ph}" aria-label="${esc(p.label || "Answer")}"><span class="res"></span></div>`;
   }).join("");
   el.innerHTML = `<div class="qt"><span class="qn" style="background:${numCol}">${num}</span>${tex(qText)}${retry ? `<span class="wrongs" aria-live="polite"></span>` : ""}</div>${extra}${parts ? inputs : `<textarea aria-label="Your working"></textarea>`}
@@ -3859,7 +3906,13 @@ function handinSection() {
   nm.oninput = cl.oninput = () => { state.name = nm.value; state.cls = cl.value; save(); render(); };
   d.querySelector("[data-send]").onclick = (e) => { if (!(nm.value.trim() && cl.value.trim())) { e.preventDefault(); nm.focus(); } else { state.sent = Date.now(); save(); } };
   const msg = (t) => { d.querySelector("[data-msg]").textContent = t; };
-  d.querySelector("[data-pdf]").onclick = () => { if (!nm.value.trim()) { msg("Type your name first."); nm.focus(); return; } render(); try { window.print(); } catch (e) { msg("Printing is blocked here: take a screenshot of your results instead."); } };
+  d.querySelector("[data-pdf]").onclick = () => {
+    if (!nm.value.trim()) { msg("Type your name first."); nm.focus(); return; } render();
+    if (!inEmbed()) { try { window.print(); } catch (e) { msg("Printing is blocked here: take a screenshot of your results instead."); } return; }
+    const sheet = document.getElementById("handinSheet");
+    if (sheet && printCopy(sheet.outerHTML, `${L.id} ${nm.value.trim()}`, "")) msg("Your results opened in a new tab. Choose Save as PDF there.");
+    else msg("Saving is blocked here: take a screenshot of your results instead.");
+  };
   d.querySelector("[data-copy]").onclick = async () => { render(); try { await navigator.clipboard.writeText(d._text); msg("Copied. Paste it where your teacher asks."); } catch (e) { msg("Copying is blocked here: use Save as PDF or a screenshot."); } };
   const clr = d.querySelector("[data-clear]");
   clr.onclick = () => {
