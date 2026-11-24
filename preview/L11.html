@@ -1169,7 +1169,7 @@ function numberLine(o, px = 420) {
 }
 
 // ---------- teacher slides ----------
-const KIND = { ext: ["Extension", "var(--purple)"], donow: ["Do Now", "var(--purple)"], kw: ["Key words", "var(--teal)"], explore: ["Explore", "var(--blue)"], concept: ["New idea", "var(--amber)"], ido: ["I do · We do", "var(--coral)"], how: ["How to", "var(--amber)"], mwb: ["Multiple choice", "var(--blue)"], cc: ["Concept check", "var(--amber)"], peer: ["Peer review", "var(--pink)"], act: ["Activity", "var(--teal)"], prob: ["Problem solving", "var(--purple)"], hinge: ["Hinge", "var(--coral)"], tier: ["Tiered practice", "var(--amber)"], exit: ["Exit ticket", "var(--ink2)"], plen: ["Plenary", "var(--purple)"], obj: ["Objectives", "var(--coral)"] };
+const KIND = { ext: ["Extension", "var(--purple)"], donow: ["Do Now", "var(--purple)"], kw: ["Key words", "var(--teal)"], explore: ["Explore", "var(--blue)"], concept: ["New idea", "var(--amber)"], ido: ["I do · We do", "var(--coral)"], how: ["How to", "var(--amber)"], mwb: ["Multiple choice", "var(--blue)"], cc: ["Concept check", "var(--amber)"], peer: ["Peer review", "var(--pink)"], act: ["Activity", "var(--teal)"], prob: ["Problem solving", "var(--purple)"], hinge: ["Hinge", "var(--coral)"], tier: ["Tiered practice", "var(--amber)"], exit: ["Exit ticket", "var(--ink2)"], plen: ["Plenary", "var(--purple)"], obj: ["Objectives", "var(--coral)"], build: ["Build it up", "var(--green)"] };
 const slides = [];
 let CUR_OBJ = null; // objective number for the slides being built
 function slide(kind, title, html, opt = {}) { slides.push({ kind, title, html, obj: kind ? CUR_OBJ : null, part: CUR_OBJ, ...opt }); }
@@ -1186,6 +1186,562 @@ function objExit(i) {
   const g = L.exitAGraph && /grid|graph/i.test(q.q) ? `<div class="svgwrap obj-gw">${graph(L.exitAGraph, 300)}</div>` : "";
   return `<div class="objgoal"><div class="objgoal-h">By the end of the lesson you should be able to answer this (Exit ticket A, Q${i + 1}):</div><div class="objgoal-q">${tex(q.q)}</div>${g}</div>`;
 }
+// ---------- Handwritten answers: Chromebook recognition when available, otherwise a built-in reader ----------
+// inkBox({ chars, onRead(text), height }) returns { el, clear() }. Students write with a finger, stylus or mouse;
+// after a pause the box shows what it read so they can check it before it is marked.
+const INK = (() => {
+  // character templates in a 100 × 100 box (y down); several shapes per character
+  const T = {
+    "0": [[[50,0],[25,8],[10,35],[10,65],[25,92],[50,100],[75,92],[90,65],[90,35],[75,8],[50,0]]],
+    "1": [[[50,0],[50,100]]],
+    "1f": [[[28,22],[50,0],[50,100]]],
+    "1b": [[[28,22],[50,0],[50,100]],[[28,100],[72,100]]],
+    "2": [[[12,24],[28,5],[52,0],[76,8],[86,28],[78,50],[50,72],[12,100],[90,100]]],
+    "2c": [[[12,24],[28,5],[52,0],[76,8],[86,28],[78,50],[50,72],[18,95],[30,90],[60,95],[90,100]]],
+    "3": [[[12,12],[35,0],[65,0],[85,15],[82,35],[60,48],[42,50],[62,52],[86,65],[88,85],[68,100],[35,100],[10,88]]],
+    "3f": [[[12,0],[85,0],[45,45],[70,48],[88,68],[80,92],[50,100],[12,88]]],
+    "4": [[[62,0],[10,66],[92,66]],[[68,28],[68,100]]],
+    "4o": [[[15,0],[10,60],[88,60]],[[66,0],[66,100]]],
+    "4s": [[[66,100],[66,0],[10,66],[92,66]]],
+    "5": [[[80,0],[20,0],[15,45],[45,38],[75,45],[88,68],[78,92],[50,100],[15,90]]],
+    "5b": [[[20,0],[15,45],[45,38],[75,45],[88,68],[78,92],[50,100],[15,90]],[[20,0],[82,0]]],
+    "6": [[[75,5],[50,0],[25,15],[12,45],[12,75],[28,97],[55,100],[80,88],[85,68],[70,52],[45,50],[22,62],[13,75]]],
+    "7": [[[10,0],[90,0],[40,100]]],
+    "7x": [[[10,0],[90,0],[40,100]],[[32,52],[76,52]]],
+    "7h": [[[10,14],[12,0],[90,0],[40,100]]],
+    "8": [[[85,15],[65,0],[35,0],[15,15],[20,35],[50,50],[80,65],[85,85],[65,100],[35,100],[15,85],[20,65],[50,50],[80,35],[85,15]]],
+    "8o": [[[50,50],[25,40],[18,20],[32,2],[50,0],[68,2],[82,20],[75,40],[50,50],[22,62],[15,82],[30,100],[50,100],[70,100],[85,82],[78,62],[50,50]]],
+    "9": [[[85,25],[65,2],[40,0],[18,12],[14,32],[30,50],[58,52],[82,38],[85,25],[82,60],[70,100]]],
+    "9s": [[[85,25],[65,2],[40,0],[18,12],[14,32],[30,50],[58,52],[82,38],[85,25],[85,100]]],
+    "-": [[[0,50],[100,50]]],
+    "/": [[[22,100],[78,0]]],
+    "x": [[[0,0],[100,100]],[[100,0],[0,100]]],
+    "xc": [[[0,10],[25,0],[50,50],[75,100],[100,90]],[[100,10],[50,50],[0,90]]],
+    "+": [[[0,50],[100,50]],[[50,0],[50,100]]],
+    "=": [[[0,30],[100,30]],[[0,70],[100,70]]],
+    "÷": [[[47,6],[53,12]],[[0,50],[100,50]],[[47,88],[53,94]]],
+    "÷d": [[[50,8],[50,10]],[[0,50],[100,50]],[[50,90],[50,92]]],
+    "y": [[[10,0],[50,55]],[[90,0],[30,100]]],
+    "yc": [[[10,5],[22,45],[45,55],[75,42],[85,5],[82,60],[65,95],[35,100],[20,88]]],
+    "yv": [[[10,0],[50,50],[90,0],[55,70],[30,100]]],
+    "m": [[[0,25],[0,100],[0,40],[12,15],[28,12],[42,28],[46,100],[46,40],[58,15],[76,12],[90,28],[94,100]]],
+    "m2": [[[0,15],[0,100]],[[0,40],[12,15],[28,12],[42,28],[46,100],[46,40],[58,15],[76,12],[90,28],[94,100]]],
+    "c": [[[85,15],[60,0],[30,5],[10,30],[8,60],[25,90],[55,100],[85,85]]],
+  };
+  const N = 32;
+  const len = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  function resample(pts, n) {
+    const strokes = []; for (const p of pts) (strokes[p.id] || (strokes[p.id] = [])).push(p);
+    let L = 0; for (const s of strokes) if (s) for (let i = 1; i < s.length; i++) L += len(s[i - 1], s[i]);
+    const out = [];
+    if (L < 1e-6) { const p = pts[0]; for (let i = 0; i < n; i++) out.push({ x: p.x, y: p.y, id: p.id }); return out; }
+    const I = L / (n - 1); let D = 0;
+    for (const s0 of strokes) { if (!s0) continue; const s = s0.slice(); if (!out.length) out.push({ ...s[0] });
+      for (let i = 1; i < s.length; i++) { const d = len(s[i - 1], s[i]);
+        if (D + d >= I && d > 0) { const t = (I - D) / d, q = { x: s[i - 1].x + t * (s[i].x - s[i - 1].x), y: s[i - 1].y + t * (s[i].y - s[i - 1].y), id: s[i].id }; out.push(q); s.splice(i, 0, q); D = 0; }
+        else D += d; } }
+    while (out.length < n) out.push({ ...pts[pts.length - 1] });
+    return out.slice(0, n);
+  }
+  function normalise(pts) {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const p of pts) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); }
+    const s = Math.max(x1 - x0, y1 - y0) || 1; let cx = 0, cy = 0;
+    const q = pts.map((p) => ({ x: (p.x - x0) / s, y: (p.y - y0) / s, id: p.id })); q.forEach((p) => { cx += p.x; cy += p.y; }); cx /= q.length; cy /= q.length;
+    return q.map((p) => ({ x: p.x - cx, y: p.y - cy, id: p.id }));
+  }
+  const prep = (strokes) => normalise(resample(strokes.flatMap((s, id) => s.map(([x, y]) => ({ x, y, id }))), N));
+  function cloudDist(a, b, start) { const used = new Array(N).fill(false); let sum = 0, i = start;
+    do { let mi = -1, md = Infinity; for (let j = 0; j < N; j++) if (!used[j]) { const d = (a[i].x - b[j].x) ** 2 + (a[i].y - b[j].y) ** 2; if (d < md) { md = d; mi = j; } }
+      used[mi] = true; const w = 1 - ((i - start + N) % N) / N; sum += w * md; i = (i + 1) % N; } while (i !== start);
+    return sum; }
+  function match(a, b) { const step = Math.floor(Math.pow(N, 0.5)); let best = Infinity; for (let i = 0; i < N; i += step) best = Math.min(best, cloudDist(a, b, i), cloudDist(b, a, i)); return best; }
+  // the templates, plus slanted and stretched copies so different handwriting still matches
+  const LIB = [];
+  for (const [k, strokes] of Object.entries(T)) {
+    const ch = k[0];
+    for (const sh of [-0.18, 0, 0.18]) for (const sx of [0.8, 1, 1.2]) {
+      if (ch === "-" || ch === "=" ) { if (sh) continue; }
+      const pts = prep(strokes.map((s) => s.map(([x, y]) => [x * sx + sh * (100 - y), y])));
+      LIB.push({ ch, pts }); if (ch === "x") LIB.push({ ch: "×", pts });
+    }
+  }
+  // group strokes into characters by how much they overlap left to right
+  function segment(strokes, H) {
+    const box = (s) => { let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const [x, y] of s) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } return { x0, x1, y0, y1 }; };
+    const items = strokes.filter((s) => s.length).map((s) => ({ s, b: box(s) })).sort((a, b) => a.b.x0 - b.b.x0);
+    const groups = [];
+    for (const it of items) {
+      const g = groups[groups.length - 1];
+      if (g) { const ov = Math.min(g.b.x1, it.b.x1) - Math.max(g.b.x0, it.b.x0), w = Math.min(g.b.x1 - g.b.x0, it.b.x1 - it.b.x0) || 1;
+        // a stroke joins the character before it when they overlap enough (e.g. the two lines of =, + or 4)
+        const cx = (it.b.x0 + it.b.x1) / 2, small = Math.max(it.b.x1 - it.b.x0, it.b.y1 - it.b.y0) < 0.2 * H;
+        if (ov > 0.35 * w || (small && cx >= g.b.x0 && cx <= g.b.x1) || (ov > -0.04 * H && (it.b.x1 - it.b.x0 < 0.12 * H || g.b.x1 - g.b.x0 < 0.12 * H) && Math.abs((it.b.y0 + it.b.y1) / 2 - (g.b.y0 + g.b.y1) / 2) > 0.18 * H && ov > 0)) {
+          g.strokes.push(it.s); g.b = { x0: Math.min(g.b.x0, it.b.x0), x1: Math.max(g.b.x1, it.b.x1), y0: Math.min(g.b.y0, it.b.y0), y1: Math.max(g.b.y1, it.b.y1) }; continue; } }
+      groups.push({ strokes: [it.s], b: { ...it.b } });
+    }
+    return groups;
+  }
+  // best few characters for one group
+  function classify(g, H, allowed) {
+    const w = g.b.x1 - g.b.x0, h = g.b.y1 - g.b.y0, big = Math.max(w, h);
+    if (big < 0.3 * H && allowed.includes(".")) return [{ ch: ".", d: 0 }];
+    const pts = prep(g.strokes), best = {};
+    for (const t of LIB) { if (!allowed.includes(t.ch)) continue; const d = match(pts, t.pts); if (!(t.ch in best) || d < best[t.ch]) best[t.ch] = d; }
+    let out = Object.entries(best).map(([ch, d]) => ({ ch, d }));
+    // stroke-count and shape clues the point cloud can miss
+    const ns = g.strokes.length, flat = h < 0.3 * w;
+    const sb = g.strokes.map((st) => { let a = Infinity, b = -Infinity, c = Infinity, d = -Infinity; for (const [x, y] of st) { a = Math.min(a, x); b = Math.max(b, x); c = Math.min(c, y); d = Math.max(d, y); } return { w: b - a, h: d - c }; });
+    const flatS = sb.map((q) => q.h < 0.35 * q.w && q.w > 0.25 * w), allFlat = flatS.every(Boolean), dotty = sb.filter((q) => Math.max(q.w, q.h) < 0.25 * Math.max(w, h)).length;
+    const eqLike = ns === 2 && allFlat, divLike = ns === 3 && flatS.filter(Boolean).length === 1 && dotty === 2;
+    out.forEach((o) => { if (o.ch === "-" && !(ns === 1 && flat)) o.d += 2; if (o.ch === "=" && !eqLike) o.d += 2; if (o.ch === "=" && eqLike) o.d -= 0.3; if ((o.ch === "+" || o.ch === "x" || o.ch === "×") && ns < 2) o.d += 1.5; if ((ns === 1 && flat || eqLike) && o.ch !== "-" && o.ch !== "=") o.d += 2;
+      if (o.ch === "÷") o.d += divLike ? -0.3 : 2; if (divLike && o.ch !== "÷") o.d += 2; if (o.ch === "1" && w > 0.4 * h) o.d += 0.15 + (w / h - 0.4) * 0.5; if (o.ch === "/" && w < 0.18 * h) o.d += 0.1; if (o.ch === "÷" && ns !== 3) o.d += 2; if (ns === 3 && o.ch !== "÷") o.d += 0.4; });
+    return out.sort((a, b) => a.d - b.d).slice(0, 5);
+  }
+  // choose the reading that is a sensible answer: −3, 1/2, 0.5, 2x + 1, −x − 4 ...
+  const NUM = "-?(\\d+(\\.\\d+)?|\\.\\d+)", EXPR = `${NUM}([/÷×]${NUM})?`;
+  const OK = { num: new RegExp(`^([mc]=)?${EXPR}(=${EXPR})*$`), eq: /^(y=)?(-?(\d*(\/\d+)?x)?([+-]\d+(\/\d+)?)?|-?\d+(\/\d+)?)$/ };
+  function decode(cands, mode) {
+    let beam = [{ s: "", d: 0 }];
+    for (const c of cands) { const nb = []; for (const b of beam) for (const o of c) nb.push({ s: b.s + o.ch, d: b.d + o.d }); nb.sort((a, b) => a.d - b.d); beam = nb.slice(0, 200); }
+    // answers in these lessons are small numbers and simple fractions, so prefer readings like 2/3 over 213
+    const odd = (t) => { let p = 0; for (const m of t.matchAll(/\d+/g)) if (+m[0] > 20) p += 0.25; for (const m of t.matchAll(/\/(\d+)/g)) if (+m[1] < 2) p += 0.25; return p; };
+    const good = beam.filter((b) => OK[mode].test(b.s) && b.s.length > 0).map((b) => ({ s: b.s, d: b.d + odd(b.s) })).sort((a, b) => a.d - b.d)[0];
+    return good ? good.s : null;
+  }
+  function readLocal(strokes, H, mode) {
+    const allowed = mode === "eq" ? "0123456789-/.x+=y" : "0123456789-/.=÷×mc";
+    let groups = segment(strokes, H); if (!groups.length) return null;
+    // measure against the tallest character, so small or large handwriting both work
+    const tall = Math.max(...groups.map((g) => g.b.y1 - g.b.y0), 1);
+    return decode(groups.map((g) => classify(g, groups.length > 1 ? tall : 0, allowed)), mode);
+  }
+  // Chromebooks: the built-in handwriting recogniser (on the device, nothing is sent anywhere)
+  let native = null;
+  const nativeReady = (async () => { try { if (!("createHandwritingRecognizer" in navigator)) return null; native = await navigator.createHandwritingRecognizer({ languages: ["en"] }); return native; } catch (e) { return null; } })();
+  const clean = (t, mode) => { t = String(t || "").replace(/\s+/g, "").replace(/[−–—_]/g, "-").replace(/[oO]/g, "0").replace(/[lI|]/g, "1").replace(/[sS]/g, "5").replace(/:/g, "÷");
+    return mode === "eq" ? t.replace(/[×X]/g, "x").replace(/÷/g, "/").replace(/Y/g, "y") : t.replace(/[xX]/g, "×").replace(/M/g, "m").replace(/C/g, "c"); };
+  async function readNative(strokes, mode) {
+    const r = await nativeReady; if (!r) return null;
+    try {
+      const d = r.startDrawing({ recognitionType: "text", alternatives: 5, graphemeSet: (mode === "eq" ? "0123456789-/.x+=y" : "0123456789-/.=÷×mc").split("") });
+      for (const s of strokes) { const st = new HandwritingStroke(); s.forEach(([x, y, t]) => st.addPoint({ x, y, t })); d.addStroke(st); }
+      const preds = await d.getPrediction(); d.clear && d.clear();
+      for (const p of preds || []) { const t = clean(p.text, mode); if (OK[mode].test(t)) return t; }
+    } catch (e) { /* fall back to the built-in reader */ }
+    return null;
+  }
+  const show = (t) => t.replace(/-/g, "−").replace(/([^\s=÷×/])([+−])/g, "$1 $2 ").replace(/=/g, " = ").replace(/([÷×])/g, " $1 ").replace(/\s+/g, " ").trim();
+
+  function inkBox({ mode = "num", onRead, width = 300, height = 96 }) {
+    const el = document.createElement("div"); el.className = "ink";
+    el.innerHTML = `<div class="ink-pad"><canvas></canvas><span class="ink-ph">write your answer here…</span></div><div class="ink-side"><button type="button" class="ink-undo">↶ Undo</button><button type="button" class="ink-clear">Clear</button></div><div class="ink-read"></div>`;
+    const cv = el.querySelector("canvas"), ctx = cv.getContext("2d"), pad = el.querySelector(".ink-pad"), read = el.querySelector(".ink-read");
+    let strokes = [], cur = null, timer = null, W = width, H = height;
+    function size() { W = pad.clientWidth || width; H = pad.clientHeight || height; const k = window.devicePixelRatio || 1; cv.width = W * k; cv.height = H * k; cv.style.width = W + "px"; cv.style.height = H + "px"; ctx.setTransform(k, 0, 0, k, 0, 0); draw(); }
+    function draw() { ctx.clearRect(0, 0, W, H);
+      ctx.strokeStyle = "#1D2C7A"; ctx.lineWidth = 2.8; ctx.lineCap = ctx.lineJoin = "round";
+      for (const s of strokes) { ctx.beginPath(); s.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); if (s.length === 1) ctx.lineTo(s[0][0] + 0.1, s[0][1]); ctx.stroke(); } }
+    const pos = (e) => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * (W / (r.width || W)), (e.clientY - r.top) * (H / (r.height || H)), Date.now()]; };
+    cv.addEventListener("pointerdown", (e) => { e.preventDefault(); if (!cv.width) size(); cv.setPointerCapture(e.pointerId); cur = [pos(e)]; strokes.push(cur); clearTimeout(timer); el.classList.add("inked"); read.innerHTML = ""; draw(); });
+    cv.addEventListener("pointermove", (e) => { if (!cur) return; const p = pos(e), l = cur[cur.length - 1]; if (Math.hypot(p[0] - l[0], p[1] - l[1]) > 1.5) { cur.push(p); draw(); } });
+    const end = () => { if (!cur) return; cur = null; clearTimeout(timer); timer = setTimeout(recognise, 850); };
+    cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+    async function recognise() {
+      if (!strokes.length) return;
+      const got = (await readNative(strokes, mode)) || readLocal(strokes, H, mode);
+      onRead(got ? show(got) : null, got);
+    }
+    el.querySelector(".ink-undo").onclick = () => { strokes.pop(); draw(); read.innerHTML = ""; clearTimeout(timer); if (strokes.length) timer = setTimeout(recognise, 300); else { el.classList.remove("inked"); onRead(undefined); } };
+    el.querySelector(".ink-clear").onclick = () => { strokes = []; el.classList.remove("inked"); read.innerHTML = ""; draw(); onRead(undefined); };
+    requestAnimationFrame(size); if (window.ResizeObserver) new ResizeObserver(() => size()).observe(pad); else window.addEventListener("resize", () => { if (el.isConnected) size(); });
+    return { el, read, clear: () => el.querySelector(".ink-clear").click(), strokes: () => strokes, _recognise: recognise };
+  }
+  function inkPage({ lines, lineH = 56, top = 8 }) {
+    const n = lines.length, PH = top + n * lineH + 10;
+    const el = document.createElement("div"); el.className = "ink inkpage";
+    el.innerHTML = `<div class="ink-pad page" style="height:${PH}px"><canvas></canvas>${lines.map((l, i) => `<span class="ink-lab" style="top:${top + (i + 1) * lineH - 33}px">${l.label}</span><span class="ink-got" data-i="${i}" style="top:${top + (i + 1) * lineH - 26}px"></span><span class="ink-mk" data-i="${i}" style="top:${top + (i + 1) * lineH - 44}px"></span>`).join("")}</div>`;
+    const pad = el.querySelector(".ink-pad"), cv = el.querySelector("canvas"), ctx = cv.getContext("2d");
+    let W = 400, strokes = [], cur = null, timer = null;
+    const lineOf = (s) => { const ys = s.map((p) => p[1]).sort((a, b) => a - b); return Math.max(0, Math.min(n - 1, Math.floor((ys[ys.length >> 1] - top) / lineH))); };
+    const api = { readings: lines.map(() => null), locked: lines.map(() => false) };
+    function size() { W = pad.clientWidth || 400; const k = window.devicePixelRatio || 1; cv.width = W * k; cv.height = PH * k; cv.style.width = W + "px"; cv.style.height = PH + "px"; ctx.setTransform(k, 0, 0, k, 0, 0); draw(); }
+    function draw() {
+      ctx.clearRect(0, 0, W, PH); ctx.strokeStyle = "#A8C6E8"; ctx.lineWidth = 1.5;
+      for (let i = 0; i < n; i++) { const y = top + (i + 1) * lineH + 0.5; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+      ctx.lineCap = ctx.lineJoin = "round"; ctx.lineWidth = 2.8;
+      for (const s of strokes) { ctx.strokeStyle = api.locked[s.line] ? "#1F7A4D" : "#1D2C7A"; ctx.beginPath(); s.pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); if (s.pts.length === 1) ctx.lineTo(s.pts[0][0] + 0.1, s.pts[0][1]); ctx.stroke(); }
+    }
+    const pos = (e) => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * (W / (r.width || W)), (e.clientY - r.top) * (PH / (r.height || PH)), Date.now()]; };
+    cv.addEventListener("pointerdown", (e) => { e.preventDefault(); if (!cv.width) size(); cv.setPointerCapture(e.pointerId); cur = { pts: [pos(e)], line: -1 }; strokes.push(cur); clearTimeout(timer); draw(); });
+    cv.addEventListener("pointermove", (e) => { if (!cur) return; const p = pos(e), l = cur.pts[cur.pts.length - 1]; if (Math.hypot(p[0] - l[0], p[1] - l[1]) > 1.5) { cur.pts.push(p); draw(); } });
+    const end = () => { if (!cur) return; cur.line = lineOf(cur.pts); if (api.locked[cur.line]) strokes.pop(); else { api.readings[cur.line] = "…"; mark(cur.line, null); got(cur.line, ""); } cur = null; draw(); clearTimeout(timer); timer = setTimeout(recognise, 850); };
+    cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+    const got = (i, t) => { el.querySelector(`.ink-got[data-i="${i}"]`).innerHTML = t; };
+    function mark(i, ok) { const m = el.querySelector(`.ink-mk[data-i="${i}"]`); m.className = "ink-mk" + (ok === true ? " ok" : ok === false ? " no" : ""); m.textContent = ok === true ? "✓" : ok === false ? "✗" : ""; }
+    async function recognise() {
+      for (let i = 0; i < n; i++) {
+        if (api.locked[i] || api.readings[i] !== "…") continue;
+        const st = strokes.filter((s) => s.line === i).map((s) => s.pts);
+        if (!st.length) { api.readings[i] = null; got(i, ""); continue; }
+        const raw = (await readNative(st, lines[i].mode)) || readLocal(st, lineH, lines[i].mode);
+        api.readings[i] = raw ? { raw, shown: show(raw) } : { raw: null };
+        got(i, raw ? `I read <b>${show(raw).replace(/</g, "&lt;")}</b>` : `<span class="ink-cant">can't read this line</span>`);
+      }
+    }
+    api.clearLine = (i) => { strokes = strokes.filter((s) => s.line !== i); api.readings[i] = null; mark(i, null); got(i, ""); draw(); };
+    api.undo = () => { for (let i = strokes.length - 1; i >= 0; i--) { const s = strokes[i]; if (api.locked[s.line]) continue; strokes.splice(i, 1); const left = strokes.some((t) => t.line === s.line); api.readings[s.line] = left ? "…" : null; mark(s.line, null); got(s.line, ""); draw(); clearTimeout(timer); if (left) timer = setTimeout(recognise, 300); return; } };
+    api.clear = () => { for (let i = 0; i < n; i++) if (!api.locked[i]) api.clearLine(i); };
+    api.mark = (i, ok) => { mark(i, ok); if (ok) { api.locked[i] = true; got(i, ""); draw(); } };
+    api.pending = () => api.readings.some((r) => r === "…");
+    api.flush = async () => { clearTimeout(timer); await recognise(); };
+    requestAnimationFrame(size); if (window.ResizeObserver) new ResizeObserver(() => size()).observe(pad);
+    return Object.assign(api, { el });
+  }
+  return { inkBox, inkPage, readLocal, T };
+})();
+
+// ---------- Build it up: a step-by-step carousel before the first I do / We do ----------
+// A lesson defines BUILDUP[partIndex] = { title, intro, cards: [{ title, sub, make() }] }.
+// make() returns { q, line: { m, c }, tri: [p, q] | null, free: bool, steps: [...] }.
+// Step kinds: "num" (pre, ans or ans(ctx), why(v, ctx), loneMinus), "eq" (pre "y =", m, c), "tri" (draw a triangle on the line).
+// Each card adds one step to the ones before it; a card opens only when the one before it is done.
+(() => { const st = document.createElement("style"); st.textContent = `
+.bu { display: flex; flex-direction: column; gap: 10px; height: 100%; min-height: 0; }
+.bu-top { display: flex; align-items: center; gap: 14px; }
+.bu-intro { flex: 1; font-size: 16px; color: var(--ink2); line-height: 1.35; }
+.bu-nav { display: flex; align-items: center; gap: 8px; flex: none; }
+.bu-arr { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--ink); background: #fff; font: 800 22px/1 var(--body); cursor: pointer; color: var(--ink); padding: 0; }
+.bu-arr:disabled { opacity: .3; cursor: default; }
+.bu-dots { display: flex; gap: 6px; }
+.bu-dot { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--ink); background: #fff; font: 800 14px var(--body); display: grid; place-items: center; cursor: pointer; padding: 0; color: var(--ink); transition: transform .2s; }
+.bu-dot.done { background: var(--green); color: #fff; border-color: var(--green); }
+.bu-dot.cur { outline: 3px solid var(--blue); outline-offset: 2px; }
+.bu-dot.lock { border-style: dashed; border-color: #AEB6C8; color: #AEB6C8; cursor: not-allowed; }
+.bu-dot.nudge { animation: bunudge .4s; }
+@keyframes bunudge { 30% { transform: translateX(-5px); } 60% { transform: translateX(5px); } }
+.bu-view { overflow: hidden; flex: 1; min-height: 0; border: 2px solid var(--ink); border-radius: 8px; background: #fff; box-shadow: 4px 4px 0 var(--ink); touch-action: pan-y; }
+.bu-track { display: flex; height: 100%; transition: transform .55s cubic-bezier(.6,0,.3,1); }
+.bu-card { flex: 0 0 100%; min-width: 0; padding: 12px 18px 14px; display: flex; flex-direction: column; gap: 8px; }
+.bu-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.bu-num { font: 800 13px var(--body); letter-spacing: .06em; text-transform: uppercase; color: #fff; background: var(--green); border-radius: 20px; padding: 3px 10px; }
+.bu-head b { font: 800 22px var(--display); }
+.bu-new { font-size: 16px; color: var(--coral); font-weight: 700; }
+.bu-body { display: flex; gap: 20px; flex: 1; min-height: 0; align-items: flex-start; }
+.bu-g { flex: none; width: 390px; max-width: 100%; }
+.bu-svg { width: 100%; height: auto; display: block; touch-action: none; user-select: none; -webkit-user-select: none; }
+.bu-side { flex: 1; display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.bu-q { font: 800 20px/1.3 var(--body); }
+.bu-inkslot { flex: 1 1 300px; min-width: 220px; max-width: 440px; }
+.bu-in .ink button { background: #fff; color: var(--ink); border: 2px solid var(--ink); }
+.bu-in .ink .ink-read button.go { background: var(--ink); color: #fff; }
+.bu-in button.bu-type { flex-basis: 100%; text-align: left; background: none; border: 0; color: var(--ink2); padding: 0 0 0 40px; font: 700 14px var(--body); text-decoration: underline; }
+.bu-inkslot.wide { flex-basis: 420px; max-width: 560px; }
+.ink { display: grid; grid-template-columns: 1fr auto; gap: 6px 8px; align-items: start; width: 100%; }
+.ink-pad { position: relative; height: 112px; border-radius: 3px; touch-action: none; overflow: hidden;
+  background: linear-gradient(90deg, transparent 38px, #E79A9A 38px, #E79A9A 39.5px, transparent 39.5px, transparent 42px, #E79A9A 42px, #E79A9A 43.5px, transparent 43.5px), repeating-linear-gradient(180deg, transparent 0 36px, #A8C6E8 36px 37.5px), #FFFEF5;
+  box-shadow: 0 1px 0 #E6E1CF, 0 3px 0 #FBF8EC, 0 4px 0 #E6E1CF, 0 6px 0 #F8F4E6, 0 7px 0 #E2DCC7, 2px 9px 14px rgba(35,38,74,.18); border: 1px solid #DCD6C2; }
+.ink-pad::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 7px; background: linear-gradient(#C9C2AC, #E9E4D3); opacity: .55; pointer-events: none; }
+.ink-pad canvas { position: absolute; inset: 0; touch-action: none; cursor: crosshair; display: block; }
+.ink-ph { position: absolute; left: 54px; top: 46px; font: 400 21px var(--hand); color: #B9C0CF; pointer-events: none; }
+.ink.inked .ink-ph { display: none; }
+.ink-side { display: flex; flex-direction: column; gap: 6px; }
+.ink-side button, .ink-read button, .bu-type { font: 800 14px var(--body); padding: 5px 10px; border-radius: 6px; border: 2px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; }
+.ink-read { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font: 700 16px var(--body); }
+.ink-read:empty { display: none; }
+.ink-read b { font: 800 22px var(--body); padding: 0 8px; background: #F1F5FF; border-radius: 6px; }
+.ink-read button.go { background: var(--ink); color: #fff; }
+.bu-type { border: 0; background: none; text-decoration: underline; padding: 2px 0; color: var(--ink2); font-weight: 700; }
+.bu-val { font: 800 20px var(--body); color: var(--green); }
+.inkpage { display: block; width: min(100%, 520px); }
+.ink-pad.page { background: linear-gradient(90deg, transparent 38px, #E79A9A 38px, #E79A9A 39.5px, transparent 39.5px, transparent 42px, #E79A9A 42px, #E79A9A 43.5px, transparent 43.5px), #FFFEF5; }
+.ink-lab { position: absolute; left: 52px; font: 400 25px var(--hand); color: #5B6B9C; pointer-events: none; white-space: nowrap; }
+.ink-got { position: absolute; right: 46px; font: 600 13px var(--body); color: #8A93A8; pointer-events: none; white-space: nowrap; }
+.ink-got b { font-size: 15px; color: var(--ink2); }
+.ink-cant { color: var(--red); }
+.ink-mk { position: absolute; right: 10px; font: 400 34px/1 var(--hand); pointer-events: none; }
+.ink-mk.ok { color: #1F9D55; } .ink-mk.no { color: #D93A3A; }
+.pg-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+.pg-bar button { font: 800 14px var(--body); padding: 6px 12px; border-radius: 6px; border: 2px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; }
+.pg-bar button.go { background: var(--ink); color: #fff; }
+.bu-in .pg-bar button:not(.go) { background: #fff; color: var(--ink); }
+.bu-in .pg-bar button.ty { border: 0; background: none; text-decoration: underline; color: var(--ink2); }
+.bu-step.done .bu-in.pgdone::after { content: none; }
+.pg-bar button.ty { border: 0; background: none; text-decoration: underline; color: var(--ink2); padding: 6px 4px; }
+.pg-ty { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.pg-ty label { width: 70px; text-align: right; font: italic 700 20px "STIX Two Text", serif; }
+.pg-ty input { width: 200px; font: 700 18px var(--body); padding: 4px 8px; border: 2px solid var(--ink); border-radius: 6px; }
+.pg-ty input:disabled { border-color: var(--green); color: var(--green); background: #EFFAF3; }
+.pg-sum { display: flex; flex-wrap: wrap; gap: 4px 14px; font: 800 17px var(--body); color: var(--green); }
+.bu.big .bu-remind { display: none; }
+.bu-remind { font-size: 16px; line-height: 1.35; background: #FFF6DA; border: 2px solid var(--yellow); border-radius: 8px; padding: 6px 10px; }
+.bu-rtag { color: var(--amber); font-weight: 800; margin-right: 4px; }
+.bu.big .bu-remind { font-size: 18px; }
+.bu-step { display: grid; grid-template-columns: 30px 1fr; gap: 5px 10px; align-items: center; padding: 7px 10px; border-radius: 8px; border: 2px solid var(--line); background: #fff; transition: background .2s, border-color .2s; }
+.bu-step.locked { opacity: .38; }
+.bu-step.active { border-color: var(--blue); background: #F1F5FF; }
+.bu-step.done { border-color: var(--green); background: #EFFAF3; }
+.bu-sn { width: 28px; height: 28px; border-radius: 50%; background: var(--ink); color: #fff; display: grid; place-items: center; font: 800 14px var(--body); }
+.bu-step.done .bu-sn { background: var(--green); }
+.bu-step.done { padding: 3px 10px; }
+.bu-step.done:not(.tri) .bu-lab, .bu-step.done:not(.tri) .bu-fb, .bu-step.done.tri .bu-in { display: none; }
+.bu-step.done:not(.tri) .bu-in { grid-column: 2; grid-row: 1; }
+.bu-step.done:not(.tri) .bu-in::after { content: "✓"; color: var(--green); font: 800 18px var(--body); }
+.bu-step.done.tri .bu-lab { display: none; } .bu-step.done.tri .bu-fb { grid-row: 1; }
+.bu-step.done .bu-in input { padding: 1px 8px; }
+.bu-card { overflow-y: auto; }
+.bu-lab { font-size: 17px; line-height: 1.3; }
+.bu-in { grid-column: 2; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bu-step:not(.active):not(.done) .bu-in, .bu-step:not(.active) .bu-fb:empty, .bu-step.done .bu-in button { display: none; }
+.bu-in label { font: italic 700 21px "STIX Two Text", "Cambria Math", serif; }
+.bu-in input { width: 110px; font: 700 19px var(--body); padding: 4px 8px; border: 2px solid var(--ink); border-radius: 6px; background: #fff; }
+.bu-in input.eq { width: 190px; }
+.bu-in input:disabled { background: transparent; border-color: var(--green); color: var(--green); }
+.bu-in button, .bu-end button { font: 800 15px var(--body); padding: 6px 14px; border-radius: 6px; border: 2px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+.bu-end button.alt { background: #fff; color: var(--ink); }
+.bu-fb { grid-column: 2; font-size: 15px; line-height: 1.35; font-weight: 700; }
+.bu-fb.bad { color: var(--red); } .bu-fb.good { color: var(--green); }
+.bu-fb .bu-hint { display: block; margin-top: 4px; font-weight: 600; color: var(--ink); background: #FFF6DA; border-radius: 6px; padding: 5px 8px; }
+.bu-tries { font-size: 13px; color: var(--muted); font-weight: 700; }
+.bu-end { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 9px 12px; background: #EFFAF3; border: 2px solid var(--green); border-radius: 8px; font: 800 17px var(--body); color: var(--green); animation: buin .35s; }
+.bu-end .sp { flex: 1; }
+@keyframes buin { from { transform: translateY(8px); opacity: 0; } }
+.bu-gl { stroke: #DCE2EE; stroke-width: 1; }
+.bu-ax { stroke: var(--ink); stroke-width: 2; }
+.bu-tn { font: 700 12px var(--body); fill: var(--ink2); }
+.bu-axl { font: italic 700 16px "STIX Two Text", serif; fill: var(--ink); }
+.bu-line { stroke: var(--coral); stroke-width: 3.5; stroke-linecap: round; }
+.bu-ll { font: italic 800 17px "STIX Two Text", serif; fill: var(--coral); }
+.bu-run { stroke: var(--blue); stroke-width: 4; } .bu-rise { stroke: var(--purple); stroke-width: 4; }
+.bu-rl { font: 800 14px var(--body); } .bu-rl.r { fill: var(--blue); } .bu-rl.u { fill: var(--purple); }
+.bu-pt { fill: var(--ink); stroke: #fff; stroke-width: 2; }
+.bu-ring { fill: none; stroke: var(--blue); stroke-width: 2; stroke-dasharray: 3 3; }
+.bu-hov { fill: var(--blue); opacity: .25; }
+.bu-svg.picking { cursor: crosshair; }
+.bu-flash { animation: buflash .8s 3; }
+@keyframes buflash { 50% { stroke: var(--amber); stroke-width: 8; } }
+.bu-yax.bu-flash { animation: buflash .8s 3; }
+.bu.big .bu-g { width: 440px; }
+.bu.big .bu-q { font-size: 22px; } .bu.big .bu-lab { font-size: 19px; } .bu.big .bu-intro { font-size: 17px; }
+#student .bu-view { height: auto; }
+#student .bu-track { align-items: flex-start; }
+@media (max-width: 860px) { #student .bu-body { flex-direction: column; align-items: stretch; } #student .bu-g { width: 100%; max-width: 460px; align-self: center; } #student .bu-top { flex-direction: column; align-items: stretch; } #student .bu-nav { justify-content: center; } }
+@media (max-width: 600px) { #student .bu-dot { width: 12px; height: 12px; font-size: 0; border-width: 2px; } #student .bu-dots { gap: 7px; } #student .bu-dot.cur { outline-offset: 1px; } #student .bu-dot.lock { border-style: solid; background: #DCE2EE; border-color: #DCE2EE; } }
+`; document.head.appendChild(st); })();
+
+function buGrid(host, line, size) {
+  const NS = "http://www.w3.org/2000/svg", R = 5.6, s = size / (2 * R), X = (x) => (x + R) * s, Y = (y) => (R - y) * s, uid = "bu" + Math.random().toString(36).slice(2, 8);
+  let g = `<defs><clipPath id="${uid}"><rect x="${X(-5.3)}" y="${Y(5.3)}" width="${10.6 * s}" height="${10.6 * s}"/></clipPath></defs>`;
+  for (let i = -5; i <= 5; i++) g += `<line class="bu-gl" x1="${X(i)}" y1="${Y(-5.3)}" x2="${X(i)}" y2="${Y(5.3)}"/><line class="bu-gl" x1="${X(-5.3)}" y1="${Y(i)}" x2="${X(5.3)}" y2="${Y(i)}"/>`;
+  g += `<line class="bu-ax" x1="${X(-5.4)}" y1="${Y(0)}" x2="${X(5.4)}" y2="${Y(0)}"/><line class="bu-ax bu-yax" x1="${X(0)}" y1="${Y(-5.4)}" x2="${X(0)}" y2="${Y(5.4)}"/>`;
+  g += `<text class="bu-axl" x="${X(5.45)}" y="${Y(0) - 6}" text-anchor="end">x</text><text class="bu-axl" x="${X(0) + 7}" y="${Y(5.25)}">y</text>`;
+  for (let i = -5; i <= 5; i++) if (i) g += `<text class="bu-tn" x="${X(i)}" y="${Y(0) + 15}" text-anchor="middle">${String(i).replace("-", "−")}</text><text class="bu-tn" x="${X(0) - 6}" y="${Y(i) + 4}" text-anchor="end">${String(i).replace("-", "−")}</text>`;
+  g += `<text class="bu-tn" x="${X(0) - 6}" y="${Y(0) + 15}" text-anchor="end">0</text>`;
+  const { m, c } = line, lx = [4.4, -4.4, 3.4, -3.4, 2.4, -2.4, 1.4].find((x) => Math.abs(m * x + c) <= 4.4);
+  g += `<g clip-path="url(#${uid})"><line class="bu-line" x1="${X(-6)}" y1="${Y(-6 * m + c)}" x2="${X(6)}" y2="${Y(6 * m + c)}"/></g>`;
+  if (lx !== undefined) g += `<text class="bu-ll" x="${X(lx) + 8}" y="${Y(m * lx + c) - 8}">L</text>`;
+  g += `<g class="bu-hot"></g><g class="bu-tri"></g><g class="bu-picks"></g><circle class="bu-hov" r="9" cx="-50" cy="-50"/>`;
+  host.innerHTML = `<svg class="bu-svg" viewBox="0 0 ${size} ${size}" xmlns="${NS}" role="img" aria-label="Line L on a coordinate grid">${g}</svg>`;
+  const svg = host.firstElementChild, $g = (c) => svg.querySelector(c), onLine = (p) => Math.abs(m * p.x + c - p.y) < 1e-9;
+  const api = {
+    tri: null, onLine,
+    lattice() { const out = []; for (let x = -5; x <= 5; x++) { const y = m * x + c; if (Math.abs(y - Math.round(y)) < 1e-9 && Math.abs(y) <= 5) out.push({ x, y: Math.round(y) }); } return out; },
+    drawTri(p, q) {
+      const [a, b] = p.x < q.x ? [p, q] : [q, p], up = b.y >= a.y;
+      api.tri = { a, b, run: b.x - a.x, rise: b.y - a.y };
+      $g(".bu-tri").innerHTML = `<line class="bu-run" x1="${X(a.x)}" y1="${Y(a.y)}" x2="${X(b.x)}" y2="${Y(a.y)}"/><line class="bu-rise" x1="${X(b.x)}" y1="${Y(a.y)}" x2="${X(b.x)}" y2="${Y(b.y)}"/>` +
+        `<text class="bu-rl r" x="${X((a.x + b.x) / 2)}" y="${Y(a.y) + (up ? 18 : -8)}" text-anchor="middle">run</text><text class="bu-rl u" x="${X(b.x) + 7}" y="${Y((a.y + b.y) / 2) + 5}">rise</text>` +
+        `<circle class="bu-pt" cx="${X(a.x)}" cy="${Y(a.y)}" r="6"/><circle class="bu-pt" cx="${X(b.x)}" cy="${Y(b.y)}" r="6"/>`;
+      $g(".bu-picks").innerHTML = "";
+    },
+    mark(p) { $g(".bu-picks").innerHTML = `<circle class="bu-pt" cx="${X(p.x)}" cy="${Y(p.y)}" r="7"/>`; },
+    clear() { api.tri = null; $g(".bu-tri").innerHTML = ""; $g(".bu-picks").innerHTML = ""; },
+    rings(on) { $g(".bu-hot").innerHTML = on ? api.lattice().map((p) => `<circle class="bu-ring" cx="${X(p.x)}" cy="${Y(p.y)}" r="10"/>`).join("") : ""; },
+    flash(what) {
+      const el = what === "yaxis" ? $g(".bu-yax") : what === "run" ? $g(".bu-run") : what === "rise" ? $g(".bu-rise") : null;
+      if (what === "lattice") return api.rings(true);
+      if (!el) return; el.classList.remove("bu-flash"); void el.getBoundingClientRect(); el.classList.add("bu-flash");
+    },
+    pick: null, // set to a function(p) to receive clicks on grid corners
+  };
+  const toUnit = (e) => { const r = svg.getBoundingClientRect(); return { x: ((e.clientX - r.left) / r.width) * 2 * R - R, y: R - ((e.clientY - r.top) / r.height) * 2 * R }; };
+  svg.addEventListener("pointermove", (e) => { const h = $g(".bu-hov"); if (!api.pick) { h.setAttribute("cx", -50); return; } const u = toUnit(e), p = { x: Math.round(u.x), y: Math.round(u.y) }; const near = Math.hypot(u.x - p.x, u.y - p.y) < 0.4 && Math.abs(p.x) <= 5 && Math.abs(p.y) <= 5; h.setAttribute("cx", near ? X(p.x) : -50); h.setAttribute("cy", near ? Y(p.y) : -50); });
+  svg.addEventListener("pointerleave", () => $g(".bu-hov").setAttribute("cx", -50));
+  svg.addEventListener("pointerdown", (e) => { if (!api.pick) return; e.preventDefault(); const u = toUnit(e), p = { x: Math.round(u.x), y: Math.round(u.y) }; if (Math.hypot(u.x - p.x, u.y - p.y) > 0.45 || Math.abs(p.x) > 5 || Math.abs(p.y) > 5) return api.pick(null); api.pick(p); });
+  api.setPicking = (on) => svg.classList.toggle("picking", !!on);
+  return api;
+}
+
+function mountBuildUp(host, B, { big = false, store = null } = {}) {
+  const N = B.cards.length, saved = (store && store.load()) || {}, st = { done: Math.min(N, saved.done || 0) };
+  let cur = Math.min(st.done, N - 1);
+  host.innerHTML = `<div class="bu${big ? " big" : ""}"><div class="bu-top"><div class="bu-intro">${tex(B.intro || "")}</div><div class="bu-nav"><button class="bu-arr" data-d="-1" type="button" aria-label="Previous card">‹</button><div class="bu-dots"></div><button class="bu-arr" data-d="1" type="button" aria-label="Next card">›</button></div></div><div class="bu-view"><div class="bu-track"></div></div></div>`;
+  const root = host.firstElementChild, track = root.querySelector(".bu-track"), dots = root.querySelector(".bu-dots");
+  const cards = B.cards.map((spec) => { const el = document.createElement("div"); el.className = "bu-card"; track.appendChild(el); return { spec, el, built: false }; });
+  dots.innerHTML = cards.map((c, i) => `<button class="bu-dot" type="button" data-i="${i}" title="Card ${i + 1}: ${esc(c.spec.title)}">${i + 1}</button>`).join("");
+  const save = () => { if (store) store.save({ done: st.done }); };
+  const c0 = cards;
+  function paint() {
+    dots.querySelectorAll(".bu-dot").forEach((d, i) => { d.className = "bu-dot" + (i < st.done ? " done" : "") + (i === cur ? " cur" : "") + (i > st.done ? " lock" : ""); d.textContent = i < st.done ? "✓" : i + 1; d.title = `Card ${i + 1}: ${c0[i].spec.title}${i > st.done ? " (finish the card before it first)" : ""}`; });
+    root.querySelector('[data-d="-1"]').disabled = cur === 0; root.querySelector('[data-d="1"]').disabled = cur >= Math.min(st.done, N - 1);
+    cards.forEach((c, i) => { c.el.inert = i !== cur; });
+  }
+  function go(i) {
+    if (i < 0 || i >= N) return;
+    if (i > st.done) { const d = dots.children[st.done]; if (d) { d.classList.remove("nudge"); void d.offsetWidth; d.classList.add("nudge"); } return; }
+    cur = i; if (!cards[i].built) build(i); track.style.transform = `translateX(${-100 * i}%)`; paint();
+  }
+  root.querySelectorAll(".bu-arr").forEach((b) => (b.onclick = () => go(cur + +b.dataset.d)));
+  dots.onclick = (e) => { const d = e.target.closest(".bu-dot"); if (d) go(+d.dataset.i); };
+  // swipe between cards (not on the graph, inputs or buttons)
+  let sx = null; const view = root.querySelector(".bu-view");
+  view.addEventListener("pointerdown", (e) => { sx = e.target.closest("input,button,svg") ? null : e.clientX; });
+  view.addEventListener("pointerup", (e) => { if (sx === null) return; const dx = e.clientX - sx; sx = null; if (Math.abs(dx) > 60) go(cur + (dx < 0 ? 1 : -1)); });
+
+  function build(i) {
+    const c = cards[i], Q = c.spec.make(); c.built = true;
+    c.el.innerHTML = `<div class="bu-head"><span class="bu-num">Card ${i + 1} of ${N}</span><b>${tex(c.spec.title)}</b>${c.spec.sub ? `<span class="bu-new">${tex(c.spec.sub)}</span>` : ""}</div><div class="bu-body"><div class="bu-g"></div><div class="bu-side"><div class="bu-q">${tex(Q.q)}</div>${c.spec.remind ? `<div class="bu-remind"><span class="bu-rtag">Reminder</span> ${c.spec.remind}</div>` : ""}<div class="bu-steps"></div><div class="bu-endslot"></div></div></div>`;
+    const G = buGrid(c.el.querySelector(".bu-g"), Q.line, big ? 440 : 390), ctx = { Q, G }; c.el.__bu = ctx;
+    if (Q.tri) G.drawTri(Q.tri[0], Q.tri[1]);
+    const box = c.el.querySelector(".bu-steps"), rows = [];
+    Q.steps.forEach((s, k) => {
+      const r = document.createElement("div"); r.className = "bu-step locked";
+      const input = s.kind === "tri" ? "" : s.kind === "page" ? `<div class="bu-pageslot"></div>` : s.kind === "ink" ? `<label>${tex(s.pre || "")}</label><div class="bu-inkslot${s.as === "eq" ? " wide" : ""}"></div>` : `<label>${tex(s.pre || "")}</label><input type="text" class="${s.kind === "eq" ? "eq" : ""}" autocomplete="off" spellcheck="false" inputmode="text" aria-label="${esc((s.pre || "answer").replace("=", "").trim())}"><button type="button">Check</button><span class="bu-tries"></span>`;
+      if (s.kind === "tri") r.classList.add("tri");
+      r.innerHTML = `<span class="bu-sn">${k + 1}</span><span class="bu-lab">${s.label}</span><div class="bu-in">${input}</div><div class="bu-fb"></div>`;
+      box.appendChild(r); rows.push(r);
+      s.wrong = 0;
+      if (s.kind === "ink") {
+        const slot = r.querySelector(".bu-inkslot");
+        const box = INK.inkBox({ mode: s.as, onRead: (shown, raw) => {
+          if (shown === undefined) return;
+          if (!raw) { box.read.innerHTML = `I can't read that yet. Press Clear and write it again, a bit bigger.`; return; }
+          box.read.innerHTML = `I read: <b>${esc(shown)}</b><button type="button" class="go">✓ Mark it</button><span class="small muted">Not what you wrote? Press Clear.</span>`;
+          box.read.querySelector(".go").onclick = () => check(k, raw, shown);
+        } });
+        slot.appendChild(box.el);
+        const ty = document.createElement("button"); ty.type = "button"; ty.className = "bu-type"; ty.textContent = "⌨ Type instead";
+        ty.onclick = () => { slot.innerHTML = `<input type="text" class="${s.as === "eq" ? "eq" : ""}" autocomplete="off" spellcheck="false" aria-label="${esc((s.pre || "answer").replace("=", "").trim())}"><button type="button">Check</button>`; const inp = slot.querySelector("input"); slot.querySelector("button").onclick = () => check(k); inp.addEventListener("keydown", (e) => { if (e.key === "Enter") check(k); }); inp.focus(); ty.remove(); };
+        r.querySelector(".bu-in").appendChild(ty);
+        r.querySelector(".bu-in").insertAdjacentHTML("beforeend", `<span class="bu-tries"></span>`);
+      }
+      if (s.kind === "page") setupPage(k, r);
+      if (s.kind !== "tri" && s.kind !== "ink" && s.kind !== "page") { const inp = r.querySelector("input"); r.querySelector("button").onclick = () => check(k); inp.addEventListener("keydown", (e) => { if (e.key === "Enter") check(k); }); }
+    });
+    const fb = (k, html, cls) => { const f = rows[k].querySelector(".bu-fb"); f.className = "bu-fb " + (cls || ""); f.innerHTML = html; };
+    function wrong(k, msg) {
+      const s = Q.steps[k]; s.wrong++;
+      const t = rows[k].querySelector(".bu-tries"); if (t) t.textContent = `✗ ${s.wrong}`;
+      let html = esc(msg || "Not yet. Look at the graph again.");
+      if (s.wrong >= 2 && s.hint) { html += `<span class="bu-hint">💡 ${tex(s.hint)}</span>`; if (s.flash) G.flash(s.flash); }
+      fb(k, html, "bad");
+    }
+    function activate(k) {
+      if (k >= Q.steps.length) return finish();
+      const s = Q.steps[k]; rows[k].className = "bu-step active" + (s.kind === "tri" ? " tri" : "");
+      if (s.kind === "tri") {
+        G.clear(); let first = null; G.setPicking(true);
+        fb(k, "Click the first point.", "");
+        G.pick = (p) => {
+          if (!p) return fb(k, "Click exactly on a grid corner (where two grid lines cross).", "bad");
+          if (!G.onLine(p)) return wrong(k, `(${String(p.x).replace("-", "−")}, ${String(p.y).replace("-", "−")}) is not on line L. Pick a corner the line goes exactly through.`);
+          if (!first) { first = p; G.mark(p); return fb(k, "Good. Now click a second point on the line.", "good"); }
+          if (p.x === first.x) return fb(k, "Pick a different point on the line.", "bad");
+          G.drawTri(first, p); G.pick = null; G.setPicking(false); G.rings(false); done(k);
+        };
+      } else if (k > 0) { const inp = rows[k].querySelector("input"); if (inp) setTimeout(() => inp.focus({ preventScroll: true }), 50); }
+    }
+    // { ok } or { ok: false, msg, form } (form = the answer isn't in a form we can mark)
+    function judge(s, raw, kind) {
+      if (kind === "num") {
+        const a = typeof s.ans === "function" ? s.ans(ctx) : s.ans, close = (v) => Math.abs(v - a) < 1e-6;
+        const val = (t) => { t = t.replace(/[−–]/g, "-"); if (s.loneMinus && t === "-") return -1; const m = t.match(/^(-?[\d.]+)([÷×:*])(-?[\d.]+)$/); if (m) { const p = parseNum(m[1]), q = parseNum(m[3]); return m[2] === "×" || m[2] === "*" ? p * q : p / q; } return parseNum(t); };
+        const parts = raw.replace(/\s+/g, "").replace(/^[a-z]+=/i, "").split("=").filter((t) => t !== ""), vals = parts.map(val);
+        if (!vals.length || vals.some((v) => !isFinite(v))) return { ok: false, form: true, msg: "Type a number, like 3, −2 or 1/2." };
+        const v = vals[vals.length - 1];
+        if (vals.every(close)) return { ok: true };
+        if (vals.length > 1 && close(v)) return { ok: false, msg: "Your answer is right, but part of your working doesn't equal it. Check each part." };
+        if (vals.length > 1 && vals.some(close)) return { ok: false, msg: "Your working is right. Check the last part." };
+        return { ok: false, msg: (s.why && s.why(v, ctx)) || "Not yet. Look at the graph again." };
+      }
+      const t = /=/.test(raw) ? raw : "y=" + raw, L2 = parseLine(t);
+      if (L2.error || Math.abs(L2.B) < 1e-12) return { ok: false, form: true, msg: "Write it like y = 2x + 1." };
+      const m2 = -L2.A / L2.B, c2 = L2.C / L2.B, mOK = Math.abs(m2 - s.m) < 1e-6, cOK = Math.abs(c2 - s.c) < 1e-6;
+      if (mOK && cOK) return { ok: true };
+      if (Math.abs(m2 - s.c) < 1e-6 && Math.abs(c2 - s.m) < 1e-6) return { ok: false, msg: "m and c are swapped: m goes with x, c is the number on its own." };
+      return { ok: false, msg: mOK ? "Your gradient is right. Check c." : cOK ? "Your c is right. Check the gradient." : "Find c first, then the gradient, then write y = mx + c." };
+    }
+    function check(k, written, shown) {
+      const s = Q.steps[k], inp = rows[k].querySelector("input"), raw = written !== undefined ? written : inp ? inp.value.trim() : "", kind = s.kind === "ink" ? s.as : s.kind;
+      if (!raw) return fb(k, "Type your answer first.", "bad");
+      s.lastShown = shown || raw;
+      const res = judge(s, raw, kind);
+      if (res.ok) return done(k);
+      if (res.form) return fb(k, res.msg, "bad");
+      return wrong(k, res.msg);
+    }
+    // a page of working: one printed label per line, each line marked on its own
+    function setupPage(k, r) {
+      const s = Q.steps[k], slot = r.querySelector(".bu-pageslot");
+      s.lines.forEach((d) => { d.ok = false; d.wrong = 0; d.shown = ""; });
+      function markAll(getRaw, onMark) {
+        const msgs = [];
+        s.lines.forEach((d, j) => {
+          if (d.ok) return;
+          const g = getRaw(j), lab = `<b>${esc(d.pre.replace(/\s*=\s*$/, ""))}:</b> `;
+          if (g === null) return msgs.push(lab + "write your answer on this line.");
+          if (g.raw === null) return msgs.push(lab + "I can't read this line. Rub it out and write it again, a bit bigger.");
+          const res = judge(d, g.raw, d.kind);
+          if (res.ok) { d.ok = true; d.shown = g.shown || g.raw; onMark(j, true); return; }
+          onMark(j, false);
+          if (res.form) return msgs.push(lab + esc(res.msg));
+          d.wrong++; msgs.push(lab + esc(res.msg) + (d.wrong >= 2 && d.hint ? `<span class="bu-hint">💡 ${tex(d.hint)}</span>` : ""));
+        });
+        if (s.lines.every((d) => d.ok)) return done(k);
+        fb(k, msgs.join("<br>"), "bad");
+      }
+      const P = INK.inkPage({ lines: s.lines.map((d) => ({ label: esc(d.pre), mode: d.kind })), lineH: big ? 46 : 56 });
+      slot.innerHTML = ""; slot.appendChild(P.el);
+      slot.insertAdjacentHTML("beforeend", `<div class="pg-bar"><button type="button" class="go">✓ Mark my working</button><button type="button" class="undo">↶ Undo</button><button type="button" class="rub">Rub out ✗</button><button type="button" class="clr">Clear page</button><button type="button" class="ty">⌨ Type instead</button></div>`);
+      slot.querySelector(".go").onclick = async () => {
+        await P.flush();
+        markAll((j) => { const rd = P.readings[j]; return !rd ? null : rd.raw ? rd : { raw: null }; }, (j, ok) => P.mark(j, ok));
+      };
+      slot.querySelector(".undo").onclick = () => P.undo();
+      slot.querySelector(".rub").onclick = () => s.lines.forEach((d, j) => { if (!d.ok) P.clearLine(j); });
+      slot.querySelector(".clr").onclick = () => P.clear();
+      slot.querySelector(".ty").onclick = () => {
+        slot.innerHTML = s.lines.map((d, j) => `<div class="pg-ty"><label>${tex(d.pre)}</label><input type="text" data-j="${j}" autocomplete="off" spellcheck="false" ${d.ok ? `value="${esc(d.shown)}" disabled` : ""}><span class="ink-mk-t" data-j="${j}">${d.ok ? "✓" : ""}</span></div>`).join("") + `<div class="pg-bar"><button type="button" class="go">Check my answers</button></div>`;
+        const ins = [...slot.querySelectorAll("input")];
+        const go = () => markAll((j) => { const v = ins[j].value.trim(); return v ? { raw: v, shown: v } : null; }, (j, ok) => { slot.querySelector(`.ink-mk-t[data-j="${j}"]`).textContent = ok ? "✓" : "✗"; if (ok) ins[j].disabled = true; });
+        slot.querySelector(".go").onclick = go; ins.forEach((i) => i.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); }));
+        const first = ins.find((i) => !i.disabled); if (first) first.focus();
+      };
+    }
+    function done(k) {
+      const s = Q.steps[k]; rows[k].className = "bu-step done" + (s.kind === "tri" ? " tri" : "");
+      const inp = rows[k].querySelector("input"); if (inp) inp.disabled = true;
+      if (s.kind === "page") rows[k].querySelector(".bu-in").classList.add("pgdone");
+      if (s.kind === "page") rows[k].querySelector(".bu-in").innerHTML = `<div class="pg-sum">${s.lines.map((d) => `<span>${tex(d.pre)} ${esc(String(d.shown).replace(/^\s*[a-z]+\s*=\s*/i, "").replace(/-/g, "−"))} ✓</span>`).join("")}</div>`;
+      if (s.kind === "ink") rows[k].querySelector(".bu-in").innerHTML = `<label>${tex(s.pre || "")}</label><span class="bu-val">${esc(String(s.lastShown).replace(/-/g, "−"))}</span>`;
+      fb(k, s.kind === "tri" ? "✓ Triangle drawn." : s.kind === "page" ? "✓ All your working is correct." : "✓ Correct.", "good");
+      activate(k + 1);
+    }
+    function finish() {
+      const last = i === N - 1, slot = c.el.querySelector(".bu-endslot");
+      if (i + 1 > st.done) { st.done = i + 1; save(); }
+      slot.innerHTML = `<div class="bu-end">${last ? "✓ You can do the whole thing on your own!" : "✓ Card done!"}<span class="sp"></span><button type="button" class="alt" data-again>↻ Another like this</button>${last ? "" : `<button type="button" data-next>Next card →</button>`}</div>`;
+      slot.querySelector("[data-again]").onclick = () => { build(i); };
+      const nx = slot.querySelector("[data-next]"); if (nx) nx.onclick = () => go(i + 1);
+      paint();
+    }
+    // free drawing while answering (last card): any two points on the line make a triangle
+    if (Q.free) { G.setPicking(true); let first = null; G.pick = (p) => { if (!p || !G.onLine(p)) return; if (!first) { first = p; G.clear(); G.mark(p); } else if (p.x !== first.x) { G.drawTri(first, p); first = null; } }; }
+    activate(0);
+  }
+  build(cur); track.style.transition = "none"; track.style.transform = `translateX(${-100 * cur}%)`; void track.offsetWidth; track.style.transition = ""; paint();
+}
+
 function buildSlides() {
   // the Do Now opens the lesson; the lesson title sits at the top of it
   slide("donow", "Do Now", `<div class="dn-title"><div class="dn-unit">${esc(L.unit || "Year 8 · Linear graphs")} · ${esc(L.id)}</div><h1>${tex(L.title)}</h1><div class="dn-date">${new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}</div></div>` + head("donow", "Do Now", 5).replace("<h2>Do Now</h2>", `<h2>Do Now</h2><span class="dn-ins">Write the date and title, then answer in your book.</span>`) + `<div class="grid2 fit dn-grid" style="flex:1">${L.doNow.map((d, i) => `<div class="card"><div class="small" style="color:var(--blue);font-weight:800">${i + 1} · ${esc(d.tag)}</div><div class="mid">${tex(d.q)}</div>${d.line ? `<div class="svgwrap" style="max-width:460px">${numberLine(d.line)}</div>` : ""}<div class="ans rv" style="margin-top:8px">${tex(d.a)}</div></div>`).join("")}</div>`);
@@ -1199,6 +1755,7 @@ function buildSlides() {
     slide(null, "", `<div class="sec-title${anim ? " sec-anim" : ""}"><div class="sec-left"><div style="color:var(--coral);font-weight:800;font-size:22px">Part ${ci + 1} of ${L.cycles.length} · ${esc(cy.los)}</div><h2 style="font:800 58px/1.1 var(--display);margin:10px 0 0">${tex(cy.title)}</h2>${anim ? `<div class="sa-card"><span class="sa-step" id="sa-step-${ci}"></span><div class="sa-cap" id="sa-cap-${ci}"></div><button class="sa-btn" id="sa-btn-${ci}" type="button"></button></div>` : ""}</div><div class="svgwrap sec-graph">${anim ? `<div data-anim="${cy.sectionAnim}" data-cap="#sa-cap-${ci}" data-step="#sa-step-${ci}" data-btn="#sa-btn-${ci}"></div>` : graph(cy.sectionGrid || { lines: [{ m: 2, c: 1, color: "accent1" }, { m: 2, c: -2, color: "accent1" }] }, 630)}</div></div>`, { dark: true });
     const C0 = cy.concept;
     slide("concept", C0.title, head("concept", C0.title) + `<div class="sbody"><div class="col"><ol class="mid" style="padding-left:28px;margin:0">${C0.points.map((p) => `<li style="margin-bottom:10px">${tex(p)}</li>`).join("")}</ol><div class="keyidea rv" style="margin-top:auto"><b>Key idea</b> ${tex(C0.key)}</div></div><div class="svgwrap" style="width:470px">${graph(C0.graph || {}, 470)}</div></div>`);
+    if (typeof BUILDUP === "object" && BUILDUP && BUILDUP[ci]) slide("build", `Build it up: ${BUILDUP[ci].title}`, head("build", `Build it up: ${BUILDUP[ci].title}`) + `<div class="bu-host" style="flex:1;min-height:0" data-buildup="${ci}"></div>`);
     cy.pairs.forEach((p, pi) => {
       const side = (lab, s, colr) => `<div class="col"><span class="chip" style="background:${colr};align-self:flex-start">${lab}</span><div class="big" style="font-weight:800">${tex(s.q)}</div>${s.graph ? `<div class="svgwrap" style="width:430px;align-self:center">${graph(s.graph, 430)}</div>` : ""}<div style="flex:1"></div></div>`;
       slide("ido", `I do, we do ${pi + 1}`, head("ido", `I do, we do ${pi + 1}`) + `<div class="sbody">${side("I do", p.ido, "var(--coral)")}<div style="width:2px;background:var(--line)"></div>${side("We do", p.wedo, "var(--teal)")}</div>`, { notes: `I do: ${p.ido.steps.join("; ")}. We do: ${p.wedo.steps.join("; ")}` });
@@ -1910,6 +2467,7 @@ function setMenu() {
     mn.innerHTML = `<div class="a11y-h"><b>Settings</b><button type="button" data-a="close" aria-label="Close">✕</button></div>` +
       (teacher ? `<div class="set-row"><div><b>🎲 Pick a name</b><span>Random name picker for your class lists</span></div><button type="button" data-a="names">Open</button></div>` +
         `<div class="set-sub set-subsw"><span>Names button on the main page</span><button type="button" class="set-sw${namesBtnOn() ? " on" : ""}" data-a="namesbtn" role="switch" aria-checked="${namesBtnOn()}"><i></i>${namesBtnOn() ? "On" : "Off"}</button></div>` +
+        (LIVE.url ? `<div class="set-row"><div><b>📡 Live class</b><span>See who's working, idle or on another tab</span></div><button type="button" data-a="live">Open</button></div>` : "") +
         `<div class="set-row"><div><b>🖨 Print</b><span>Student worksheet or answer key</span></div><button type="button" data-a="print">Open</button></div>` : "") +
       (teacher ? `<div class="set-row"><div><b>Pace tracker</b><span>Shows if you're ahead or behind the planned timings</span></div><button type="button" class="set-sw${p.on ? " on" : ""}" data-a="pace" role="switch" aria-checked="${!!p.on}"><i></i>${p.on ? "On" : "Off"}</button></div>` +
         (p.on ? `<div class="set-sub">Lesson clock <b class="set-clock"></b><button type="button" data-a="pause">${p.paused ? "▶ Carry on" : "❚❚ Pause"}</button><button type="button" data-a="restart">↺ Restart</button></div>` : "") : "") +
@@ -1929,6 +2487,7 @@ function setMenu() {
     if (a === "read") { mn.remove(); a11yPanel(); }
     if (a === "namesbtn") { try { localStorage.setItem("jw-names-btn", namesBtnOn() ? "0" : "1"); } catch (err) { /* storage not available */ } namesBtnSync(); draw(); }
     if (a === "names") { mn.remove(); btn.setAttribute("aria-expanded", "false"); openPicker(); }
+    if (a === "live") { mn.remove(); btn.setAttribute("aria-expanded", "false"); openLive(); return; }
     if (a === "print") { mn.remove(); btn.setAttribute("aria-expanded", "false"); openPrint(); }
     if (a === "tr") { mn.remove(); trPanel(); }
     if (a === "english") { TR.on = false; trRevertAll(); btn.classList.remove("on"); draw(); }
@@ -2039,6 +2598,8 @@ function show(i) {
   const host = sl.querySelector("[data-explorer]");
   if (host && !host.dataset.mounted) { host.dataset.mounted = "1"; mountExplorer(host); }
   sl.querySelectorAll("[data-anim]:not([data-mounted])").forEach((h) => { h.dataset.mounted = "1"; mountAnim(h, SECVIZ[h.dataset.anim], 630); });
+  const bh = sl.querySelector("[data-buildup]");
+  if (bh && !bh.dataset.mounted) { bh.dataset.mounted = "1"; mountBuildUp(bh, BUILDUP[+bh.dataset.buildup], { big: true }); }
   const eh = sl.querySelector("[data-ext]");
   if (eh && !eh.dataset.mounted) { eh.dataset.mounted = "1"; eh.appendChild(EXT.widget(true)); }
   try { localStorage.setItem(`${LID}-slide`, cur); } catch (e) { /* storage not available */ }
@@ -2123,7 +2684,7 @@ try { state = JSON.parse(localStorage.getItem(SAVE) || "{}"); } catch (e) { stat
 function setHash(h) { try { if (location.hash !== h) history.replaceState(null, "", h); } catch (e) { /* not allowed inside some embeds: ignore */ } }
 // Student-only copy: no teacher view (built by build.py as a separate file).
 const STUDENT_ONLY = /*STUDENT_ONLY*/false;
-const save = () => { try { localStorage.setItem(SAVE, JSON.stringify(state)); } catch (e) { /* storage not available */ } };
+const save = () => { try { localStorage.setItem(SAVE, JSON.stringify(state)); } catch (e) { /* storage not available */ } if (window.__live) window.__live.beatSoon(); };
 
 function parseNum(s) {
   let t = String(s).trim().replace(/[−–]/g, "-").replace(/\s+/g, "");
@@ -2245,7 +2806,8 @@ function buildStudent() {
   const root = document.getElementById("student");
   const secs = [["donow", "Do Now"], ["kw", "Key Words"], ["explore", "Explore"], ["p1", "Part 1"], ["p2", "Part 2"], ["practice", "Practice"], ["ext", "Extension"], ["exit", "Exit ticket"], ["board", "Whiteboard"], ["handin", "Hand in"]];
   if (typeof GAME === "object" && GAME) secs.splice(secs.findIndex(([k]) => k === "board"), 0, ["game", "Game"]);
-  root.innerHTML = `<div class="tabs" role="tablist" data-tc-tabs>${secs.map(([k, t]) => `<button data-sec="${k}" aria-pressed="false">${t}</button>`).join("")}</div><div id="secs"></div>`;
+  root.innerHTML = `<div id="livebar"></div><div class="tabs" role="tablist" data-tc-tabs>${secs.map(([k, t]) => `<button data-sec="${k}" aria-pressed="false">${t}</button>`).join("")}</div><div id="secs"></div>`;
+  setTimeout(liveBar, 0);
   const box = root.querySelector("#secs");
   const make = {
     donow() {
@@ -2338,6 +2900,12 @@ function buildStudent() {
       w.innerHTML = `<div data-cap="#swc-${ci}" data-step="#sws-${ci}" data-btn="#swb-${ci}"></div><div class="sa-card"><b style="font:700 20px var(--display)">Watch first</b><br><span class="sa-step" id="sws-${ci}"></span><div class="sa-cap" id="swc-${ci}"></div><button class="sa-btn" id="swb-${ci}" type="button"></button></div>`;
       d.appendChild(w);
       mountAnim(w.firstElementChild, SECVIZ[cy.sectionAnim], 400);
+    }
+    if (typeof BUILDUP === "object" && BUILDUP && BUILDUP[ci]) {
+      const b = document.createElement("div"); b.className = "q";
+      b.innerHTML = `<div class="qt"><span class="qn" style="background:var(--green)">Build it up</span>${tex(BUILDUP[ci].title)}</div><div class="bu-host"></div>`;
+      d.appendChild(b);
+      mountBuildUp(b.querySelector(".bu-host"), BUILDUP[ci], { store: { load: () => state[`bu${ci}`], save: (o) => { state[`bu${ci}`] = o; save(); } } });
     }
     if (cy.cloze) {
       const c = document.createElement("div"); c.className = "q";
@@ -3543,6 +4111,7 @@ function gather() {
   L.doNow.forEach((_, i) => add("Do Now", `Q${i + 1}`, `dn${i}`));
   add("Key Words", "Match the definitions", "kwmatch");
   L.cycles.forEach((cy, ci) => {
+    if (typeof BUILDUP === "object" && BUILDUP && BUILDUP[ci]) { const b = state[`bu${ci}`], n = BUILDUP[ci].cards.length, k = (b && b.done) || 0; rows.push({ sec: `Part ${ci + 1}`, label: "Build it up", status: k ? `${k} of ${n} cards done` : "Not tried", cls: k >= n ? "ok" : k ? "no" : "", ok: k >= n, tried: k > 0, note: "" }); }
     if (cy.cloze) add(`Part ${ci + 1}`, "Concept check", `cc${ci}`);
     cy.mcqs.forEach((_, mi) => { const st = state[`mc${ci}-${mi}`]; rows.push({ sec: `Part ${ci + 1}`, label: `Multiple choice ${mi + 1}`, status: st && st.pick !== undefined ? `Chose ${letters[st.pick]}` : "Not tried", cls: "", ok: false, tried: !!st }); });
     cy.miscons.forEach((m, mi) => add(`Part ${ci + 1}`, `Peer review: ${m.who}`, `peer${ci}-${mi}`, m.wrong, "peer"));
@@ -3602,8 +4171,19 @@ function handinSection() {
   nm.oninput = cl.oninput = () => { state.name = nm.value; state.cls = cl.value; save(); render(); };
   d.querySelector("[data-send]").onclick = (e) => { if (!(nm.value.trim() && cl.value.trim())) { e.preventDefault(); nm.focus(); } else { state.sent = Date.now(); save(); } };
   const msg = (t) => { d.querySelector("[data-msg]").textContent = t; };
-  d.querySelector("[data-pdf]").onclick = () => {
+  if (LIVE.url) { const b = d.querySelector("[data-pdf]"); b.textContent = "Hand in and save as PDF"; b.classList.add("primary"); }
+  d.querySelector("[data-pdf]").onclick = async () => {
     if (!nm.value.trim()) { msg("Type your name first."); nm.focus(); return; } render();
+    if (LIVE.url) {
+      if (!cl.value.trim()) { msg("Type your class first."); cl.focus(); return; }
+      const b = d.querySelector("[data-pdf]"); b.disabled = true; msg("Handing in…");
+      try {
+        const j = await liveHandin(nm.value.trim(), cl.value.trim(), d.querySelector("[data-score] b").textContent);
+        state.sent = Date.now(); save(); b.disabled = false;
+        d.querySelector("[data-msg]").innerHTML = `✓ Handed in. Your teacher has it. <a href="${esc(j.url)}" target="_blank" rel="noopener">Open your PDF</a> to save or print your own copy.`;
+        return;
+      } catch (e) { b.disabled = false; msg("Couldn't reach your teacher's Drive. Trying Save as PDF instead…"); }
+    }
     if (!inEmbed()) { try { window.print(); } catch (e) { msg("Printing is blocked here: take a screenshot of your results instead."); } return; }
     const sheet = document.getElementById("handinSheet");
     if (sheet && printCopy(sheet.outerHTML, `${L.id} ${nm.value.trim()}`, "")) msg("Your results opened in a new tab. Choose Save as PDF there.");
@@ -3618,6 +4198,154 @@ function handinSection() {
   };
   render();
   return d;
+}
+
+// ---------- Live class: progress to the teacher's laptop, and hand-in to the teacher's Drive ----------
+// LIVE.url is the teacher's Google Apps Script web app (see the setup notes). Without it, none of this runs.
+const LIVE = {"url": ""};
+const LIVE_IDLE = 90; // seconds without touching the lesson before a student shows as idle
+(() => { const st = document.createElement("style"); st.textContent = `
+#livebar { margin: 0 0 12px; }
+.lvb { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; border: 2px solid var(--ink); border-radius: 8px; background: #FFF6DA; box-shadow: 3px 3px 0 var(--ink); font: 700 16px var(--body); }
+.lvb input { font: 700 16px var(--body); padding: 5px 8px; border: 2px solid var(--ink); border-radius: 6px; width: 170px; }
+.lvb input.c { width: 90px; }
+.lvb button { font: 800 15px var(--body); padding: 6px 14px; border-radius: 6px; border: 2px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+.lvb.on { background: #EFFAF3; border-color: var(--green); box-shadow: none; font-size: 14px; padding: 6px 12px; }
+.lvb.on button { background: none; color: var(--ink2); border: 0; text-decoration: underline; padding: 0; font-size: 14px; }
+.lvdot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px rgba(31,157,85,.2); }
+.lv-ov { position: fixed; inset: 0; z-index: 9000; background: rgba(20,24,40,.55); display: flex; align-items: stretch; justify-content: center; padding: 24px; }
+.lv-p { background: #fff; border: 2px solid var(--ink); border-radius: 10px; box-shadow: 6px 6px 0 var(--ink); width: min(1300px, 100%); display: flex; flex-direction: column; overflow: hidden; font-family: var(--body); }
+.lv-h { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 2px solid var(--line); flex-wrap: wrap; }
+.lv-h b.t { font: 800 22px var(--display); margin-right: auto; }
+.lv-h select, .lv-h input { font: 700 15px var(--body); padding: 5px 8px; border: 2px solid var(--ink); border-radius: 6px; }
+.lv-h button { font: 800 14px var(--body); padding: 6px 12px; border-radius: 6px; border: 2px solid var(--ink); background: #fff; cursor: pointer; }
+.lv-counts { display: flex; gap: 8px; flex-wrap: wrap; padding: 10px 18px; border-bottom: 1px solid var(--line); }
+.lv-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; font: 800 14px var(--body); background: #F3F5FA; }
+.lv-chip i { width: 10px; height: 10px; border-radius: 50%; }
+.lv-grid { flex: 1; overflow: auto; padding: 14px 18px; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; align-content: start; }
+.lv-card { font-family: var(--body); border: 2px solid var(--line); border-left-width: 8px; border-radius: 8px; padding: 9px 11px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; background: #fff; }
+.lv-card:hover { box-shadow: 3px 3px 0 var(--ink); }
+.lv-card .n { font: 800 17px var(--body); display: flex; justify-content: space-between; gap: 6px; }
+.lv-card .n span { font-size: 13px; color: var(--muted); }
+.lv-card .s { font: 800 14px var(--body); }
+.lv-card .m { font-size: 13px; color: var(--ink2); }
+.lv-bar { display: flex; gap: 1px; height: 8px; }
+.lv-bar i { flex: 1; border-radius: 1px; background: #E3E7EF; } .lv-bar i.k { background: #1F9D55; } .lv-bar i.w { background: #D93A3A; }
+.lv-empty { grid-column: 1 / -1; padding: 30px; text-align: center; color: var(--muted); font: 700 17px var(--body); }
+.lv-det { border-top: 2px solid var(--line); max-height: 45%; overflow: auto; padding: 12px 18px; }
+.lv-det table { border-collapse: collapse; width: 100%; font-size: 14px; } .lv-det td, .lv-det th { border-bottom: 1px solid var(--line); padding: 4px 8px; text-align: left; }
+.lv-det .ok { color: #1F9D55; font-weight: 800; } .lv-det .no { color: #D93A3A; font-weight: 800; }
+.lv-note { padding: 8px 18px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); }
+`; document.head.appendChild(st); })();
+
+window.__live = (() => {
+  if (!LIVE.url) return null;
+  let lastInput = Date.now(), timer = null, soon = null, started = false;
+  const touch = () => { const was = Date.now() - lastInput > LIVE_IDLE * 1000; lastInput = Date.now(); if (was) beatSoon(300); };
+  ["pointerdown", "keydown", "wheel", "touchstart", "input"].forEach((ev) => addEventListener(ev, touch, { passive: true, capture: true }));
+  let mv = 0; addEventListener("pointermove", () => { const t = Date.now(); if (t - mv > 3000) { mv = t; touch(); } }, { passive: true });
+  document.addEventListener("visibilitychange", () => beatSoon(150));
+  addEventListener("focus", () => beatSoon(150)); addEventListener("blur", () => beatSoon(1500));
+  function payload(t) {
+    const rows = gather(), btn = document.querySelector('#student .tabs button[aria-pressed="true"]');
+    const bu = typeof BUILDUP === "object" && BUILDUP ? Object.keys(BUILDUP).map((ci) => `${(state["bu" + ci] && state["bu" + ci].done) || 0}/${BUILDUP[ci].cards.length}`).join(" ") : "";
+    return { t, lesson: L.id, name: String(state.name || "").trim(), cls: String(state.cls || "").trim(), vis: document.hidden ? "hidden" : "visible", focus: document.hasFocus(), idle: Math.round((Date.now() - lastInput) / 1000), sec: btn ? btn.textContent.trim() : "", bu, r: rows.map((r) => (r.ok ? "1" : r.tried ? "2" : "0")).join("") };
+  }
+  function send(t) {
+    if (!started) return; const p = payload(t); if (!p.name) return; const body = JSON.stringify(p);
+    if (t === "bye" && navigator.sendBeacon) { try { if (navigator.sendBeacon(LIVE.url, new Blob([body], { type: "text/plain" }))) return; } catch (e) { /* fall through */ } }
+    try { fetch(LIVE.url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body, keepalive: true }).catch(() => {}); } catch (e) { /* offline */ }
+  }
+  function beatSoon(ms = 1500) { if (!started) return; clearTimeout(soon); soon = setTimeout(() => send("beat"), ms); }
+  function start() { if (started) return beatSoon(100); started = true; send("beat"); timer = setInterval(() => send("beat"), 12000); addEventListener("pagehide", () => send("bye")); }
+  return { start, beatSoon, send };
+})();
+
+// the bar at the top of the student page: join with a name and class, and always shows that the teacher can see progress
+function liveBar() {
+  const box = document.getElementById("livebar"); if (!box || !window.__live) return;
+  const on = !!(String(state.name || "").trim() && String(state.cls || "").trim());
+  if (on && !box.dataset.edit) {
+    box.innerHTML = `<div class="lvb on"><span class="lvdot"></span><span>Live: your teacher can see your progress in this lesson, ${esc(state.name)} · ${esc(state.cls)}.</span><button type="button">Not you?</button></div>`;
+    box.querySelector("button").onclick = () => { box.dataset.edit = "1"; liveBar(); };
+    window.__live.start(); return;
+  }
+  box.innerHTML = `<div class="lvb"><span>👋 Type your name and class to join the lesson:</span><input type="text" placeholder="Your name" aria-label="Your name" value="${esc(state.name || "")}"><input class="c" type="text" placeholder="Class" aria-label="Your class" value="${esc(state.cls || "")}"><button type="button">Join</button></div>`;
+  const [nm, cl] = box.querySelectorAll("input"), go = () => { if (!nm.value.trim()) return nm.focus(); if (!cl.value.trim()) return cl.focus(); state.name = nm.value.trim(); state.cls = cl.value.trim().toUpperCase(); save(); delete box.dataset.edit; liveBar(); const h = document.querySelector("#hiName"), c = document.querySelector("#hiClass"); if (h) h.value = state.name; if (c) c.value = state.cls; };
+  box.querySelector("button").onclick = go; [nm, cl].forEach((i) => i.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); }));
+}
+
+// a plain page for the PDF in the teacher's Drive (Google's converter ignores scripts and most styling)
+function handinHTML(name, cls, score) {
+  const rows = gather(), plain = (t) => String(t || "").replace(/\$|\\[a-z]+|[{}]/gi, "");
+  return `<html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;font-size:11pt;color:#222}h1{font-size:16pt;margin:0 0 4px}p{margin:2px 0 8px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #bbb;padding:4px 6px;text-align:left;font-size:10pt}th{background:#eee}.ok{color:#1a7f37;font-weight:bold}.no{color:#c62828;font-weight:bold}.small{color:#666;font-size:9pt}</style></head><body>` +
+    `<h1>${esc(L.id)} ${esc(plain(L.title))}</h1><p><b>${esc(name)}</b> · ${esc(cls)} · ${esc(new Date().toLocaleString("en-GB"))}</p><p><b>${esc(score)}</b><br><span class="small">${rows.filter((r) => r.tried).length} of ${rows.length} questions tried</span></p>` +
+    `<table><tr><th>Section</th><th>Question</th><th>Result</th></tr>${rows.map((r) => `<tr><td>${esc(r.sec)}</td><td>${esc(r.label)}</td><td class="${r.cls}">${esc(r.status)}${r.note ? `<br><span class="small">Their answer: ${esc(r.note)}</span>` : ""}</td></tr>`).join("")}</table>` +
+    `<p class="small">© J. Wilkinson 2026 · All rights reserved</p></body></html>`;
+}
+async function liveHandin(name, cls, score) {
+  const res = await fetch(LIVE.url, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ t: "handin", lesson: L.id, name, cls, score, html: handinHTML(name, cls, score) }) });
+  const j = await res.json(); if (!j || !j.ok) throw new Error((j && j.error) || "failed"); return j;
+}
+
+// ---------- the teacher's live class view ----------
+function liveStatus(s, now) {
+  const age = Math.max(0, (now - s.at) / 1000), idle = (s.idle || 0) + age, min = (x) => (x < 120 ? `${Math.round(x / 60) || 1} min` : `${Math.round(x / 60)} mins`);
+  if (s.left && s.left >= s.at) return ["gone", "Left the lesson", "#8A93A8"];
+  if (age > 40) return ["gone", "Not connected", "#8A93A8"];
+  if (s.vis === "hidden") return ["away", "On another tab", "#E8833A"];
+  if (!s.focus) return ["away", "Not on the lesson", "#E8833A"];
+  if (idle >= LIVE_IDLE) return ["idle", `Idle for ${min(idle)}`, "#D9A400"];
+  return ["ok", "Working", "#1F9D55"];
+}
+function openLive() {
+  const ov = document.createElement("div"); ov.className = "lv-ov";
+  ov.innerHTML = `<div class="lv-p" role="dialog" aria-label="Live class"><div class="lv-h"><b class="t">📡 Live class · ${esc(L.id)}</b><label class="small">Class <select data-cls><option value="">All</option></select></label><button type="button" data-key>🔑 Key</button><button type="button" data-x>✕ Close</button></div><div class="lv-counts"></div><div class="lv-grid"><div class="lv-empty">Connecting…</div></div><div class="lv-det" hidden></div><div class="lv-note">Updates every 5 seconds. Students show here once they type their name and class at the top of the lesson. "Not on the lesson" means the lesson isn't the window they're using, for example another app or the page around the lesson.</div></div>`;
+  document.body.appendChild(ov);
+  const grid = ov.querySelector(".lv-grid"), counts = ov.querySelector(".lv-counts"), det = ov.querySelector(".lv-det"), sel = ov.querySelector("[data-cls]");
+  const labels = gather().map((r) => [r.sec, r.label]);
+  let data = {}, picked = null, tm = null, alive = true;
+  const keyGet = () => { try { return localStorage.getItem("jw-live-key") || ""; } catch (e) { return ""; } };
+  function askKey(msg) {
+    grid.innerHTML = `<div class="lv-empty">${msg || "Type your teacher key (the word you set in the script)."}<br><br><input type="password" data-lvk style="font:700 16px var(--body);padding:6px 10px;border:2px solid var(--ink);border-radius:6px"> <button type="button" data-lvks style="font:800 15px var(--body);padding:6px 14px;border-radius:6px;border:2px solid var(--ink);background:var(--ink);color:#fff">Save</button></div>`;
+    const k = grid.querySelector("[data-lvk]"); k.focus();
+    const go = () => { try { localStorage.setItem("jw-live-key", k.value.trim()); } catch (e) { /* storage not available */ } poll(); };
+    grid.querySelector("[data-lvks]").onclick = go; k.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+  }
+  async function poll() {
+    clearTimeout(tm); if (!alive) return;
+    const key = keyGet(); if (!key) return askKey();
+    try {
+      const r = await fetch(`${LIVE.url}?t=live&lesson=${encodeURIComponent(L.id)}&key=${encodeURIComponent(key)}`), j = await r.json();
+      if (!j.ok && j.error === "key") return askKey("That key wasn't right. Type it again.");
+      data = j; draw();
+    } catch (e) { counts.innerHTML = `<span class="lv-chip" style="color:#D93A3A">Can't reach the live server. Trying again…</span>`; }
+    tm = setTimeout(poll, 5000);
+  }
+  function draw() {
+    const now = data.now || Date.now(), all = Object.values(data.students || {});
+    const classes = [...new Set(all.map((s) => s.cls))].sort(); const cur = sel.value;
+    sel.innerHTML = `<option value="">All</option>` + classes.map((c) => `<option${c === cur ? " selected" : ""}>${esc(c)}</option>`).join("");
+    const list = all.filter((s) => !sel.value || s.cls === sel.value).sort((a, b) => a.name.localeCompare(b.name));
+    const st = list.map((s) => [s, liveStatus(s, now)]), n = (k) => st.filter(([, x]) => x[0] === k).length;
+    counts.innerHTML = [["ok", "Working", "#1F9D55"], ["idle", "Idle", "#D9A400"], ["away", "Elsewhere", "#E8833A"], ["gone", "Gone", "#8A93A8"]].map(([k, t, c]) => `<span class="lv-chip"><i style="background:${c}"></i>${t}: ${n(k)}</span>`).join("") + `<span class="lv-chip">${list.length} student${list.length === 1 ? "" : "s"}</span>`;
+    if (!list.length) { grid.innerHTML = `<div class="lv-empty">No students yet. They appear when they type their name and class at the top of the lesson.</div>`; return; }
+    grid.innerHTML = st.map(([s, x]) => { const code = s.r || "", ok = (code.match(/1/g) || []).length, bad = (code.match(/2/g) || []).length;
+      return `<div class="lv-card" data-id="${esc(s.cls + "|" + s.name)}" style="border-left-color:${x[2]}"><div class="n">${esc(s.name)}<span>${esc(s.cls)}</span></div><div class="s" style="color:${x[2]}">● ${x[1]}</div><div class="m">${s.sec ? `On <b>${esc(s.sec)}</b>` : ""}${s.bu ? ` · Build it up ${esc(s.bu)}` : ""}</div><div class="m">${ok} right · ${bad} wrong · ${code.length - ok - bad} not tried</div><div class="lv-bar">${[...code].map((c) => `<i class="${c === "1" ? "k" : c === "2" ? "w" : ""}"></i>`).join("")}</div></div>`; }).join("");
+    grid.querySelectorAll(".lv-card").forEach((c) => (c.onclick = () => { picked = c.dataset.id; detail(); }));
+    detail();
+  }
+  function detail() {
+    const s = Object.values(data.students || {}).find((x) => x.cls + "|" + x.name === picked); if (!s) { det.hidden = true; return; }
+    const code = s.r || ""; det.hidden = false;
+    det.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><b style="font:800 18px var(--body)">${esc(s.name)} · ${esc(s.cls)}</b><button type="button" data-c style="font:800 14px var(--body);padding:4px 10px;border:2px solid var(--ink);border-radius:6px;background:#fff">Close</button></div><table><tr><th>Section</th><th>Question</th><th>So far</th></tr>${labels.map(([sec, lab], i) => `<tr><td>${esc(sec)}</td><td>${esc(lab)}</td><td class="${code[i] === "1" ? "ok" : code[i] === "2" ? "no" : ""}">${code[i] === "1" ? "✓ Correct" : code[i] === "2" ? "✗ Not right yet" : "Not tried"}</td></tr>`).join("")}</table>`;
+    det.querySelector("[data-c]").onclick = () => { picked = null; det.hidden = true; };
+  }
+  sel.onchange = draw;
+  ov.querySelector("[data-key]").onclick = () => askKey();
+  const close = () => { alive = false; clearTimeout(tm); ov.remove(); };
+  ov.querySelector("[data-x]").onclick = close; ov.addEventListener("click", (e) => { if (e.target === ov) close(); });
+  poll();
 }
 
 // ---------- mode switching ----------
@@ -3666,7 +4394,7 @@ document.getElementById("pickBtn").onclick = () => openPicker();
 namesBtnSync();
 setInterval(paceTick, 1000);
 a11yApply();
-document.getElementById("stage").addEventListener("click", (e) => { if (e.target.closest("button, input, canvas, .explorer, .ext, .kwcard, .kw-modal, .cloze")) return; step(1); });
+document.getElementById("stage").addEventListener("click", (e) => { if (e.target.closest("button, input, canvas, .explorer, .ext, .kwcard, .kw-modal, .cloze, .bu")) return; const sl = e.target.closest(".slide"); if (sl && sl.querySelector("[data-buildup]")) return; step(1); }); // tapping a Build it up slide never moves on: students draw and write on it
 window.addEventListener("resize", fit);
 if (STUDENT_ONLY) {
   document.querySelector(".modes").style.display = "none";
