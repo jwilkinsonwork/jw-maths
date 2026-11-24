@@ -1273,7 +1273,7 @@ const INK = (() => {
   // best few characters for one group
   function classify(g, H, allowed) {
     const w = g.b.x1 - g.b.x0, h = g.b.y1 - g.b.y0, big = Math.max(w, h);
-    if (big < 0.16 * H && allowed.includes(".")) return [{ ch: ".", d: 0 }];
+    if (big < 0.3 * H && allowed.includes(".")) return [{ ch: ".", d: 0 }];
     const pts = prep(g.strokes), best = {};
     for (const t of LIB) { if (!allowed.includes(t.ch)) continue; const d = match(pts, t.pts); if (!(t.ch in best) || d < best[t.ch]) best[t.ch] = d; }
     let out = Object.entries(best).map(([ch, d]) => ({ ch, d }));
@@ -1294,8 +1294,10 @@ const INK = (() => {
   }
   function readLocal(strokes, H, mode) {
     const allowed = mode === "eq" ? "0123456789-/.x+" : "0123456789-/.";
-    const groups = segment(strokes, H); if (!groups.length) return null;
-    return decode(groups.map((g) => classify(g, H, allowed)), mode);
+    let groups = segment(strokes, H); if (!groups.length) return null;
+    // measure against the tallest character, so small or large handwriting both work
+    const tall = Math.max(...groups.map((g) => g.b.y1 - g.b.y0), 1);
+    return decode(groups.map((g) => classify(g, groups.length > 1 ? tall : 0, allowed)), mode);
   }
   // Chromebooks: the built-in handwriting recogniser (on the device, nothing is sent anywhere)
   let native = null;
@@ -1315,12 +1317,12 @@ const INK = (() => {
 
   function inkBox({ mode = "num", onRead, width = 300, height = 96 }) {
     const el = document.createElement("div"); el.className = "ink";
-    el.innerHTML = `<div class="ink-pad"><canvas></canvas><span class="ink-ph">write here</span></div><div class="ink-side"><button type="button" class="ink-clear">Clear</button></div><div class="ink-read"></div>`;
+    el.innerHTML = `<div class="ink-pad"><canvas></canvas><span class="ink-ph">write your answer here…</span></div><div class="ink-side"><button type="button" class="ink-clear">Clear</button></div><div class="ink-read"></div>`;
     const cv = el.querySelector("canvas"), ctx = cv.getContext("2d"), pad = el.querySelector(".ink-pad"), read = el.querySelector(".ink-read");
     let strokes = [], cur = null, timer = null, W = width, H = height;
     function size() { W = pad.clientWidth || width; H = pad.clientHeight || height; const k = window.devicePixelRatio || 1; cv.width = W * k; cv.height = H * k; cv.style.width = W + "px"; cv.style.height = H + "px"; ctx.setTransform(k, 0, 0, k, 0, 0); draw(); }
-    function draw() { ctx.clearRect(0, 0, W, H); ctx.strokeStyle = "#D6DCEA"; ctx.lineWidth = 1; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(8, H * 0.82); ctx.lineTo(W - 8, H * 0.82); ctx.stroke(); ctx.setLineDash([]);
-      ctx.strokeStyle = "#23264A"; ctx.lineWidth = 3.2; ctx.lineCap = ctx.lineJoin = "round";
+    function draw() { ctx.clearRect(0, 0, W, H);
+      ctx.strokeStyle = "#1D2C7A"; ctx.lineWidth = 2.8; ctx.lineCap = ctx.lineJoin = "round";
       for (const s of strokes) { ctx.beginPath(); s.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); if (s.length === 1) ctx.lineTo(s[0][0] + 0.1, s[0][1]); ctx.stroke(); } }
     const pos = (e) => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * (W / (r.width || W)), (e.clientY - r.top) * (H / (r.height || H)), Date.now()]; };
     cv.addEventListener("pointerdown", (e) => { e.preventDefault(); if (!cv.width) size(); cv.setPointerCapture(e.pointerId); cur = [pos(e)]; strokes.push(cur); clearTimeout(timer); el.classList.add("inked"); read.innerHTML = ""; draw(); });
@@ -1376,9 +1378,12 @@ const INK = (() => {
 .bu-in button.bu-type { flex-basis: 100%; text-align: left; background: none; border: 0; color: var(--ink2); padding: 0 0 0 40px; font: 700 14px var(--body); text-decoration: underline; }
 .bu-inkslot.wide { flex-basis: 420px; max-width: 560px; }
 .ink { display: grid; grid-template-columns: 1fr auto; gap: 6px 8px; align-items: start; width: 100%; }
-.ink-pad { position: relative; height: 96px; border: 2px solid var(--ink); border-radius: 8px; background: #fff; touch-action: none; }
+.ink-pad { position: relative; height: 112px; border-radius: 3px; touch-action: none; overflow: hidden;
+  background: linear-gradient(90deg, transparent 38px, #E79A9A 38px, #E79A9A 39.5px, transparent 39.5px, transparent 42px, #E79A9A 42px, #E79A9A 43.5px, transparent 43.5px), repeating-linear-gradient(180deg, transparent 0 36px, #A8C6E8 36px 37.5px), #FFFEF5;
+  box-shadow: 0 1px 0 #E6E1CF, 0 3px 0 #FBF8EC, 0 4px 0 #E6E1CF, 0 6px 0 #F8F4E6, 0 7px 0 #E2DCC7, 2px 9px 14px rgba(35,38,74,.18); border: 1px solid #DCD6C2; }
+.ink-pad::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 7px; background: linear-gradient(#C9C2AC, #E9E4D3); opacity: .55; pointer-events: none; }
 .ink-pad canvas { position: absolute; inset: 0; touch-action: none; cursor: crosshair; display: block; }
-.ink-ph { position: absolute; left: 12px; top: 8px; font: 600 14px var(--body); color: #AEB6C8; pointer-events: none; }
+.ink-ph { position: absolute; left: 54px; top: 46px; font: 400 21px var(--hand); color: #B9C0CF; pointer-events: none; }
 .ink.inked .ink-ph { display: none; }
 .ink-side { display: flex; flex-direction: column; gap: 6px; }
 .ink-side button, .ink-read button, .bu-type { font: 800 14px var(--body); padding: 5px 10px; border-radius: 6px; border: 2px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; }
