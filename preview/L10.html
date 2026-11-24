@@ -1217,6 +1217,14 @@ const INK = (() => {
     "xc": [[[0,10],[25,0],[50,50],[75,100],[100,90]],[[100,10],[50,50],[0,90]]],
     "+": [[[0,50],[100,50]],[[50,0],[50,100]]],
     "=": [[[0,30],[100,30]],[[0,70],[100,70]]],
+    "÷": [[[47,6],[53,12]],[[0,50],[100,50]],[[47,88],[53,94]]],
+    "÷d": [[[50,8],[50,10]],[[0,50],[100,50]],[[50,90],[50,92]]],
+    "y": [[[10,0],[50,55]],[[90,0],[30,100]]],
+    "yc": [[[10,5],[22,45],[45,55],[75,42],[85,5],[82,60],[65,95],[35,100],[20,88]]],
+    "yv": [[[10,0],[50,50],[90,0],[55,70],[30,100]]],
+    "m": [[[0,25],[0,100],[0,40],[12,15],[28,12],[42,28],[46,100],[46,40],[58,15],[76,12],[90,28],[94,100]]],
+    "m2": [[[0,15],[0,100]],[[0,40],[12,15],[28,12],[42,28],[46,100],[46,40],[58,15],[76,12],[90,28],[94,100]]],
+    "c": [[[85,15],[60,0],[30,5],[10,30],[8,60],[25,90],[55,100],[85,85]]],
   };
   const N = 32;
   const len = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -1252,7 +1260,8 @@ const INK = (() => {
     const ch = k[0];
     for (const sh of [-0.18, 0, 0.18]) for (const sx of [0.8, 1, 1.2]) {
       if (ch === "-" || ch === "=" ) { if (sh) continue; }
-      LIB.push({ ch, pts: prep(strokes.map((s) => s.map(([x, y]) => [x * sx + sh * (100 - y), y]))) });
+      const pts = prep(strokes.map((s) => s.map(([x, y]) => [x * sx + sh * (100 - y), y])));
+      LIB.push({ ch, pts }); if (ch === "x") LIB.push({ ch: "×", pts });
     }
   }
   // group strokes into characters by how much they overlap left to right
@@ -1264,7 +1273,8 @@ const INK = (() => {
       const g = groups[groups.length - 1];
       if (g) { const ov = Math.min(g.b.x1, it.b.x1) - Math.max(g.b.x0, it.b.x0), w = Math.min(g.b.x1 - g.b.x0, it.b.x1 - it.b.x0) || 1;
         // a stroke joins the character before it when they overlap enough (e.g. the two lines of =, + or 4)
-        if (ov > 0.35 * w || (ov > -0.04 * H && (it.b.x1 - it.b.x0 < 0.12 * H || g.b.x1 - g.b.x0 < 0.12 * H) && Math.abs((it.b.y0 + it.b.y1) / 2 - (g.b.y0 + g.b.y1) / 2) > 0.18 * H && ov > 0)) {
+        const cx = (it.b.x0 + it.b.x1) / 2, small = Math.max(it.b.x1 - it.b.x0, it.b.y1 - it.b.y0) < 0.2 * H;
+        if (ov > 0.35 * w || (small && cx >= g.b.x0 && cx <= g.b.x1) || (ov > -0.04 * H && (it.b.x1 - it.b.x0 < 0.12 * H || g.b.x1 - g.b.x0 < 0.12 * H) && Math.abs((it.b.y0 + it.b.y1) / 2 - (g.b.y0 + g.b.y1) / 2) > 0.18 * H && ov > 0)) {
           g.strokes.push(it.s); g.b = { x0: Math.min(g.b.x0, it.b.x0), x1: Math.max(g.b.x1, it.b.x1), y0: Math.min(g.b.y0, it.b.y0), y1: Math.max(g.b.y1, it.b.y1) }; continue; } }
       groups.push({ strokes: [it.s], b: { ...it.b } });
     }
@@ -1279,21 +1289,26 @@ const INK = (() => {
     let out = Object.entries(best).map(([ch, d]) => ({ ch, d }));
     // stroke-count and shape clues the point cloud can miss
     const ns = g.strokes.length, flat = h < 0.3 * w;
-    out.forEach((o) => { if (o.ch === "-" && !flat) o.d += 2; if (o.ch === "=" && (ns < 2 || !flat)) o.d += 2; if ((o.ch === "+" || o.ch === "x") && ns < 2) o.d += 1.5; if (flat && o.ch !== "-" && o.ch !== "=") o.d += 2; if (o.ch === "1" && w > 0.4 * h) o.d += 0.15 + (w / h - 0.4) * 0.5; if (o.ch === "/" && w < 0.18 * h) o.d += 0.1; });
-    return out.sort((a, b) => a.d - b.d).slice(0, 4);
+    const sb = g.strokes.map((st) => { let a = Infinity, b = -Infinity, c = Infinity, d = -Infinity; for (const [x, y] of st) { a = Math.min(a, x); b = Math.max(b, x); c = Math.min(c, y); d = Math.max(d, y); } return { w: b - a, h: d - c }; });
+    const flatS = sb.map((q) => q.h < 0.35 * q.w && q.w > 0.25 * w), allFlat = flatS.every(Boolean), dotty = sb.filter((q) => Math.max(q.w, q.h) < 0.25 * Math.max(w, h)).length;
+    const eqLike = ns === 2 && allFlat, divLike = ns === 3 && flatS.filter(Boolean).length === 1 && dotty === 2;
+    out.forEach((o) => { if (o.ch === "-" && !(ns === 1 && flat)) o.d += 2; if (o.ch === "=" && !eqLike) o.d += 2; if (o.ch === "=" && eqLike) o.d -= 0.3; if ((o.ch === "+" || o.ch === "x" || o.ch === "×") && ns < 2) o.d += 1.5; if ((ns === 1 && flat || eqLike) && o.ch !== "-" && o.ch !== "=") o.d += 2;
+      if (o.ch === "÷") o.d += divLike ? -0.3 : 2; if (divLike && o.ch !== "÷") o.d += 2; if (o.ch === "1" && w > 0.4 * h) o.d += 0.15 + (w / h - 0.4) * 0.5; if (o.ch === "/" && w < 0.18 * h) o.d += 0.1; if (o.ch === "÷" && ns !== 3) o.d += 2; if (ns === 3 && o.ch !== "÷") o.d += 0.4; });
+    return out.sort((a, b) => a.d - b.d).slice(0, 5);
   }
   // choose the reading that is a sensible answer: −3, 1/2, 0.5, 2x + 1, −x − 4 ...
-  const OK = { num: /^-?(\d+(\.\d+)?|\.\d+)(\/\d+)?$/, eq: /^-?(\d*(\/\d+)?x)?([+-]\d+(\/\d+)?)?$|^-?\d+(\/\d+)?$/ };
+  const NUM = "-?(\\d+(\\.\\d+)?|\\.\\d+)", EXPR = `${NUM}([/÷×]${NUM})?`;
+  const OK = { num: new RegExp(`^([mc]=)?${EXPR}(=${EXPR})*$`), eq: /^(y=)?(-?(\d*(\/\d+)?x)?([+-]\d+(\/\d+)?)?|-?\d+(\/\d+)?)$/ };
   function decode(cands, mode) {
     let beam = [{ s: "", d: 0 }];
-    for (const c of cands) { const nb = []; for (const b of beam) for (const o of c) nb.push({ s: b.s + o.ch, d: b.d + o.d }); nb.sort((a, b) => a.d - b.d); beam = nb.slice(0, 60); }
+    for (const c of cands) { const nb = []; for (const b of beam) for (const o of c) nb.push({ s: b.s + o.ch, d: b.d + o.d }); nb.sort((a, b) => a.d - b.d); beam = nb.slice(0, 200); }
     // answers in these lessons are small numbers and simple fractions, so prefer readings like 2/3 over 213
     const odd = (t) => { let p = 0; for (const m of t.matchAll(/\d+/g)) if (+m[0] > 20) p += 0.25; for (const m of t.matchAll(/\/(\d+)/g)) if (+m[1] < 2) p += 0.25; return p; };
     const good = beam.filter((b) => OK[mode].test(b.s) && b.s.length > 0).map((b) => ({ s: b.s, d: b.d + odd(b.s) })).sort((a, b) => a.d - b.d)[0];
     return good ? good.s : null;
   }
   function readLocal(strokes, H, mode) {
-    const allowed = mode === "eq" ? "0123456789-/.x+" : "0123456789-/.";
+    const allowed = mode === "eq" ? "0123456789-/.x+=y" : "0123456789-/.=÷×mc";
     let groups = segment(strokes, H); if (!groups.length) return null;
     // measure against the tallest character, so small or large handwriting both work
     const tall = Math.max(...groups.map((g) => g.b.y1 - g.b.y0), 1);
@@ -1302,22 +1317,23 @@ const INK = (() => {
   // Chromebooks: the built-in handwriting recogniser (on the device, nothing is sent anywhere)
   let native = null;
   const nativeReady = (async () => { try { if (!("createHandwritingRecognizer" in navigator)) return null; native = await navigator.createHandwritingRecognizer({ languages: ["en"] }); return native; } catch (e) { return null; } })();
-  const clean = (t) => String(t || "").replace(/\s+/g, "").replace(/[−–—_]/g, "-").replace(/[×X]/g, "x").replace(/[oO]/g, "0").replace(/[lI|]/g, "1").replace(/[sS]/g, "5").replace(/÷/g, "/").replace(/^y=/, "");
+  const clean = (t, mode) => { t = String(t || "").replace(/\s+/g, "").replace(/[−–—_]/g, "-").replace(/[oO]/g, "0").replace(/[lI|]/g, "1").replace(/[sS]/g, "5").replace(/:/g, "÷");
+    return mode === "eq" ? t.replace(/[×X]/g, "x").replace(/÷/g, "/").replace(/Y/g, "y") : t.replace(/[xX]/g, "×").replace(/M/g, "m").replace(/C/g, "c"); };
   async function readNative(strokes, mode) {
     const r = await nativeReady; if (!r) return null;
     try {
-      const d = r.startDrawing({ recognitionType: "text", alternatives: 5, graphemeSet: (mode === "eq" ? "0123456789-/.x+" : "0123456789-/.").split("") });
+      const d = r.startDrawing({ recognitionType: "text", alternatives: 5, graphemeSet: (mode === "eq" ? "0123456789-/.x+=y" : "0123456789-/.=÷×mc").split("") });
       for (const s of strokes) { const st = new HandwritingStroke(); s.forEach(([x, y, t]) => st.addPoint({ x, y, t })); d.addStroke(st); }
       const preds = await d.getPrediction(); d.clear && d.clear();
-      for (const p of preds || []) { const t = clean(p.text); if (OK[mode].test(t)) return t; }
+      for (const p of preds || []) { const t = clean(p.text, mode); if (OK[mode].test(t)) return t; }
     } catch (e) { /* fall back to the built-in reader */ }
     return null;
   }
-  const show = (t) => t.replace(/-/g, "−").replace(/(\d)x/g, "$1x").replace(/([^\s])([+−])/g, "$1 $2 ").replace(/^−\s/, "−");
+  const show = (t) => t.replace(/-/g, "−").replace(/([^\s=÷×/])([+−])/g, "$1 $2 ").replace(/=/g, " = ").replace(/([÷×])/g, " $1 ").replace(/\s+/g, " ").trim();
 
   function inkBox({ mode = "num", onRead, width = 300, height = 96 }) {
     const el = document.createElement("div"); el.className = "ink";
-    el.innerHTML = `<div class="ink-pad"><canvas></canvas><span class="ink-ph">write your answer here…</span></div><div class="ink-side"><button type="button" class="ink-clear">Clear</button></div><div class="ink-read"></div>`;
+    el.innerHTML = `<div class="ink-pad"><canvas></canvas><span class="ink-ph">write your answer here…</span></div><div class="ink-side"><button type="button" class="ink-undo">↶ Undo</button><button type="button" class="ink-clear">Clear</button></div><div class="ink-read"></div>`;
     const cv = el.querySelector("canvas"), ctx = cv.getContext("2d"), pad = el.querySelector(".ink-pad"), read = el.querySelector(".ink-read");
     let strokes = [], cur = null, timer = null, W = width, H = height;
     function size() { W = pad.clientWidth || width; H = pad.clientHeight || height; const k = window.devicePixelRatio || 1; cv.width = W * k; cv.height = H * k; cv.style.width = W + "px"; cv.style.height = H + "px"; ctx.setTransform(k, 0, 0, k, 0, 0); draw(); }
@@ -1334,6 +1350,7 @@ const INK = (() => {
       const got = (await readNative(strokes, mode)) || readLocal(strokes, H, mode);
       onRead(got ? show(got) : null, got);
     }
+    el.querySelector(".ink-undo").onclick = () => { strokes.pop(); draw(); read.innerHTML = ""; clearTimeout(timer); if (strokes.length) timer = setTimeout(recognise, 300); else { el.classList.remove("inked"); onRead(undefined); } };
     el.querySelector(".ink-clear").onclick = () => { strokes = []; el.classList.remove("inked"); read.innerHTML = ""; draw(); onRead(undefined); };
     requestAnimationFrame(size); if (window.ResizeObserver) new ResizeObserver(() => size()).observe(pad); else window.addEventListener("resize", () => { if (el.isConnected) size(); });
     return { el, read, clear: () => el.querySelector(".ink-clear").click(), strokes: () => strokes, _recognise: recognise };
@@ -1371,6 +1388,7 @@ const INK = (() => {
       }
     }
     api.clearLine = (i) => { strokes = strokes.filter((s) => s.line !== i); api.readings[i] = null; mark(i, null); got(i, ""); draw(); };
+    api.undo = () => { for (let i = strokes.length - 1; i >= 0; i--) { const s = strokes[i]; if (api.locked[s.line]) continue; strokes.splice(i, 1); const left = strokes.some((t) => t.line === s.line); api.readings[s.line] = left ? "…" : null; mark(s.line, null); got(s.line, ""); draw(); clearTimeout(timer); if (left) timer = setTimeout(recognise, 300); return; } };
     api.clear = () => { for (let i = 0; i < n; i++) if (!api.locked[i]) api.clearLine(i); };
     api.mark = (i, ok) => { mark(i, ok); if (ok) { api.locked[i] = true; got(i, ""); draw(); } };
     api.pending = () => api.readings.some((r) => r === "…");
@@ -1634,10 +1652,14 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
     // { ok } or { ok: false, msg, form } (form = the answer isn't in a form we can mark)
     function judge(s, raw, kind) {
       if (kind === "num") {
-        const a = typeof s.ans === "function" ? s.ans(ctx) : s.ans;
-        const v = s.loneMinus && /^[-−–]$/.test(raw) ? -1 : parseNum(raw);
-        if (!isFinite(v)) return { ok: false, form: true, msg: "Type a number, like 3, −2 or 1/2." };
-        if (Math.abs(v - a) < 1e-6) return { ok: true };
+        const a = typeof s.ans === "function" ? s.ans(ctx) : s.ans, close = (v) => Math.abs(v - a) < 1e-6;
+        const val = (t) => { t = t.replace(/[−–]/g, "-"); if (s.loneMinus && t === "-") return -1; const m = t.match(/^(-?[\d.]+)([÷×:*])(-?[\d.]+)$/); if (m) { const p = parseNum(m[1]), q = parseNum(m[3]); return m[2] === "×" || m[2] === "*" ? p * q : p / q; } return parseNum(t); };
+        const parts = raw.replace(/\s+/g, "").replace(/^[a-z]+=/i, "").split("=").filter((t) => t !== ""), vals = parts.map(val);
+        if (!vals.length || vals.some((v) => !isFinite(v))) return { ok: false, form: true, msg: "Type a number, like 3, −2 or 1/2." };
+        const v = vals[vals.length - 1];
+        if (vals.every(close)) return { ok: true };
+        if (vals.length > 1 && close(v)) return { ok: false, msg: "Your answer is right, but part of your working doesn't equal it. Check each part." };
+        if (vals.length > 1 && vals.some(close)) return { ok: false, msg: "Your working is right. Check the last part." };
         return { ok: false, msg: (s.why && s.why(v, ctx)) || "Not yet. Look at the graph again." };
       }
       const t = /=/.test(raw) ? raw : "y=" + raw, L2 = parseLine(t);
@@ -1678,11 +1700,12 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
       }
       const P = INK.inkPage({ lines: s.lines.map((d) => ({ label: esc(d.pre), mode: d.kind })), lineH: big ? 46 : 56 });
       slot.innerHTML = ""; slot.appendChild(P.el);
-      slot.insertAdjacentHTML("beforeend", `<div class="pg-bar"><button type="button" class="go">✓ Mark my working</button><button type="button" class="rub">Rub out ✗</button><button type="button" class="clr">Clear page</button><button type="button" class="ty">⌨ Type instead</button></div>`);
+      slot.insertAdjacentHTML("beforeend", `<div class="pg-bar"><button type="button" class="go">✓ Mark my working</button><button type="button" class="undo">↶ Undo</button><button type="button" class="rub">Rub out ✗</button><button type="button" class="clr">Clear page</button><button type="button" class="ty">⌨ Type instead</button></div>`);
       slot.querySelector(".go").onclick = async () => {
         await P.flush();
         markAll((j) => { const rd = P.readings[j]; return !rd ? null : rd.raw ? rd : { raw: null }; }, (j, ok) => P.mark(j, ok));
       };
+      slot.querySelector(".undo").onclick = () => P.undo();
       slot.querySelector(".rub").onclick = () => s.lines.forEach((d, j) => { if (!d.ok) P.clearLine(j); });
       slot.querySelector(".clr").onclick = () => P.clear();
       slot.querySelector(".ty").onclick = () => {
@@ -1697,7 +1720,7 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
       const s = Q.steps[k]; rows[k].className = "bu-step done" + (s.kind === "tri" ? " tri" : "");
       const inp = rows[k].querySelector("input"); if (inp) inp.disabled = true;
       if (s.kind === "page") rows[k].querySelector(".bu-in").classList.add("pgdone");
-      if (s.kind === "page") rows[k].querySelector(".bu-in").innerHTML = `<div class="pg-sum">${s.lines.map((d) => `<span>${tex(d.pre)} ${esc(String(d.shown).replace(/-/g, "−"))} ✓</span>`).join("")}</div>`;
+      if (s.kind === "page") rows[k].querySelector(".bu-in").innerHTML = `<div class="pg-sum">${s.lines.map((d) => `<span>${tex(d.pre)} ${esc(String(d.shown).replace(/^\s*[a-z]+\s*=\s*/i, "").replace(/-/g, "−"))} ✓</span>`).join("")}</div>`;
       if (s.kind === "ink") rows[k].querySelector(".bu-in").innerHTML = `<label>${tex(s.pre || "")}</label><span class="bu-val">${esc(String(s.lastShown).replace(/-/g, "−"))}</span>`;
       fb(k, s.kind === "tri" ? "✓ Triangle drawn." : s.kind === "page" ? "✓ All your working is correct." : "✓ Correct.", "good");
       activate(k + 1);
@@ -4399,7 +4422,7 @@ const BUILDUP = (() => {
       remind: "<b>m = rise ÷ run</b>. The <b>run</b> is how far across the triangle goes (left to right). The <b>rise</b> is how far up (+) or down (−). Then divide: rise ÷ run.",
       make() { const Ln = line(FRAC); return { q: "Find c and the gradient m of line L.", line: Ln, steps: [S.c(Ln), S.tri(), S.mOnly()] }; } },
     { title: "The whole thing", sub: "On your own, in your own handwriting.",
-      make() { const Ln = line(FRAC, [-4, -3, -2, -1, 0, 1, 2, 3, 4]); return { q: "Find the equation of line L.", line: Ln, steps: [S.tri(), { kind: "page", label: "Write the run, the rise, m and the equation, then press <b>Mark my working</b>.", lines: [S.run(), S.rise(), S.m(), S.eq(Ln)] }] }; } },
+      make() { const Ln = line(ALL, [-4, -3, -2, -1, 0, 1, 2, 3, 4]); return { q: "Find the equation of line L.", line: Ln, steps: [S.tri(), { kind: "page", label: "Write the run, the rise, m and the equation, then press <b>Mark my working</b>.", lines: [S.run(), S.rise(), S.m(), S.eq(Ln)] }] }; } },
   ];
   return { 0: { title: "find the equation of a line from its graph", intro: "One step at a time. Each card adds one more step to the ones before. Finish a card to unlock the next, then slide on.", cards } };
 })();
