@@ -1184,6 +1184,161 @@ function objExit(i) {
   const g = L.exitAGraph && /grid|graph/i.test(q.q) ? `<div class="svgwrap obj-gw">${graph(L.exitAGraph, 300)}</div>` : "";
   return `<div class="objgoal"><div class="objgoal-h">By the end of the lesson you should be able to answer this (Exit ticket A, Q${i + 1}):</div><div class="objgoal-q">${tex(q.q)}</div>${g}</div>`;
 }
+// ---------- Handwritten answers: Chromebook recognition when available, otherwise a built-in reader ----------
+// inkBox({ chars, onRead(text), height }) returns { el, clear() }. Students write with a finger, stylus or mouse;
+// after a pause the box shows what it read so they can check it before it is marked.
+const INK = (() => {
+  // character templates in a 100 × 100 box (y down); several shapes per character
+  const T = {
+    "0": [[[50,0],[25,8],[10,35],[10,65],[25,92],[50,100],[75,92],[90,65],[90,35],[75,8],[50,0]]],
+    "1": [[[50,0],[50,100]]],
+    "1f": [[[28,22],[50,0],[50,100]]],
+    "1b": [[[28,22],[50,0],[50,100]],[[28,100],[72,100]]],
+    "2": [[[12,24],[28,5],[52,0],[76,8],[86,28],[78,50],[50,72],[12,100],[90,100]]],
+    "2c": [[[12,24],[28,5],[52,0],[76,8],[86,28],[78,50],[50,72],[18,95],[30,90],[60,95],[90,100]]],
+    "3": [[[12,12],[35,0],[65,0],[85,15],[82,35],[60,48],[42,50],[62,52],[86,65],[88,85],[68,100],[35,100],[10,88]]],
+    "3f": [[[12,0],[85,0],[45,45],[70,48],[88,68],[80,92],[50,100],[12,88]]],
+    "4": [[[62,0],[10,66],[92,66]],[[68,28],[68,100]]],
+    "4o": [[[15,0],[10,60],[88,60]],[[66,0],[66,100]]],
+    "4s": [[[66,100],[66,0],[10,66],[92,66]]],
+    "5": [[[80,0],[20,0],[15,45],[45,38],[75,45],[88,68],[78,92],[50,100],[15,90]]],
+    "5b": [[[20,0],[15,45],[45,38],[75,45],[88,68],[78,92],[50,100],[15,90]],[[20,0],[82,0]]],
+    "6": [[[75,5],[50,0],[25,15],[12,45],[12,75],[28,97],[55,100],[80,88],[85,68],[70,52],[45,50],[22,62],[13,75]]],
+    "7": [[[10,0],[90,0],[40,100]]],
+    "7x": [[[10,0],[90,0],[40,100]],[[32,52],[76,52]]],
+    "7h": [[[10,14],[12,0],[90,0],[40,100]]],
+    "8": [[[85,15],[65,0],[35,0],[15,15],[20,35],[50,50],[80,65],[85,85],[65,100],[35,100],[15,85],[20,65],[50,50],[80,35],[85,15]]],
+    "8o": [[[50,50],[25,40],[18,20],[32,2],[50,0],[68,2],[82,20],[75,40],[50,50],[22,62],[15,82],[30,100],[50,100],[70,100],[85,82],[78,62],[50,50]]],
+    "9": [[[85,25],[65,2],[40,0],[18,12],[14,32],[30,50],[58,52],[82,38],[85,25],[82,60],[70,100]]],
+    "9s": [[[85,25],[65,2],[40,0],[18,12],[14,32],[30,50],[58,52],[82,38],[85,25],[85,100]]],
+    "-": [[[0,50],[100,50]]],
+    "/": [[[22,100],[78,0]]],
+    "x": [[[0,0],[100,100]],[[100,0],[0,100]]],
+    "xc": [[[0,10],[25,0],[50,50],[75,100],[100,90]],[[100,10],[50,50],[0,90]]],
+    "+": [[[0,50],[100,50]],[[50,0],[50,100]]],
+    "=": [[[0,30],[100,30]],[[0,70],[100,70]]],
+  };
+  const N = 32;
+  const len = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  function resample(pts, n) {
+    const strokes = []; for (const p of pts) (strokes[p.id] || (strokes[p.id] = [])).push(p);
+    let L = 0; for (const s of strokes) if (s) for (let i = 1; i < s.length; i++) L += len(s[i - 1], s[i]);
+    const out = [];
+    if (L < 1e-6) { const p = pts[0]; for (let i = 0; i < n; i++) out.push({ x: p.x, y: p.y, id: p.id }); return out; }
+    const I = L / (n - 1); let D = 0;
+    for (const s0 of strokes) { if (!s0) continue; const s = s0.slice(); if (!out.length) out.push({ ...s[0] });
+      for (let i = 1; i < s.length; i++) { const d = len(s[i - 1], s[i]);
+        if (D + d >= I && d > 0) { const t = (I - D) / d, q = { x: s[i - 1].x + t * (s[i].x - s[i - 1].x), y: s[i - 1].y + t * (s[i].y - s[i - 1].y), id: s[i].id }; out.push(q); s.splice(i, 0, q); D = 0; }
+        else D += d; } }
+    while (out.length < n) out.push({ ...pts[pts.length - 1] });
+    return out.slice(0, n);
+  }
+  function normalise(pts) {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const p of pts) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); }
+    const s = Math.max(x1 - x0, y1 - y0) || 1; let cx = 0, cy = 0;
+    const q = pts.map((p) => ({ x: (p.x - x0) / s, y: (p.y - y0) / s, id: p.id })); q.forEach((p) => { cx += p.x; cy += p.y; }); cx /= q.length; cy /= q.length;
+    return q.map((p) => ({ x: p.x - cx, y: p.y - cy, id: p.id }));
+  }
+  const prep = (strokes) => normalise(resample(strokes.flatMap((s, id) => s.map(([x, y]) => ({ x, y, id }))), N));
+  function cloudDist(a, b, start) { const used = new Array(N).fill(false); let sum = 0, i = start;
+    do { let mi = -1, md = Infinity; for (let j = 0; j < N; j++) if (!used[j]) { const d = (a[i].x - b[j].x) ** 2 + (a[i].y - b[j].y) ** 2; if (d < md) { md = d; mi = j; } }
+      used[mi] = true; const w = 1 - ((i - start + N) % N) / N; sum += w * md; i = (i + 1) % N; } while (i !== start);
+    return sum; }
+  function match(a, b) { const step = Math.floor(Math.pow(N, 0.5)); let best = Infinity; for (let i = 0; i < N; i += step) best = Math.min(best, cloudDist(a, b, i), cloudDist(b, a, i)); return best; }
+  // the templates, plus slanted and stretched copies so different handwriting still matches
+  const LIB = [];
+  for (const [k, strokes] of Object.entries(T)) {
+    const ch = k[0];
+    for (const sh of [-0.18, 0, 0.18]) for (const sx of [0.8, 1, 1.2]) {
+      if (ch === "-" || ch === "=" ) { if (sh) continue; }
+      LIB.push({ ch, pts: prep(strokes.map((s) => s.map(([x, y]) => [x * sx + sh * (100 - y), y]))) });
+    }
+  }
+  // group strokes into characters by how much they overlap left to right
+  function segment(strokes, H) {
+    const box = (s) => { let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const [x, y] of s) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } return { x0, x1, y0, y1 }; };
+    const items = strokes.filter((s) => s.length).map((s) => ({ s, b: box(s) })).sort((a, b) => a.b.x0 - b.b.x0);
+    const groups = [];
+    for (const it of items) {
+      const g = groups[groups.length - 1];
+      if (g) { const ov = Math.min(g.b.x1, it.b.x1) - Math.max(g.b.x0, it.b.x0), w = Math.min(g.b.x1 - g.b.x0, it.b.x1 - it.b.x0) || 1;
+        // a stroke joins the character before it when they overlap enough (e.g. the two lines of =, + or 4)
+        if (ov > 0.35 * w || (ov > -0.04 * H && (it.b.x1 - it.b.x0 < 0.12 * H || g.b.x1 - g.b.x0 < 0.12 * H) && Math.abs((it.b.y0 + it.b.y1) / 2 - (g.b.y0 + g.b.y1) / 2) > 0.18 * H && ov > 0)) {
+          g.strokes.push(it.s); g.b = { x0: Math.min(g.b.x0, it.b.x0), x1: Math.max(g.b.x1, it.b.x1), y0: Math.min(g.b.y0, it.b.y0), y1: Math.max(g.b.y1, it.b.y1) }; continue; } }
+      groups.push({ strokes: [it.s], b: { ...it.b } });
+    }
+    return groups;
+  }
+  // best few characters for one group
+  function classify(g, H, allowed) {
+    const w = g.b.x1 - g.b.x0, h = g.b.y1 - g.b.y0, big = Math.max(w, h);
+    if (big < 0.16 * H && allowed.includes(".")) return [{ ch: ".", d: 0 }];
+    const pts = prep(g.strokes), best = {};
+    for (const t of LIB) { if (!allowed.includes(t.ch)) continue; const d = match(pts, t.pts); if (!(t.ch in best) || d < best[t.ch]) best[t.ch] = d; }
+    let out = Object.entries(best).map(([ch, d]) => ({ ch, d }));
+    // stroke-count and shape clues the point cloud can miss
+    const ns = g.strokes.length, flat = h < 0.3 * w;
+    out.forEach((o) => { if (o.ch === "-" && !flat) o.d += 2; if (o.ch === "=" && (ns < 2 || !flat)) o.d += 2; if ((o.ch === "+" || o.ch === "x") && ns < 2) o.d += 1.5; if (flat && o.ch !== "-" && o.ch !== "=") o.d += 2; if (o.ch === "1" && w > 0.4 * h) o.d += 0.15 + (w / h - 0.4) * 0.5; if (o.ch === "/" && w < 0.18 * h) o.d += 0.1; });
+    return out.sort((a, b) => a.d - b.d).slice(0, 4);
+  }
+  // choose the reading that is a sensible answer: −3, 1/2, 0.5, 2x + 1, −x − 4 ...
+  const OK = { num: /^-?(\d+(\.\d+)?|\.\d+)(\/\d+)?$/, eq: /^-?(\d*(\/\d+)?x)?([+-]\d+(\/\d+)?)?$|^-?\d+(\/\d+)?$/ };
+  function decode(cands, mode) {
+    let beam = [{ s: "", d: 0 }];
+    for (const c of cands) { const nb = []; for (const b of beam) for (const o of c) nb.push({ s: b.s + o.ch, d: b.d + o.d }); nb.sort((a, b) => a.d - b.d); beam = nb.slice(0, 60); }
+    // answers in these lessons are small numbers and simple fractions, so prefer readings like 2/3 over 213
+    const odd = (t) => { let p = 0; for (const m of t.matchAll(/\d+/g)) if (+m[0] > 20) p += 0.25; for (const m of t.matchAll(/\/(\d+)/g)) if (+m[1] < 2) p += 0.25; return p; };
+    const good = beam.filter((b) => OK[mode].test(b.s) && b.s.length > 0).map((b) => ({ s: b.s, d: b.d + odd(b.s) })).sort((a, b) => a.d - b.d)[0];
+    return good ? good.s : null;
+  }
+  function readLocal(strokes, H, mode) {
+    const allowed = mode === "eq" ? "0123456789-/.x+" : "0123456789-/.";
+    const groups = segment(strokes, H); if (!groups.length) return null;
+    return decode(groups.map((g) => classify(g, H, allowed)), mode);
+  }
+  // Chromebooks: the built-in handwriting recogniser (on the device, nothing is sent anywhere)
+  let native = null;
+  const nativeReady = (async () => { try { if (!("createHandwritingRecognizer" in navigator)) return null; native = await navigator.createHandwritingRecognizer({ languages: ["en"] }); return native; } catch (e) { return null; } })();
+  const clean = (t) => String(t || "").replace(/\s+/g, "").replace(/[−–—_]/g, "-").replace(/[×X]/g, "x").replace(/[oO]/g, "0").replace(/[lI|]/g, "1").replace(/[sS]/g, "5").replace(/÷/g, "/").replace(/^y=/, "");
+  async function readNative(strokes, mode) {
+    const r = await nativeReady; if (!r) return null;
+    try {
+      const d = r.startDrawing({ recognitionType: "text", alternatives: 5, graphemeSet: (mode === "eq" ? "0123456789-/.x+" : "0123456789-/.").split("") });
+      for (const s of strokes) { const st = new HandwritingStroke(); s.forEach(([x, y, t]) => st.addPoint({ x, y, t })); d.addStroke(st); }
+      const preds = await d.getPrediction(); d.clear && d.clear();
+      for (const p of preds || []) { const t = clean(p.text); if (OK[mode].test(t)) return t; }
+    } catch (e) { /* fall back to the built-in reader */ }
+    return null;
+  }
+  const show = (t) => t.replace(/-/g, "−").replace(/(\d)x/g, "$1x").replace(/([^\s])([+−])/g, "$1 $2 ").replace(/^−\s/, "−");
+
+  function inkBox({ mode = "num", onRead, width = 300, height = 96 }) {
+    const el = document.createElement("div"); el.className = "ink";
+    el.innerHTML = `<div class="ink-pad"><canvas></canvas><span class="ink-ph">write here</span></div><div class="ink-side"><button type="button" class="ink-clear">Clear</button></div><div class="ink-read"></div>`;
+    const cv = el.querySelector("canvas"), ctx = cv.getContext("2d"), pad = el.querySelector(".ink-pad"), read = el.querySelector(".ink-read");
+    let strokes = [], cur = null, timer = null, W = width, H = height;
+    function size() { W = pad.clientWidth || width; H = pad.clientHeight || height; const k = window.devicePixelRatio || 1; cv.width = W * k; cv.height = H * k; cv.style.width = W + "px"; cv.style.height = H + "px"; ctx.setTransform(k, 0, 0, k, 0, 0); draw(); }
+    function draw() { ctx.clearRect(0, 0, W, H); ctx.strokeStyle = "#D6DCEA"; ctx.lineWidth = 1; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(8, H * 0.82); ctx.lineTo(W - 8, H * 0.82); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = "#23264A"; ctx.lineWidth = 3.2; ctx.lineCap = ctx.lineJoin = "round";
+      for (const s of strokes) { ctx.beginPath(); s.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); if (s.length === 1) ctx.lineTo(s[0][0] + 0.1, s[0][1]); ctx.stroke(); } }
+    const pos = (e) => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * (W / (r.width || W)), (e.clientY - r.top) * (H / (r.height || H)), Date.now()]; };
+    cv.addEventListener("pointerdown", (e) => { e.preventDefault(); if (!cv.width) size(); cv.setPointerCapture(e.pointerId); cur = [pos(e)]; strokes.push(cur); clearTimeout(timer); el.classList.add("inked"); read.innerHTML = ""; draw(); });
+    cv.addEventListener("pointermove", (e) => { if (!cur) return; const p = pos(e), l = cur[cur.length - 1]; if (Math.hypot(p[0] - l[0], p[1] - l[1]) > 1.5) { cur.push(p); draw(); } });
+    const end = () => { if (!cur) return; cur = null; clearTimeout(timer); timer = setTimeout(recognise, 850); };
+    cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+    async function recognise() {
+      if (!strokes.length) return;
+      const got = (await readNative(strokes, mode)) || readLocal(strokes, H, mode);
+      onRead(got ? show(got) : null, got);
+    }
+    el.querySelector(".ink-clear").onclick = () => { strokes = []; el.classList.remove("inked"); read.innerHTML = ""; draw(); onRead(undefined); };
+    requestAnimationFrame(size); if (window.ResizeObserver) new ResizeObserver(() => size()).observe(pad); else window.addEventListener("resize", () => { if (el.isConnected) size(); });
+    return { el, read, clear: () => el.querySelector(".ink-clear").click(), strokes: () => strokes, _recognise: recognise };
+  }
+  return { inkBox, readLocal, T };
+})();
+
 // ---------- Build it up: a step-by-step carousel before the first I do / We do ----------
 // A lesson defines BUILDUP[partIndex] = { title, intro, cards: [{ title, sub, make() }] }.
 // make() returns { q, line: { m, c }, tri: [p, q] | null, free: bool, steps: [...] }.
@@ -1215,6 +1370,24 @@ function objExit(i) {
 .bu-svg { width: 100%; height: auto; display: block; touch-action: none; user-select: none; -webkit-user-select: none; }
 .bu-side { flex: 1; display: flex; flex-direction: column; gap: 7px; min-width: 0; }
 .bu-q { font: 800 20px/1.3 var(--body); }
+.bu-inkslot { flex: 1 1 300px; min-width: 220px; max-width: 440px; }
+.bu-in .ink button { background: #fff; color: var(--ink); border: 2px solid var(--ink); }
+.bu-in .ink .ink-read button.go { background: var(--ink); color: #fff; }
+.bu-in button.bu-type { flex-basis: 100%; text-align: left; background: none; border: 0; color: var(--ink2); padding: 0 0 0 40px; font: 700 14px var(--body); text-decoration: underline; }
+.bu-inkslot.wide { flex-basis: 420px; max-width: 560px; }
+.ink { display: grid; grid-template-columns: 1fr auto; gap: 6px 8px; align-items: start; width: 100%; }
+.ink-pad { position: relative; height: 96px; border: 2px solid var(--ink); border-radius: 8px; background: #fff; touch-action: none; }
+.ink-pad canvas { position: absolute; inset: 0; touch-action: none; cursor: crosshair; display: block; }
+.ink-ph { position: absolute; left: 12px; top: 8px; font: 600 14px var(--body); color: #AEB6C8; pointer-events: none; }
+.ink.inked .ink-ph { display: none; }
+.ink-side { display: flex; flex-direction: column; gap: 6px; }
+.ink-side button, .ink-read button, .bu-type { font: 800 14px var(--body); padding: 5px 10px; border-radius: 6px; border: 2px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; }
+.ink-read { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font: 700 16px var(--body); }
+.ink-read:empty { display: none; }
+.ink-read b { font: 800 22px var(--body); padding: 0 8px; background: #F1F5FF; border-radius: 6px; }
+.ink-read button.go { background: var(--ink); color: #fff; }
+.bu-type { border: 0; background: none; text-decoration: underline; padding: 2px 0; color: var(--ink2); font-weight: 700; }
+.bu-val { font: 800 20px var(--body); color: var(--green); }
 .bu-remind { font-size: 16px; line-height: 1.35; background: #FFF6DA; border: 2px solid var(--yellow); border-radius: 8px; padding: 6px 10px; }
 .bu-rtag { color: var(--amber); font-weight: 800; margin-right: 4px; }
 .bu.big .bu-remind { font-size: 18px; }
@@ -1347,12 +1520,26 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
     const box = c.el.querySelector(".bu-steps"), rows = [];
     Q.steps.forEach((s, k) => {
       const r = document.createElement("div"); r.className = "bu-step locked";
-      const input = s.kind === "tri" ? "" : `<label>${tex(s.pre || "")}</label><input type="text" class="${s.kind === "eq" ? "eq" : ""}" autocomplete="off" spellcheck="false" inputmode="text" aria-label="${esc((s.pre || "answer").replace("=", "").trim())}"><button type="button">Check</button><span class="bu-tries"></span>`;
+      const input = s.kind === "tri" ? "" : s.kind === "ink" ? `<label>${tex(s.pre || "")}</label><div class="bu-inkslot${s.as === "eq" ? " wide" : ""}"></div>` : `<label>${tex(s.pre || "")}</label><input type="text" class="${s.kind === "eq" ? "eq" : ""}" autocomplete="off" spellcheck="false" inputmode="text" aria-label="${esc((s.pre || "answer").replace("=", "").trim())}"><button type="button">Check</button><span class="bu-tries"></span>`;
       if (s.kind === "tri") r.classList.add("tri");
       r.innerHTML = `<span class="bu-sn">${k + 1}</span><span class="bu-lab">${s.label}</span><div class="bu-in">${input}</div><div class="bu-fb"></div>`;
       box.appendChild(r); rows.push(r);
       s.wrong = 0;
-      if (s.kind !== "tri") { const inp = r.querySelector("input"); r.querySelector("button").onclick = () => check(k); inp.addEventListener("keydown", (e) => { if (e.key === "Enter") check(k); }); }
+      if (s.kind === "ink") {
+        const slot = r.querySelector(".bu-inkslot");
+        const box = INK.inkBox({ mode: s.as, onRead: (shown, raw) => {
+          if (shown === undefined) return;
+          if (!raw) { box.read.innerHTML = `I can't read that yet. Press Clear and write it again, a bit bigger.`; return; }
+          box.read.innerHTML = `I read: <b>${esc(shown)}</b><button type="button" class="go">✓ Mark it</button><span class="small muted">Not what you wrote? Press Clear.</span>`;
+          box.read.querySelector(".go").onclick = () => check(k, raw, shown);
+        } });
+        slot.appendChild(box.el);
+        const ty = document.createElement("button"); ty.type = "button"; ty.className = "bu-type"; ty.textContent = "⌨ Type instead";
+        ty.onclick = () => { slot.innerHTML = `<input type="text" class="${s.as === "eq" ? "eq" : ""}" autocomplete="off" spellcheck="false" aria-label="${esc((s.pre || "answer").replace("=", "").trim())}"><button type="button">Check</button>`; const inp = slot.querySelector("input"); slot.querySelector("button").onclick = () => check(k); inp.addEventListener("keydown", (e) => { if (e.key === "Enter") check(k); }); inp.focus(); ty.remove(); };
+        r.querySelector(".bu-in").appendChild(ty);
+        r.querySelector(".bu-in").insertAdjacentHTML("beforeend", `<span class="bu-tries"></span>`);
+      }
+      if (s.kind !== "tri" && s.kind !== "ink") { const inp = r.querySelector("input"); r.querySelector("button").onclick = () => check(k); inp.addEventListener("keydown", (e) => { if (e.key === "Enter") check(k); }); }
     });
     const fb = (k, html, cls) => { const f = rows[k].querySelector(".bu-fb"); f.className = "bu-fb " + (cls || ""); f.innerHTML = html; };
     function wrong(k, msg) {
@@ -1375,19 +1562,20 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
           if (p.x === first.x) return fb(k, "Pick a different point on the line.", "bad");
           G.drawTri(first, p); G.pick = null; G.setPicking(false); G.rings(false); done(k);
         };
-      } else if (k > 0) { const inp = rows[k].querySelector("input"); setTimeout(() => inp.focus({ preventScroll: true }), 50); }
+      } else if (k > 0) { const inp = rows[k].querySelector("input"); if (inp) setTimeout(() => inp.focus({ preventScroll: true }), 50); }
     }
-    function check(k) {
-      const s = Q.steps[k], inp = rows[k].querySelector("input"), raw = inp.value.trim();
+    function check(k, written, shown) {
+      const s = Q.steps[k], inp = rows[k].querySelector("input"), raw = written !== undefined ? written : inp ? inp.value.trim() : "", kind = s.kind === "ink" ? s.as : s.kind;
       if (!raw) return fb(k, "Type your answer first.", "bad");
-      if (s.kind === "num") {
+      s.lastShown = shown || raw;
+      if (kind === "num") {
         const a = typeof s.ans === "function" ? s.ans(ctx) : s.ans;
         let v = s.loneMinus && /^[-−–]$/.test(raw) ? -1 : parseNum(raw);
         if (!isFinite(v)) return fb(k, "Type a number, like 3, −2 or 1/2.", "bad");
         if (Math.abs(v - a) < 1e-6) return done(k);
         return wrong(k, s.why && s.why(v, ctx));
       }
-      if (s.kind === "eq") {
+      if (kind === "eq") {
         const t = /=/.test(raw) ? raw : "y=" + raw, L2 = parseLine(t);
         if (L2.error || Math.abs(L2.B) < 1e-12) return fb(k, "Write it like y = 2x + 1.", "bad");
         const m2 = -L2.A / L2.B, c2 = L2.C / L2.B, mOK = Math.abs(m2 - s.m) < 1e-6, cOK = Math.abs(c2 - s.c) < 1e-6;
@@ -1399,6 +1587,7 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
     function done(k) {
       const s = Q.steps[k]; rows[k].className = "bu-step done" + (s.kind === "tri" ? " tri" : "");
       const inp = rows[k].querySelector("input"); if (inp) inp.disabled = true;
+      if (s.kind === "ink") rows[k].querySelector(".bu-in").innerHTML = `<label>${tex(s.pre || "")}</label><span class="bu-val">${esc(String(s.lastShown).replace(/-/g, "−"))}</span>`;
       fb(k, s.kind === "tri" ? "✓ Triangle drawn." : "✓ Correct.", "good");
       activate(k + 1);
     }
@@ -4080,6 +4269,7 @@ const BUILDUP = (() => {
       hint: "Count the run (across) and the rise (up or down), then work out rise ÷ run." }),
     eq: (Ln) => ({ kind: "eq", pre: "y =", m: Ln.m, c: Ln.c, label: "Find <b>c</b> and <b>m</b>, then write <b>y = mx + c</b>.", hint: "Find c where it crosses the y-axis, find m with a triangle, then put them into y = mx + c." }),
   };
+  const ink = (st) => ({ ...st, as: st.kind, kind: "ink" });
   const POS = [1, 2, 3], NEG = [-1, -2, -3], ALL = [1, 2, 3, -1, -2, -3], FRAC = [1, 2, 3, -1, -2, -3, 0.5, -0.5, 1 / 3, -1 / 3, 1.5, -1.5];
   const cards = [
     { title: "Find c", sub: "New: c is where the line crosses the y-axis.",
@@ -4097,8 +4287,8 @@ const BUILDUP = (() => {
     { title: "c, then m", sub: "New: work out the run and rise in your head.",
       remind: "<b>m = rise ÷ run</b>. The <b>run</b> is how far across the triangle goes (left to right). The <b>rise</b> is how far up (+) or down (−). Then divide: rise ÷ run.",
       make() { const Ln = line(FRAC); return { q: "Find c and the gradient m of line L.", line: Ln, steps: [S.c(Ln), S.tri(), S.mOnly()] }; } },
-    { title: "The whole thing", sub: "On your own: write y = mx + c. You can still click two points to draw a triangle.",
-      make() { const Ln = line(FRAC, [-4, -3, -2, -1, 0, 1, 2, 3, 4]); return { q: "Write the equation of line L.", line: Ln, free: true, steps: [S.eq(Ln)] }; } },
+    { title: "The whole thing", sub: "On your own, in your own handwriting.",
+      make() { const Ln = line(FRAC, [-4, -3, -2, -1, 0, 1, 2, 3, 4]); return { q: "Find the equation of line L. Write each answer with your finger or stylus.", line: Ln, steps: [S.tri(), ink(S.run()), ink(S.rise()), ink(S.m()), ink(S.eq(Ln))] }; } },
   ];
   return { 0: { title: "find the equation of a line from its graph", intro: "One step at a time. Each card adds one more step to the ones before. Finish a card to unlock the next, then slide on.", cards } };
 })();
