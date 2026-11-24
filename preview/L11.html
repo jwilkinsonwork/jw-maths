@@ -4348,6 +4348,23 @@ function openLive() {
   poll();
 }
 
+// Enter in an answer box works like pressing Check. If another box in the same question is still empty, Enter moves to it first.
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" || e.defaultPrevented || e.isComposing) return;
+  const t = e.target;
+  if (!(t instanceof HTMLInputElement) || !/^(text|number|search)$/.test(t.type)) return;
+  if (t.closest(".bu, #livebar, .handin, .lv-ov") || t.id === "goto") return;
+  for (let el = t.parentElement; el && el !== document.body; el = el.parentElement) {
+    const b = el.querySelector("[data-check]"); if (!b) continue;
+    e.preventDefault();
+    const boxes = [...el.querySelectorAll('input[type="text"], input[type="number"]')].filter((i) => !i.disabled && i.offsetParent !== null);
+    const next = boxes.slice(boxes.indexOf(t) + 1).concat(boxes.slice(0, boxes.indexOf(t))).find((i) => !i.value.trim());
+    if (next && t.value.trim()) return next.focus();
+    if (!b.hidden && !b.disabled) b.click();
+    return;
+  }
+});
+
 // ---------- mode switching ----------
 let studentBuilt = false;
 function setMode(m) {
