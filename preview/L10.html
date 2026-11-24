@@ -1200,7 +1200,7 @@ function objExit(i) {
 .bu-dot { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--ink); background: #fff; font: 800 14px var(--body); display: grid; place-items: center; cursor: pointer; padding: 0; color: var(--ink); transition: transform .2s; }
 .bu-dot.done { background: var(--green); color: #fff; border-color: var(--green); }
 .bu-dot.cur { outline: 3px solid var(--blue); outline-offset: 2px; }
-.bu-dot.lock { opacity: .4; cursor: not-allowed; }
+.bu-dot.lock { border-style: dashed; border-color: #AEB6C8; color: #AEB6C8; cursor: not-allowed; }
 .bu-dot.nudge { animation: bunudge .4s; }
 @keyframes bunudge { 30% { transform: translateX(-5px); } 60% { transform: translateX(5px); } }
 .bu-view { overflow: hidden; flex: 1; min-height: 0; border: 2px solid var(--ink); border-radius: 8px; background: #fff; box-shadow: 4px 4px 0 var(--ink); touch-action: pan-y; }
@@ -1263,7 +1263,8 @@ function objExit(i) {
 .bu.big .bu-q { font-size: 22px; } .bu.big .bu-lab { font-size: 19px; } .bu.big .bu-intro { font-size: 17px; }
 #student .bu-view { height: auto; }
 #student .bu-track { align-items: flex-start; }
-@media (max-width: 860px) { .bu-body { flex-direction: column; align-items: stretch; } .bu-g { width: 100%; max-width: 460px; align-self: center; } .bu-top { flex-direction: column; align-items: stretch; } }
+@media (max-width: 860px) { #student .bu-body { flex-direction: column; align-items: stretch; } #student .bu-g { width: 100%; max-width: 460px; align-self: center; } #student .bu-top { flex-direction: column; align-items: stretch; } #student .bu-nav { justify-content: center; } }
+@media (max-width: 600px) { #student .bu-dot { width: 12px; height: 12px; font-size: 0; border-width: 2px; } #student .bu-dots { gap: 7px; } #student .bu-dot.cur { outline-offset: 1px; } #student .bu-dot.lock { border-style: solid; background: #DCE2EE; border-color: #DCE2EE; } }
 `; document.head.appendChild(st); })();
 
 function buGrid(host, line, size) {
@@ -1317,8 +1318,9 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
   const cards = B.cards.map((spec) => { const el = document.createElement("div"); el.className = "bu-card"; track.appendChild(el); return { spec, el, built: false }; });
   dots.innerHTML = cards.map((c, i) => `<button class="bu-dot" type="button" data-i="${i}" title="Card ${i + 1}: ${esc(c.spec.title)}">${i + 1}</button>`).join("");
   const save = () => { if (store) store.save({ done: st.done }); };
+  const c0 = cards;
   function paint() {
-    dots.querySelectorAll(".bu-dot").forEach((d, i) => { d.className = "bu-dot" + (i < st.done ? " done" : "") + (i === cur ? " cur" : "") + (i > st.done ? " lock" : ""); d.textContent = i < st.done ? "✓" : i > st.done ? "🔒" : i + 1; });
+    dots.querySelectorAll(".bu-dot").forEach((d, i) => { d.className = "bu-dot" + (i < st.done ? " done" : "") + (i === cur ? " cur" : "") + (i > st.done ? " lock" : ""); d.textContent = i < st.done ? "✓" : i + 1; d.title = `Card ${i + 1}: ${c0[i].spec.title}${i > st.done ? " (finish the card before it first)" : ""}`; });
     root.querySelector('[data-d="-1"]').disabled = cur === 0; root.querySelector('[data-d="1"]').disabled = cur >= Math.min(st.done, N - 1);
     cards.forEach((c, i) => { c.el.inert = i !== cur; });
   }
