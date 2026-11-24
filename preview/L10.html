@@ -4466,7 +4466,7 @@ document.getElementById("pickBtn").onclick = () => openPicker();
 namesBtnSync();
 setInterval(paceTick, 1000);
 a11yApply();
-document.getElementById("stage").addEventListener("click", (e) => { if (e.target.closest("button, input, canvas, .explorer, .ext, .kwcard, .kw-modal, .cloze")) return; step(1); });
+document.getElementById("stage").addEventListener("click", (e) => { if (e.target.closest("button, input, canvas, .explorer, .ext, .kwcard, .kw-modal, .cloze, .bu")) return; const sl = e.target.closest(".slide"); if (sl && sl.querySelector("[data-buildup]")) return; step(1); }); // tapping a Build it up slide never moves on: students draw and write on it
 window.addEventListener("resize", fit);
 if (STUDENT_ONLY) {
   document.querySelector(".modes").style.display = "none";
