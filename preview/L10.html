@@ -1215,6 +1215,9 @@ function objExit(i) {
 .bu-svg { width: 100%; height: auto; display: block; touch-action: none; user-select: none; -webkit-user-select: none; }
 .bu-side { flex: 1; display: flex; flex-direction: column; gap: 7px; min-width: 0; }
 .bu-q { font: 800 20px/1.3 var(--body); }
+.bu-remind { font-size: 16px; line-height: 1.35; background: #FFF6DA; border: 2px solid var(--yellow); border-radius: 8px; padding: 6px 10px; }
+.bu-rtag { color: var(--amber); font-weight: 800; margin-right: 4px; }
+.bu.big .bu-remind { font-size: 18px; }
 .bu-step { display: grid; grid-template-columns: 30px 1fr; gap: 5px 10px; align-items: center; padding: 7px 10px; border-radius: 8px; border: 2px solid var(--line); background: #fff; transition: background .2s, border-color .2s; }
 .bu-step.locked { opacity: .38; }
 .bu-step.active { border-color: var(--blue); background: #F1F5FF; }
@@ -1338,7 +1341,7 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
 
   function build(i) {
     const c = cards[i], Q = c.spec.make(); c.built = true;
-    c.el.innerHTML = `<div class="bu-head"><span class="bu-num">Card ${i + 1} of ${N}</span><b>${tex(c.spec.title)}</b>${c.spec.sub ? `<span class="bu-new">${tex(c.spec.sub)}</span>` : ""}</div><div class="bu-body"><div class="bu-g"></div><div class="bu-side"><div class="bu-q">${tex(Q.q)}</div><div class="bu-steps"></div><div class="bu-endslot"></div></div></div>`;
+    c.el.innerHTML = `<div class="bu-head"><span class="bu-num">Card ${i + 1} of ${N}</span><b>${tex(c.spec.title)}</b>${c.spec.sub ? `<span class="bu-new">${tex(c.spec.sub)}</span>` : ""}</div><div class="bu-body"><div class="bu-g"></div><div class="bu-side"><div class="bu-q">${tex(Q.q)}</div>${c.spec.remind ? `<div class="bu-remind"><span class="bu-rtag">Reminder</span> ${c.spec.remind}</div>` : ""}<div class="bu-steps"></div><div class="bu-endslot"></div></div></div>`;
     const G = buGrid(c.el.querySelector(".bu-g"), Q.line, big ? 440 : 390), ctx = { Q, G }; c.el.__bu = ctx;
     if (Q.tri) G.drawTri(Q.tri[0], Q.tri[1]);
     const box = c.el.querySelector(".bu-steps"), rows = [];
@@ -4092,6 +4095,7 @@ const BUILDUP = (() => {
     { title: "c, run, rise, then divide", sub: "New: m = rise ÷ run.",
       make() { const Ln = line([1, 2, 3, -1, -2, -3, 0.5, -0.5]); return { q: "Find c. Then draw a triangle and work out the gradient m.", line: Ln, steps: [S.c(Ln), S.tri(), S.run(), S.rise(), S.m()] }; } },
     { title: "c, then m", sub: "New: work out the run and rise in your head.",
+      remind: "<b>m = rise ÷ run</b>. The <b>run</b> is how far across the triangle goes (left to right). The <b>rise</b> is how far up (+) or down (−). Then divide: rise ÷ run.",
       make() { const Ln = line(FRAC); return { q: "Find c and the gradient m of line L.", line: Ln, steps: [S.c(Ln), S.tri(), S.mOnly()] }; } },
     { title: "The whole thing", sub: "On your own: write y = mx + c. You can still click two points to draw a triangle.",
       make() { const Ln = line(FRAC, [-4, -3, -2, -1, 0, 1, 2, 3, 4]); return { q: "Write the equation of line L.", line: Ln, free: true, steps: [S.eq(Ln)] }; } },
