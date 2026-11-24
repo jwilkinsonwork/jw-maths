@@ -1338,7 +1338,47 @@ const INK = (() => {
     requestAnimationFrame(size); if (window.ResizeObserver) new ResizeObserver(() => size()).observe(pad); else window.addEventListener("resize", () => { if (el.isConnected) size(); });
     return { el, read, clear: () => el.querySelector(".ink-clear").click(), strokes: () => strokes, _recognise: recognise };
   }
-  return { inkBox, readLocal, T };
+  function inkPage({ lines, lineH = 56, top = 8 }) {
+    const n = lines.length, PH = top + n * lineH + 10;
+    const el = document.createElement("div"); el.className = "ink inkpage";
+    el.innerHTML = `<div class="ink-pad page" style="height:${PH}px"><canvas></canvas>${lines.map((l, i) => `<span class="ink-lab" style="top:${top + (i + 1) * lineH - 33}px">${l.label}</span><span class="ink-got" data-i="${i}" style="top:${top + (i + 1) * lineH - 26}px"></span><span class="ink-mk" data-i="${i}" style="top:${top + (i + 1) * lineH - 44}px"></span>`).join("")}</div>`;
+    const pad = el.querySelector(".ink-pad"), cv = el.querySelector("canvas"), ctx = cv.getContext("2d");
+    let W = 400, strokes = [], cur = null, timer = null;
+    const lineOf = (s) => { const ys = s.map((p) => p[1]).sort((a, b) => a - b); return Math.max(0, Math.min(n - 1, Math.floor((ys[ys.length >> 1] - top) / lineH))); };
+    const api = { readings: lines.map(() => null), locked: lines.map(() => false) };
+    function size() { W = pad.clientWidth || 400; const k = window.devicePixelRatio || 1; cv.width = W * k; cv.height = PH * k; cv.style.width = W + "px"; cv.style.height = PH + "px"; ctx.setTransform(k, 0, 0, k, 0, 0); draw(); }
+    function draw() {
+      ctx.clearRect(0, 0, W, PH); ctx.strokeStyle = "#A8C6E8"; ctx.lineWidth = 1.5;
+      for (let i = 0; i < n; i++) { const y = top + (i + 1) * lineH + 0.5; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+      ctx.lineCap = ctx.lineJoin = "round"; ctx.lineWidth = 2.8;
+      for (const s of strokes) { ctx.strokeStyle = api.locked[s.line] ? "#1F7A4D" : "#1D2C7A"; ctx.beginPath(); s.pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); if (s.pts.length === 1) ctx.lineTo(s.pts[0][0] + 0.1, s.pts[0][1]); ctx.stroke(); }
+    }
+    const pos = (e) => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * (W / (r.width || W)), (e.clientY - r.top) * (PH / (r.height || PH)), Date.now()]; };
+    cv.addEventListener("pointerdown", (e) => { e.preventDefault(); if (!cv.width) size(); cv.setPointerCapture(e.pointerId); cur = { pts: [pos(e)], line: -1 }; strokes.push(cur); clearTimeout(timer); draw(); });
+    cv.addEventListener("pointermove", (e) => { if (!cur) return; const p = pos(e), l = cur.pts[cur.pts.length - 1]; if (Math.hypot(p[0] - l[0], p[1] - l[1]) > 1.5) { cur.pts.push(p); draw(); } });
+    const end = () => { if (!cur) return; cur.line = lineOf(cur.pts); if (api.locked[cur.line]) strokes.pop(); else { api.readings[cur.line] = "…"; mark(cur.line, null); got(cur.line, ""); } cur = null; draw(); clearTimeout(timer); timer = setTimeout(recognise, 850); };
+    cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+    const got = (i, t) => { el.querySelector(`.ink-got[data-i="${i}"]`).innerHTML = t; };
+    function mark(i, ok) { const m = el.querySelector(`.ink-mk[data-i="${i}"]`); m.className = "ink-mk" + (ok === true ? " ok" : ok === false ? " no" : ""); m.textContent = ok === true ? "✓" : ok === false ? "✗" : ""; }
+    async function recognise() {
+      for (let i = 0; i < n; i++) {
+        if (api.locked[i] || api.readings[i] !== "…") continue;
+        const st = strokes.filter((s) => s.line === i).map((s) => s.pts);
+        if (!st.length) { api.readings[i] = null; got(i, ""); continue; }
+        const raw = (await readNative(st, lines[i].mode)) || readLocal(st, lineH, lines[i].mode);
+        api.readings[i] = raw ? { raw, shown: show(raw) } : { raw: null };
+        got(i, raw ? `I read <b>${show(raw).replace(/</g, "&lt;")}</b>` : `<span class="ink-cant">can't read this line</span>`);
+      }
+    }
+    api.clearLine = (i) => { strokes = strokes.filter((s) => s.line !== i); api.readings[i] = null; mark(i, null); got(i, ""); draw(); };
+    api.clear = () => { for (let i = 0; i < n; i++) if (!api.locked[i]) api.clearLine(i); };
+    api.mark = (i, ok) => { mark(i, ok); if (ok) { api.locked[i] = true; got(i, ""); draw(); } };
+    api.pending = () => api.readings.some((r) => r === "…");
+    api.flush = async () => { clearTimeout(timer); await recognise(); };
+    requestAnimationFrame(size); if (window.ResizeObserver) new ResizeObserver(() => size()).observe(pad);
+    return Object.assign(api, { el });
+  }
+  return { inkBox, inkPage, readLocal, T };
 })();
 
 // ---------- Build it up: a step-by-step carousel before the first I do / We do ----------
@@ -1393,6 +1433,27 @@ const INK = (() => {
 .ink-read button.go { background: var(--ink); color: #fff; }
 .bu-type { border: 0; background: none; text-decoration: underline; padding: 2px 0; color: var(--ink2); font-weight: 700; }
 .bu-val { font: 800 20px var(--body); color: var(--green); }
+.inkpage { display: block; width: min(100%, 520px); }
+.ink-pad.page { background: linear-gradient(90deg, transparent 38px, #E79A9A 38px, #E79A9A 39.5px, transparent 39.5px, transparent 42px, #E79A9A 42px, #E79A9A 43.5px, transparent 43.5px), #FFFEF5; }
+.ink-lab { position: absolute; left: 52px; font: 400 25px var(--hand); color: #5B6B9C; pointer-events: none; white-space: nowrap; }
+.ink-got { position: absolute; right: 46px; font: 600 13px var(--body); color: #8A93A8; pointer-events: none; white-space: nowrap; }
+.ink-got b { font-size: 15px; color: var(--ink2); }
+.ink-cant { color: var(--red); }
+.ink-mk { position: absolute; right: 10px; font: 400 34px/1 var(--hand); pointer-events: none; }
+.ink-mk.ok { color: #1F9D55; } .ink-mk.no { color: #D93A3A; }
+.pg-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+.pg-bar button { font: 800 14px var(--body); padding: 6px 12px; border-radius: 6px; border: 2px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; }
+.pg-bar button.go { background: var(--ink); color: #fff; }
+.bu-in .pg-bar button:not(.go) { background: #fff; color: var(--ink); }
+.bu-in .pg-bar button.ty { border: 0; background: none; text-decoration: underline; color: var(--ink2); }
+.bu-step.done .bu-in.pgdone::after { content: none; }
+.pg-bar button.ty { border: 0; background: none; text-decoration: underline; color: var(--ink2); padding: 6px 4px; }
+.pg-ty { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.pg-ty label { width: 70px; text-align: right; font: italic 700 20px "STIX Two Text", serif; }
+.pg-ty input { width: 200px; font: 700 18px var(--body); padding: 4px 8px; border: 2px solid var(--ink); border-radius: 6px; }
+.pg-ty input:disabled { border-color: var(--green); color: var(--green); background: #EFFAF3; }
+.pg-sum { display: flex; flex-wrap: wrap; gap: 4px 14px; font: 800 17px var(--body); color: var(--green); }
+.bu.big .bu-remind { display: none; }
 .bu-remind { font-size: 16px; line-height: 1.35; background: #FFF6DA; border: 2px solid var(--yellow); border-radius: 8px; padding: 6px 10px; }
 .bu-rtag { color: var(--amber); font-weight: 800; margin-right: 4px; }
 .bu.big .bu-remind { font-size: 18px; }
@@ -1525,7 +1586,7 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
     const box = c.el.querySelector(".bu-steps"), rows = [];
     Q.steps.forEach((s, k) => {
       const r = document.createElement("div"); r.className = "bu-step locked";
-      const input = s.kind === "tri" ? "" : s.kind === "ink" ? `<label>${tex(s.pre || "")}</label><div class="bu-inkslot${s.as === "eq" ? " wide" : ""}"></div>` : `<label>${tex(s.pre || "")}</label><input type="text" class="${s.kind === "eq" ? "eq" : ""}" autocomplete="off" spellcheck="false" inputmode="text" aria-label="${esc((s.pre || "answer").replace("=", "").trim())}"><button type="button">Check</button><span class="bu-tries"></span>`;
+      const input = s.kind === "tri" ? "" : s.kind === "page" ? `<div class="bu-pageslot"></div>` : s.kind === "ink" ? `<label>${tex(s.pre || "")}</label><div class="bu-inkslot${s.as === "eq" ? " wide" : ""}"></div>` : `<label>${tex(s.pre || "")}</label><input type="text" class="${s.kind === "eq" ? "eq" : ""}" autocomplete="off" spellcheck="false" inputmode="text" aria-label="${esc((s.pre || "answer").replace("=", "").trim())}"><button type="button">Check</button><span class="bu-tries"></span>`;
       if (s.kind === "tri") r.classList.add("tri");
       r.innerHTML = `<span class="bu-sn">${k + 1}</span><span class="bu-lab">${s.label}</span><div class="bu-in">${input}</div><div class="bu-fb"></div>`;
       box.appendChild(r); rows.push(r);
@@ -1544,7 +1605,8 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
         r.querySelector(".bu-in").appendChild(ty);
         r.querySelector(".bu-in").insertAdjacentHTML("beforeend", `<span class="bu-tries"></span>`);
       }
-      if (s.kind !== "tri" && s.kind !== "ink") { const inp = r.querySelector("input"); r.querySelector("button").onclick = () => check(k); inp.addEventListener("keydown", (e) => { if (e.key === "Enter") check(k); }); }
+      if (s.kind === "page") setupPage(k, r);
+      if (s.kind !== "tri" && s.kind !== "ink" && s.kind !== "page") { const inp = r.querySelector("input"); r.querySelector("button").onclick = () => check(k); inp.addEventListener("keydown", (e) => { if (e.key === "Enter") check(k); }); }
     });
     const fb = (k, html, cls) => { const f = rows[k].querySelector(".bu-fb"); f.className = "bu-fb " + (cls || ""); f.innerHTML = html; };
     function wrong(k, msg) {
@@ -1569,31 +1631,75 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
         };
       } else if (k > 0) { const inp = rows[k].querySelector("input"); if (inp) setTimeout(() => inp.focus({ preventScroll: true }), 50); }
     }
+    // { ok } or { ok: false, msg, form } (form = the answer isn't in a form we can mark)
+    function judge(s, raw, kind) {
+      if (kind === "num") {
+        const a = typeof s.ans === "function" ? s.ans(ctx) : s.ans;
+        const v = s.loneMinus && /^[-−–]$/.test(raw) ? -1 : parseNum(raw);
+        if (!isFinite(v)) return { ok: false, form: true, msg: "Type a number, like 3, −2 or 1/2." };
+        if (Math.abs(v - a) < 1e-6) return { ok: true };
+        return { ok: false, msg: (s.why && s.why(v, ctx)) || "Not yet. Look at the graph again." };
+      }
+      const t = /=/.test(raw) ? raw : "y=" + raw, L2 = parseLine(t);
+      if (L2.error || Math.abs(L2.B) < 1e-12) return { ok: false, form: true, msg: "Write it like y = 2x + 1." };
+      const m2 = -L2.A / L2.B, c2 = L2.C / L2.B, mOK = Math.abs(m2 - s.m) < 1e-6, cOK = Math.abs(c2 - s.c) < 1e-6;
+      if (mOK && cOK) return { ok: true };
+      if (Math.abs(m2 - s.c) < 1e-6 && Math.abs(c2 - s.m) < 1e-6) return { ok: false, msg: "m and c are swapped: m goes with x, c is the number on its own." };
+      return { ok: false, msg: mOK ? "Your gradient is right. Check c." : cOK ? "Your c is right. Check the gradient." : "Find c first, then the gradient, then write y = mx + c." };
+    }
     function check(k, written, shown) {
       const s = Q.steps[k], inp = rows[k].querySelector("input"), raw = written !== undefined ? written : inp ? inp.value.trim() : "", kind = s.kind === "ink" ? s.as : s.kind;
       if (!raw) return fb(k, "Type your answer first.", "bad");
       s.lastShown = shown || raw;
-      if (kind === "num") {
-        const a = typeof s.ans === "function" ? s.ans(ctx) : s.ans;
-        let v = s.loneMinus && /^[-−–]$/.test(raw) ? -1 : parseNum(raw);
-        if (!isFinite(v)) return fb(k, "Type a number, like 3, −2 or 1/2.", "bad");
-        if (Math.abs(v - a) < 1e-6) return done(k);
-        return wrong(k, s.why && s.why(v, ctx));
+      const res = judge(s, raw, kind);
+      if (res.ok) return done(k);
+      if (res.form) return fb(k, res.msg, "bad");
+      return wrong(k, res.msg);
+    }
+    // a page of working: one printed label per line, each line marked on its own
+    function setupPage(k, r) {
+      const s = Q.steps[k], slot = r.querySelector(".bu-pageslot");
+      s.lines.forEach((d) => { d.ok = false; d.wrong = 0; d.shown = ""; });
+      function markAll(getRaw, onMark) {
+        const msgs = [];
+        s.lines.forEach((d, j) => {
+          if (d.ok) return;
+          const g = getRaw(j), lab = `<b>${esc(d.pre.replace(/\s*=\s*$/, ""))}:</b> `;
+          if (g === null) return msgs.push(lab + "write your answer on this line.");
+          if (g.raw === null) return msgs.push(lab + "I can't read this line. Rub it out and write it again, a bit bigger.");
+          const res = judge(d, g.raw, d.kind);
+          if (res.ok) { d.ok = true; d.shown = g.shown || g.raw; onMark(j, true); return; }
+          onMark(j, false);
+          if (res.form) return msgs.push(lab + esc(res.msg));
+          d.wrong++; msgs.push(lab + esc(res.msg) + (d.wrong >= 2 && d.hint ? `<span class="bu-hint">💡 ${tex(d.hint)}</span>` : ""));
+        });
+        if (s.lines.every((d) => d.ok)) return done(k);
+        fb(k, msgs.join("<br>"), "bad");
       }
-      if (kind === "eq") {
-        const t = /=/.test(raw) ? raw : "y=" + raw, L2 = parseLine(t);
-        if (L2.error || Math.abs(L2.B) < 1e-12) return fb(k, "Write it like y = 2x + 1.", "bad");
-        const m2 = -L2.A / L2.B, c2 = L2.C / L2.B, mOK = Math.abs(m2 - s.m) < 1e-6, cOK = Math.abs(c2 - s.c) < 1e-6;
-        if (mOK && cOK) return done(k);
-        if (Math.abs(m2 - s.c) < 1e-6 && Math.abs(c2 - s.m) < 1e-6) return wrong(k, "m and c are swapped: m goes with x, c is the number on its own.");
-        return wrong(k, mOK ? "Your gradient is right. Check c." : cOK ? "Your c is right. Check the gradient." : "Find c first, then the gradient, then write y = mx + c.");
-      }
+      const P = INK.inkPage({ lines: s.lines.map((d) => ({ label: esc(d.pre), mode: d.kind })), lineH: big ? 46 : 56 });
+      slot.innerHTML = ""; slot.appendChild(P.el);
+      slot.insertAdjacentHTML("beforeend", `<div class="pg-bar"><button type="button" class="go">✓ Mark my working</button><button type="button" class="rub">Rub out ✗</button><button type="button" class="clr">Clear page</button><button type="button" class="ty">⌨ Type instead</button></div>`);
+      slot.querySelector(".go").onclick = async () => {
+        await P.flush();
+        markAll((j) => { const rd = P.readings[j]; return !rd ? null : rd.raw ? rd : { raw: null }; }, (j, ok) => P.mark(j, ok));
+      };
+      slot.querySelector(".rub").onclick = () => s.lines.forEach((d, j) => { if (!d.ok) P.clearLine(j); });
+      slot.querySelector(".clr").onclick = () => P.clear();
+      slot.querySelector(".ty").onclick = () => {
+        slot.innerHTML = s.lines.map((d, j) => `<div class="pg-ty"><label>${tex(d.pre)}</label><input type="text" data-j="${j}" autocomplete="off" spellcheck="false" ${d.ok ? `value="${esc(d.shown)}" disabled` : ""}><span class="ink-mk-t" data-j="${j}">${d.ok ? "✓" : ""}</span></div>`).join("") + `<div class="pg-bar"><button type="button" class="go">Check my answers</button></div>`;
+        const ins = [...slot.querySelectorAll("input")];
+        const go = () => markAll((j) => { const v = ins[j].value.trim(); return v ? { raw: v, shown: v } : null; }, (j, ok) => { slot.querySelector(`.ink-mk-t[data-j="${j}"]`).textContent = ok ? "✓" : "✗"; if (ok) ins[j].disabled = true; });
+        slot.querySelector(".go").onclick = go; ins.forEach((i) => i.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); }));
+        const first = ins.find((i) => !i.disabled); if (first) first.focus();
+      };
     }
     function done(k) {
       const s = Q.steps[k]; rows[k].className = "bu-step done" + (s.kind === "tri" ? " tri" : "");
       const inp = rows[k].querySelector("input"); if (inp) inp.disabled = true;
+      if (s.kind === "page") rows[k].querySelector(".bu-in").classList.add("pgdone");
+      if (s.kind === "page") rows[k].querySelector(".bu-in").innerHTML = `<div class="pg-sum">${s.lines.map((d) => `<span>${tex(d.pre)} ${esc(String(d.shown).replace(/-/g, "−"))} ✓</span>`).join("")}</div>`;
       if (s.kind === "ink") rows[k].querySelector(".bu-in").innerHTML = `<label>${tex(s.pre || "")}</label><span class="bu-val">${esc(String(s.lastShown).replace(/-/g, "−"))}</span>`;
-      fb(k, s.kind === "tri" ? "✓ Triangle drawn." : "✓ Correct.", "good");
+      fb(k, s.kind === "tri" ? "✓ Triangle drawn." : s.kind === "page" ? "✓ All your working is correct." : "✓ Correct.", "good");
       activate(k + 1);
     }
     function finish() {
@@ -4293,7 +4399,7 @@ const BUILDUP = (() => {
       remind: "<b>m = rise ÷ run</b>. The <b>run</b> is how far across the triangle goes (left to right). The <b>rise</b> is how far up (+) or down (−). Then divide: rise ÷ run.",
       make() { const Ln = line(FRAC); return { q: "Find c and the gradient m of line L.", line: Ln, steps: [S.c(Ln), S.tri(), S.mOnly()] }; } },
     { title: "The whole thing", sub: "On your own, in your own handwriting.",
-      make() { const Ln = line(FRAC, [-4, -3, -2, -1, 0, 1, 2, 3, 4]); return { q: "Find the equation of line L. Write each answer with your finger or stylus.", line: Ln, steps: [S.tri(), ink(S.run()), ink(S.rise()), ink(S.m()), ink(S.eq(Ln))] }; } },
+      make() { const Ln = line(FRAC, [-4, -3, -2, -1, 0, 1, 2, 3, 4]); return { q: "Find the equation of line L.", line: Ln, steps: [S.tri(), { kind: "page", label: "Write the run, the rise, m and the equation, then press <b>Mark my working</b>.", lines: [S.run(), S.rise(), S.m(), S.eq(Ln)] }] }; } },
   ];
   return { 0: { title: "find the equation of a line from its graph", intro: "One step at a time. Each card adds one more step to the ones before. Finish a card to unlock the next, then slide on.", cards } };
 })();
