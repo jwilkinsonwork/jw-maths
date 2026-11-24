@@ -2465,6 +2465,7 @@ function setMenu() {
     mn.innerHTML = `<div class="a11y-h"><b>Settings</b><button type="button" data-a="close" aria-label="Close">✕</button></div>` +
       (teacher ? `<div class="set-row"><div><b>🎲 Pick a name</b><span>Random name picker for your class lists</span></div><button type="button" data-a="names">Open</button></div>` +
         `<div class="set-sub set-subsw"><span>Names button on the main page</span><button type="button" class="set-sw${namesBtnOn() ? " on" : ""}" data-a="namesbtn" role="switch" aria-checked="${namesBtnOn()}"><i></i>${namesBtnOn() ? "On" : "Off"}</button></div>` +
+        (LIVE.url ? `<div class="set-row"><div><b>📡 Live class</b><span>See who's working, idle or on another tab</span></div><button type="button" data-a="live">Open</button></div>` : "") +
         `<div class="set-row"><div><b>🖨 Print</b><span>Student worksheet or answer key</span></div><button type="button" data-a="print">Open</button></div>` : "") +
       (teacher ? `<div class="set-row"><div><b>Pace tracker</b><span>Shows if you're ahead or behind the planned timings</span></div><button type="button" class="set-sw${p.on ? " on" : ""}" data-a="pace" role="switch" aria-checked="${!!p.on}"><i></i>${p.on ? "On" : "Off"}</button></div>` +
         (p.on ? `<div class="set-sub">Lesson clock <b class="set-clock"></b><button type="button" data-a="pause">${p.paused ? "▶ Carry on" : "❚❚ Pause"}</button><button type="button" data-a="restart">↺ Restart</button></div>` : "") : "") +
@@ -2484,6 +2485,7 @@ function setMenu() {
     if (a === "read") { mn.remove(); a11yPanel(); }
     if (a === "namesbtn") { try { localStorage.setItem("jw-names-btn", namesBtnOn() ? "0" : "1"); } catch (err) { /* storage not available */ } namesBtnSync(); draw(); }
     if (a === "names") { mn.remove(); btn.setAttribute("aria-expanded", "false"); openPicker(); }
+    if (a === "live") { mn.remove(); btn.setAttribute("aria-expanded", "false"); openLive(); return; }
     if (a === "print") { mn.remove(); btn.setAttribute("aria-expanded", "false"); openPrint(); }
     if (a === "tr") { mn.remove(); trPanel(); }
     if (a === "english") { TR.on = false; trRevertAll(); btn.classList.remove("on"); draw(); }
@@ -2680,7 +2682,7 @@ try { state = JSON.parse(localStorage.getItem(SAVE) || "{}"); } catch (e) { stat
 function setHash(h) { try { if (location.hash !== h) history.replaceState(null, "", h); } catch (e) { /* not allowed inside some embeds: ignore */ } }
 // Student-only copy: no teacher view (built by build.py as a separate file).
 const STUDENT_ONLY = /*STUDENT_ONLY*/false;
-const save = () => { try { localStorage.setItem(SAVE, JSON.stringify(state)); } catch (e) { /* storage not available */ } };
+const save = () => { try { localStorage.setItem(SAVE, JSON.stringify(state)); } catch (e) { /* storage not available */ } if (window.__live) window.__live.beatSoon(); };
 
 function parseNum(s) {
   let t = String(s).trim().replace(/[−–]/g, "-").replace(/\s+/g, "");
@@ -2802,7 +2804,8 @@ function buildStudent() {
   const root = document.getElementById("student");
   const secs = [["donow", "Do Now"], ["kw", "Key Words"], ["explore", "Explore"], ["p1", "Part 1"], ["p2", "Part 2"], ["practice", "Practice"], ["ext", "Extension"], ["exit", "Exit ticket"], ["board", "Whiteboard"], ["handin", "Hand in"]];
   if (typeof GAME === "object" && GAME) secs.splice(secs.findIndex(([k]) => k === "board"), 0, ["game", "Game"]);
-  root.innerHTML = `<div class="tabs" role="tablist" data-tc-tabs>${secs.map(([k, t]) => `<button data-sec="${k}" aria-pressed="false">${t}</button>`).join("")}</div><div id="secs"></div>`;
+  root.innerHTML = `<div id="livebar"></div><div class="tabs" role="tablist" data-tc-tabs>${secs.map(([k, t]) => `<button data-sec="${k}" aria-pressed="false">${t}</button>`).join("")}</div><div id="secs"></div>`;
+  setTimeout(liveBar, 0);
   const box = root.querySelector("#secs");
   const make = {
     donow() {
@@ -4531,8 +4534,19 @@ function handinSection() {
   nm.oninput = cl.oninput = () => { state.name = nm.value; state.cls = cl.value; save(); render(); };
   d.querySelector("[data-send]").onclick = (e) => { if (!(nm.value.trim() && cl.value.trim())) { e.preventDefault(); nm.focus(); } else { state.sent = Date.now(); save(); } };
   const msg = (t) => { d.querySelector("[data-msg]").textContent = t; };
-  d.querySelector("[data-pdf]").onclick = () => {
+  if (LIVE.url) { const b = d.querySelector("[data-pdf]"); b.textContent = "Hand in and save as PDF"; b.classList.add("primary"); }
+  d.querySelector("[data-pdf]").onclick = async () => {
     if (!nm.value.trim()) { msg("Type your name first."); nm.focus(); return; } render();
+    if (LIVE.url) {
+      if (!cl.value.trim()) { msg("Type your class first."); cl.focus(); return; }
+      const b = d.querySelector("[data-pdf]"); b.disabled = true; msg("Handing in…");
+      try {
+        const j = await liveHandin(nm.value.trim(), cl.value.trim(), d.querySelector("[data-score] b").textContent);
+        state.sent = Date.now(); save(); b.disabled = false;
+        d.querySelector("[data-msg]").innerHTML = `✓ Handed in. Your teacher has it. <a href="${esc(j.url)}" target="_blank" rel="noopener">Open your PDF</a> to save or print your own copy.`;
+        return;
+      } catch (e) { b.disabled = false; msg("Couldn't reach your teacher's Drive. Trying Save as PDF instead…"); }
+    }
     if (!inEmbed()) { try { window.print(); } catch (e) { msg("Printing is blocked here: take a screenshot of your results instead."); } return; }
     const sheet = document.getElementById("handinSheet");
     if (sheet && printCopy(sheet.outerHTML, `${L.id} ${nm.value.trim()}`, "")) msg("Your results opened in a new tab. Choose Save as PDF there.");
@@ -4547,6 +4561,154 @@ function handinSection() {
   };
   render();
   return d;
+}
+
+// ---------- Live class: progress to the teacher's laptop, and hand-in to the teacher's Drive ----------
+// LIVE.url is the teacher's Google Apps Script web app (see the setup notes). Without it, none of this runs.
+const LIVE = {"url": ""};
+const LIVE_IDLE = 90; // seconds without touching the lesson before a student shows as idle
+(() => { const st = document.createElement("style"); st.textContent = `
+#livebar { margin: 0 0 12px; }
+.lvb { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; border: 2px solid var(--ink); border-radius: 8px; background: #FFF6DA; box-shadow: 3px 3px 0 var(--ink); font: 700 16px var(--body); }
+.lvb input { font: 700 16px var(--body); padding: 5px 8px; border: 2px solid var(--ink); border-radius: 6px; width: 170px; }
+.lvb input.c { width: 90px; }
+.lvb button { font: 800 15px var(--body); padding: 6px 14px; border-radius: 6px; border: 2px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+.lvb.on { background: #EFFAF3; border-color: var(--green); box-shadow: none; font-size: 14px; padding: 6px 12px; }
+.lvb.on button { background: none; color: var(--ink2); border: 0; text-decoration: underline; padding: 0; font-size: 14px; }
+.lvdot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px rgba(31,157,85,.2); }
+.lv-ov { position: fixed; inset: 0; z-index: 9000; background: rgba(20,24,40,.55); display: flex; align-items: stretch; justify-content: center; padding: 24px; }
+.lv-p { background: #fff; border: 2px solid var(--ink); border-radius: 10px; box-shadow: 6px 6px 0 var(--ink); width: min(1300px, 100%); display: flex; flex-direction: column; overflow: hidden; font-family: var(--body); }
+.lv-h { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 2px solid var(--line); flex-wrap: wrap; }
+.lv-h b.t { font: 800 22px var(--display); margin-right: auto; }
+.lv-h select, .lv-h input { font: 700 15px var(--body); padding: 5px 8px; border: 2px solid var(--ink); border-radius: 6px; }
+.lv-h button { font: 800 14px var(--body); padding: 6px 12px; border-radius: 6px; border: 2px solid var(--ink); background: #fff; cursor: pointer; }
+.lv-counts { display: flex; gap: 8px; flex-wrap: wrap; padding: 10px 18px; border-bottom: 1px solid var(--line); }
+.lv-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; font: 800 14px var(--body); background: #F3F5FA; }
+.lv-chip i { width: 10px; height: 10px; border-radius: 50%; }
+.lv-grid { flex: 1; overflow: auto; padding: 14px 18px; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; align-content: start; }
+.lv-card { font-family: var(--body); border: 2px solid var(--line); border-left-width: 8px; border-radius: 8px; padding: 9px 11px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; background: #fff; }
+.lv-card:hover { box-shadow: 3px 3px 0 var(--ink); }
+.lv-card .n { font: 800 17px var(--body); display: flex; justify-content: space-between; gap: 6px; }
+.lv-card .n span { font-size: 13px; color: var(--muted); }
+.lv-card .s { font: 800 14px var(--body); }
+.lv-card .m { font-size: 13px; color: var(--ink2); }
+.lv-bar { display: flex; gap: 1px; height: 8px; }
+.lv-bar i { flex: 1; border-radius: 1px; background: #E3E7EF; } .lv-bar i.k { background: #1F9D55; } .lv-bar i.w { background: #D93A3A; }
+.lv-empty { grid-column: 1 / -1; padding: 30px; text-align: center; color: var(--muted); font: 700 17px var(--body); }
+.lv-det { border-top: 2px solid var(--line); max-height: 45%; overflow: auto; padding: 12px 18px; }
+.lv-det table { border-collapse: collapse; width: 100%; font-size: 14px; } .lv-det td, .lv-det th { border-bottom: 1px solid var(--line); padding: 4px 8px; text-align: left; }
+.lv-det .ok { color: #1F9D55; font-weight: 800; } .lv-det .no { color: #D93A3A; font-weight: 800; }
+.lv-note { padding: 8px 18px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); }
+`; document.head.appendChild(st); })();
+
+window.__live = (() => {
+  if (!LIVE.url) return null;
+  let lastInput = Date.now(), timer = null, soon = null, started = false;
+  const touch = () => { const was = Date.now() - lastInput > LIVE_IDLE * 1000; lastInput = Date.now(); if (was) beatSoon(300); };
+  ["pointerdown", "keydown", "wheel", "touchstart", "input"].forEach((ev) => addEventListener(ev, touch, { passive: true, capture: true }));
+  let mv = 0; addEventListener("pointermove", () => { const t = Date.now(); if (t - mv > 3000) { mv = t; touch(); } }, { passive: true });
+  document.addEventListener("visibilitychange", () => beatSoon(150));
+  addEventListener("focus", () => beatSoon(150)); addEventListener("blur", () => beatSoon(1500));
+  function payload(t) {
+    const rows = gather(), btn = document.querySelector('#student .tabs button[aria-pressed="true"]');
+    const bu = typeof BUILDUP === "object" && BUILDUP ? Object.keys(BUILDUP).map((ci) => `${(state["bu" + ci] && state["bu" + ci].done) || 0}/${BUILDUP[ci].cards.length}`).join(" ") : "";
+    return { t, lesson: L.id, name: String(state.name || "").trim(), cls: String(state.cls || "").trim(), vis: document.hidden ? "hidden" : "visible", focus: document.hasFocus(), idle: Math.round((Date.now() - lastInput) / 1000), sec: btn ? btn.textContent.trim() : "", bu, r: rows.map((r) => (r.ok ? "1" : r.tried ? "2" : "0")).join("") };
+  }
+  function send(t) {
+    if (!started) return; const p = payload(t); if (!p.name) return; const body = JSON.stringify(p);
+    if (t === "bye" && navigator.sendBeacon) { try { if (navigator.sendBeacon(LIVE.url, new Blob([body], { type: "text/plain" }))) return; } catch (e) { /* fall through */ } }
+    try { fetch(LIVE.url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body, keepalive: true }).catch(() => {}); } catch (e) { /* offline */ }
+  }
+  function beatSoon(ms = 1500) { if (!started) return; clearTimeout(soon); soon = setTimeout(() => send("beat"), ms); }
+  function start() { if (started) return beatSoon(100); started = true; send("beat"); timer = setInterval(() => send("beat"), 12000); addEventListener("pagehide", () => send("bye")); }
+  return { start, beatSoon, send };
+})();
+
+// the bar at the top of the student page: join with a name and class, and always shows that the teacher can see progress
+function liveBar() {
+  const box = document.getElementById("livebar"); if (!box || !window.__live) return;
+  const on = !!(String(state.name || "").trim() && String(state.cls || "").trim());
+  if (on && !box.dataset.edit) {
+    box.innerHTML = `<div class="lvb on"><span class="lvdot"></span><span>Live: your teacher can see your progress in this lesson, ${esc(state.name)} · ${esc(state.cls)}.</span><button type="button">Not you?</button></div>`;
+    box.querySelector("button").onclick = () => { box.dataset.edit = "1"; liveBar(); };
+    window.__live.start(); return;
+  }
+  box.innerHTML = `<div class="lvb"><span>👋 Type your name and class to join the lesson:</span><input type="text" placeholder="Your name" aria-label="Your name" value="${esc(state.name || "")}"><input class="c" type="text" placeholder="Class" aria-label="Your class" value="${esc(state.cls || "")}"><button type="button">Join</button></div>`;
+  const [nm, cl] = box.querySelectorAll("input"), go = () => { if (!nm.value.trim()) return nm.focus(); if (!cl.value.trim()) return cl.focus(); state.name = nm.value.trim(); state.cls = cl.value.trim().toUpperCase(); save(); delete box.dataset.edit; liveBar(); const h = document.querySelector("#hiName"), c = document.querySelector("#hiClass"); if (h) h.value = state.name; if (c) c.value = state.cls; };
+  box.querySelector("button").onclick = go; [nm, cl].forEach((i) => i.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); }));
+}
+
+// a plain page for the PDF in the teacher's Drive (Google's converter ignores scripts and most styling)
+function handinHTML(name, cls, score) {
+  const rows = gather(), plain = (t) => String(t || "").replace(/\$|\\[a-z]+|[{}]/gi, "");
+  return `<html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;font-size:11pt;color:#222}h1{font-size:16pt;margin:0 0 4px}p{margin:2px 0 8px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #bbb;padding:4px 6px;text-align:left;font-size:10pt}th{background:#eee}.ok{color:#1a7f37;font-weight:bold}.no{color:#c62828;font-weight:bold}.small{color:#666;font-size:9pt}</style></head><body>` +
+    `<h1>${esc(L.id)} ${esc(plain(L.title))}</h1><p><b>${esc(name)}</b> · ${esc(cls)} · ${esc(new Date().toLocaleString("en-GB"))}</p><p><b>${esc(score)}</b><br><span class="small">${rows.filter((r) => r.tried).length} of ${rows.length} questions tried</span></p>` +
+    `<table><tr><th>Section</th><th>Question</th><th>Result</th></tr>${rows.map((r) => `<tr><td>${esc(r.sec)}</td><td>${esc(r.label)}</td><td class="${r.cls}">${esc(r.status)}${r.note ? `<br><span class="small">Their answer: ${esc(r.note)}</span>` : ""}</td></tr>`).join("")}</table>` +
+    `<p class="small">© J. Wilkinson 2026 · All rights reserved</p></body></html>`;
+}
+async function liveHandin(name, cls, score) {
+  const res = await fetch(LIVE.url, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ t: "handin", lesson: L.id, name, cls, score, html: handinHTML(name, cls, score) }) });
+  const j = await res.json(); if (!j || !j.ok) throw new Error((j && j.error) || "failed"); return j;
+}
+
+// ---------- the teacher's live class view ----------
+function liveStatus(s, now) {
+  const age = Math.max(0, (now - s.at) / 1000), idle = (s.idle || 0) + age, min = (x) => (x < 120 ? `${Math.round(x / 60) || 1} min` : `${Math.round(x / 60)} mins`);
+  if (s.left && s.left >= s.at) return ["gone", "Left the lesson", "#8A93A8"];
+  if (age > 40) return ["gone", "Not connected", "#8A93A8"];
+  if (s.vis === "hidden") return ["away", "On another tab", "#E8833A"];
+  if (!s.focus) return ["away", "Not on the lesson", "#E8833A"];
+  if (idle >= LIVE_IDLE) return ["idle", `Idle for ${min(idle)}`, "#D9A400"];
+  return ["ok", "Working", "#1F9D55"];
+}
+function openLive() {
+  const ov = document.createElement("div"); ov.className = "lv-ov";
+  ov.innerHTML = `<div class="lv-p" role="dialog" aria-label="Live class"><div class="lv-h"><b class="t">📡 Live class · ${esc(L.id)}</b><label class="small">Class <select data-cls><option value="">All</option></select></label><button type="button" data-key>🔑 Key</button><button type="button" data-x>✕ Close</button></div><div class="lv-counts"></div><div class="lv-grid"><div class="lv-empty">Connecting…</div></div><div class="lv-det" hidden></div><div class="lv-note">Updates every 5 seconds. Students show here once they type their name and class at the top of the lesson. "Not on the lesson" means the lesson isn't the window they're using, for example another app or the page around the lesson.</div></div>`;
+  document.body.appendChild(ov);
+  const grid = ov.querySelector(".lv-grid"), counts = ov.querySelector(".lv-counts"), det = ov.querySelector(".lv-det"), sel = ov.querySelector("[data-cls]");
+  const labels = gather().map((r) => [r.sec, r.label]);
+  let data = {}, picked = null, tm = null, alive = true;
+  const keyGet = () => { try { return localStorage.getItem("jw-live-key") || ""; } catch (e) { return ""; } };
+  function askKey(msg) {
+    grid.innerHTML = `<div class="lv-empty">${msg || "Type your teacher key (the word you set in the script)."}<br><br><input type="password" data-lvk style="font:700 16px var(--body);padding:6px 10px;border:2px solid var(--ink);border-radius:6px"> <button type="button" data-lvks style="font:800 15px var(--body);padding:6px 14px;border-radius:6px;border:2px solid var(--ink);background:var(--ink);color:#fff">Save</button></div>`;
+    const k = grid.querySelector("[data-lvk]"); k.focus();
+    const go = () => { try { localStorage.setItem("jw-live-key", k.value.trim()); } catch (e) { /* storage not available */ } poll(); };
+    grid.querySelector("[data-lvks]").onclick = go; k.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+  }
+  async function poll() {
+    clearTimeout(tm); if (!alive) return;
+    const key = keyGet(); if (!key) return askKey();
+    try {
+      const r = await fetch(`${LIVE.url}?t=live&lesson=${encodeURIComponent(L.id)}&key=${encodeURIComponent(key)}`), j = await r.json();
+      if (!j.ok && j.error === "key") return askKey("That key wasn't right. Type it again.");
+      data = j; draw();
+    } catch (e) { counts.innerHTML = `<span class="lv-chip" style="color:#D93A3A">Can't reach the live server. Trying again…</span>`; }
+    tm = setTimeout(poll, 5000);
+  }
+  function draw() {
+    const now = data.now || Date.now(), all = Object.values(data.students || {});
+    const classes = [...new Set(all.map((s) => s.cls))].sort(); const cur = sel.value;
+    sel.innerHTML = `<option value="">All</option>` + classes.map((c) => `<option${c === cur ? " selected" : ""}>${esc(c)}</option>`).join("");
+    const list = all.filter((s) => !sel.value || s.cls === sel.value).sort((a, b) => a.name.localeCompare(b.name));
+    const st = list.map((s) => [s, liveStatus(s, now)]), n = (k) => st.filter(([, x]) => x[0] === k).length;
+    counts.innerHTML = [["ok", "Working", "#1F9D55"], ["idle", "Idle", "#D9A400"], ["away", "Elsewhere", "#E8833A"], ["gone", "Gone", "#8A93A8"]].map(([k, t, c]) => `<span class="lv-chip"><i style="background:${c}"></i>${t}: ${n(k)}</span>`).join("") + `<span class="lv-chip">${list.length} student${list.length === 1 ? "" : "s"}</span>`;
+    if (!list.length) { grid.innerHTML = `<div class="lv-empty">No students yet. They appear when they type their name and class at the top of the lesson.</div>`; return; }
+    grid.innerHTML = st.map(([s, x]) => { const code = s.r || "", ok = (code.match(/1/g) || []).length, bad = (code.match(/2/g) || []).length;
+      return `<div class="lv-card" data-id="${esc(s.cls + "|" + s.name)}" style="border-left-color:${x[2]}"><div class="n">${esc(s.name)}<span>${esc(s.cls)}</span></div><div class="s" style="color:${x[2]}">● ${x[1]}</div><div class="m">${s.sec ? `On <b>${esc(s.sec)}</b>` : ""}${s.bu ? ` · Build it up ${esc(s.bu)}` : ""}</div><div class="m">${ok} right · ${bad} wrong · ${code.length - ok - bad} not tried</div><div class="lv-bar">${[...code].map((c) => `<i class="${c === "1" ? "k" : c === "2" ? "w" : ""}"></i>`).join("")}</div></div>`; }).join("");
+    grid.querySelectorAll(".lv-card").forEach((c) => (c.onclick = () => { picked = c.dataset.id; detail(); }));
+    detail();
+  }
+  function detail() {
+    const s = Object.values(data.students || {}).find((x) => x.cls + "|" + x.name === picked); if (!s) { det.hidden = true; return; }
+    const code = s.r || ""; det.hidden = false;
+    det.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><b style="font:800 18px var(--body)">${esc(s.name)} · ${esc(s.cls)}</b><button type="button" data-c style="font:800 14px var(--body);padding:4px 10px;border:2px solid var(--ink);border-radius:6px;background:#fff">Close</button></div><table><tr><th>Section</th><th>Question</th><th>So far</th></tr>${labels.map(([sec, lab], i) => `<tr><td>${esc(sec)}</td><td>${esc(lab)}</td><td class="${code[i] === "1" ? "ok" : code[i] === "2" ? "no" : ""}">${code[i] === "1" ? "✓ Correct" : code[i] === "2" ? "✗ Not right yet" : "Not tried"}</td></tr>`).join("")}</table>`;
+    det.querySelector("[data-c]").onclick = () => { picked = null; det.hidden = true; };
+  }
+  sel.onchange = draw;
+  ov.querySelector("[data-key]").onclick = () => askKey();
+  const close = () => { alive = false; clearTimeout(tm); ov.remove(); };
+  ov.querySelector("[data-x]").onclick = close; ov.addEventListener("click", (e) => { if (e.target === ov) close(); });
+  poll();
 }
 
 // ---------- mode switching ----------
