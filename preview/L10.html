@@ -220,6 +220,7 @@ button.primary { background: var(--ink); color: #fff; border-color: var(--ink); 
 .mt-inline .mt-panel { width: auto; height: auto; box-shadow: 4px 4px 0 var(--ink); animation: none; }
 .mt-inline .mt-head { display: none; }
 .mt-inline .mt-area { grid-template-columns: minmax(170px, 300px) 1fr; column-gap: clamp(60px, 12%, 160px); }
+@media (max-width: 600px) { .mt-inline .mt-area { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); column-gap: 34px; } .mt-inline .mt-item { min-width: 0; padding: 6px 8px; overflow-wrap: anywhere; } .mt-inline .mt-word { font-size: 18px; } .mt-inline .mt-def { font-size: 15px; } .mt-inline .mt-dt { min-width: 0; } }
 .mt-inline .mt-item { min-height: 62px; }
 .mt-inline .mt-word { font-size: 24px; } .mt-inline .mt-def { font-size: 18px; }
 .mt-inline .mt-closebtn { display: none; }
@@ -230,6 +231,8 @@ button.primary { background: var(--ink); color: #fff; border-color: var(--ink); 
 .smc-grid4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .smc-opt { display: flex; align-items: center; gap: 16px; min-height: 96px; padding: 12px 18px; text-align: left; font: 600 28px var(--body); color: var(--ink); background: #fff; border: 2.5px solid var(--ink); border-radius: 8px; box-shadow: -4px 4px 0 var(--ink); cursor: pointer; }
 .smc-opt:hover { background: #FFF8D6; }
+#student .smc-opt { min-width: 0; } #student .smc-opt .katex { white-space: normal; }
+@media (max-width: 600px) { #student .smc-body { flex-direction: column; } #student .smc-grid, #student .smc-grid4 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } #student .smc-opt { font-size: 20px; min-height: 64px; padding: 8px 10px; gap: 8px; } #student .smc-l { width: 40px; height: 40px; font-size: 22px; } #student .smc-show { width: auto; } #student .smc .qt { font-size: 20px; } }
 .smc-l { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; border-radius: 50%; background: var(--margin, #E8505B); color: #fff; font: 700 32px var(--display); }
 .smc-g { flex-direction: column; align-items: stretch; padding: 10px; }
 .smc-g .smc-l { width: 44px; height: 44px; font-size: 26px; }
@@ -2787,7 +2790,7 @@ function qCard(key, num, numCol, qText, model, parts, extra = "", retry = null) 
     return `<div class="part" data-p="${i}">${lab}<input type="text" placeholder="${ph}" aria-label="${esc(p.label || "Answer")}"><span class="res"></span></div>`;
   }).join("");
   const ladder = !/^ex[AB]/.test(key) && (LIVE.url || (retry && (retry.hint || retry.how)));
-  el.innerHTML = `<div class="qt">${ladder ? `<button type="button" class="askhelp" data-ladder title="Get help with this question">💡 Help</button>` : ""}<span class="qn" style="background:${numCol}">${num}</span>${retry && retry.look ? texLook(qText, retry.look) : tex(qText)}${retry ? `<span class="wrongs" aria-live="polite"></span>` : ""}</div>${extra && retry && retry.lookGraph ? extra.replace('class="svgwrap"', 'class="svgwrap lookg"') : extra}${parts ? inputs : `<textarea aria-label="Your working"></textarea>`}
+  el.innerHTML = `<div class="qt"><button type="button" class="npbtn" data-np="${esc(key)}">📝 Notepad</button>${ladder ? `<button type="button" class="askhelp" data-ladder title="Get help with this question">💡 Help</button>` : ""}<span class="qn" style="background:${numCol}">${num}</span>${retry && retry.look ? texLook(qText, retry.look) : tex(qText)}${retry ? `<span class="wrongs" aria-live="polite"></span>` : ""}</div>${extra && retry && retry.lookGraph ? extra.replace('class="svgwrap"', 'class="svgwrap lookg"') : extra}${parts ? inputs : `<textarea aria-label="Your working"></textarea>`}
     <div class="qactions">${parts ? `<button class="primary" data-check>Check</button>` : ""}<button data-show ${parts ? "hidden" : ""}>Show the answer</button>${retry ? `<button class="primary" data-new hidden>Try a similar question</button>` : ""}<span class="fb small"></span></div>${retry ? `<div class="model hint hidden"><b>Hint:</b> ${tex(retry.hint)}${retry.look || retry.lookGraph ? ` <span class="small" style="color:var(--amber)">Look at the highlighted part of the question.</span>` : ""}</div>` : ""}<div class="helpbox" hidden></div>
     <div class="model hidden">${tex(model)}${parts ? "" : `<div class="qactions"><button data-self="1">I got it</button><button data-self="0">Not yet</button></div>`}</div>`;
   const parts$ = el.querySelectorAll(".part");
@@ -2879,7 +2882,7 @@ function buildStudent() {
   if (typeof DRAWQ !== "undefined" ? DRAWQ !== false : true) { const lastPart = secs.map(([k]) => /^p\d+$/.test(k)).lastIndexOf(true); secs.splice(lastPart + 1, 0, ["draw", "Draw graphs"]); }
   if (typeof GAME === "object" && GAME) secs.splice(secs.findIndex(([k]) => k === "board"), 0, ["game", "Game"]);
   root.innerHTML = `<div id="livebar"></div><div class="tabs" role="tablist" data-tc-tabs>${secs.map(([k, t]) => `<button data-sec="${k}" aria-pressed="false">${t}</button>`).join("")}</div><div id="secs"></div>`;
-  setTimeout(liveBar, 0);
+  setTimeout(liveBar, 0); setTimeout(() => NP.badges(), 0);
   const box = root.querySelector("#secs");
   const make = {
     donow() {
@@ -4580,7 +4583,7 @@ function handinSection() {
   d.className = "handin";
   d.innerHTML = `<h2>Hand in your work</h2><p class="intro noprint">Type your name and class, check your results, then send them to your teacher.</p>
     <div class="noprint"><label for="hiName">Your name</label><input type="text" id="hiName" autocomplete="name"><label for="hiClass">Your class</label><input type="text" id="hiClass" placeholder="e.g. 8X2"></div>
-    <div id="handinSheet"><div class="printhead"><h2>${esc(L.id)} ${tex(L.title)}</h2><p data-who></p></div><div class="summary" data-score></div><table class="htable"><thead><tr><th>Section</th><th>Question</th><th>Result</th></tr></thead><tbody></tbody></table></div>
+    <div id="handinSheet"><div class="printhead"><h2>${esc(L.id)} ${tex(L.title)}</h2><p data-who></p></div><div class="summary" data-score></div><table class="htable"><thead><tr><th>Section</th><th>Question</th><th>Result</th></tr></thead><tbody></tbody></table><div data-pads></div></div>
     <div class="hbtns noprint"><a class="primary" data-send target="_blank" rel="noopener" role="button">Send to my teacher</a><button data-pdf>Save as PDF</button><button data-copy>Copy my results</button><span class="fb small" data-msg></span></div>
     <p class="small muted noprint" data-sendnote></p>
     <details class="noprint" style="margin-top:22px"><summary class="small">Finished and handed in? Clear this device for the next person</summary><p class="small">This removes every answer saved on this device for this lesson.</p><button data-clear>Clear my answers</button></details>`;
@@ -4595,6 +4598,7 @@ function handinSection() {
     const score = `Exit A ${exitScore} · Do Now ${part((r) => r.sec === "Do Now")} · Part 1 ${part((r) => r.sec === "Part 1")} · Part 2 ${part((r) => r.sec === "Part 2")}${state.ext && state.ext.tried ? ` · Extension ${state.ext.correct} correct` : ""}`;
     d.querySelector("[data-score]").innerHTML = `<b>${esc(score)}</b><br><span class="small">${rows.filter((r) => r.tried).length} of ${rows.length} questions tried</span>`;
     d.querySelector("[data-who]").textContent = `${nm.value || "(no name)"} · ${cl.value || "(no class)"} · ${new Date().toLocaleString("en-GB")}`;
+    d.querySelector("[data-pads]").innerHTML = padsHTML();
     d.querySelector("tbody").innerHTML = rows.map((r) => `<tr><td>${esc(r.sec)}</td><td>${esc(r.label)}</td><td class="${r.cls}">${esc(r.status)}${r.note ? `<br><span class="small muted">Their answer: ${esc(r.note)}</span>` : ""}</td></tr>`).join("");
     // compact text for the form: one line per section, wrong items listed with the typed answer
     const secs = [...new Set(rows.filter((r) => !r.ext).map((r) => r.sec))];
@@ -4648,6 +4652,227 @@ function handinSection() {
   return d;
 }
 
+// ---------- Notepads: one ruled notepad per question for written working, typed or handwritten ----------
+// Saved in state.np[key] as { s: strokes, t: typed text, h: page height, v: version }. Strokes are { c: colour, w: width, p: [x, y, x, y, ...] }
+// in page units (the page is 800 units wide). Teacher feedback arrives in state.npFb[key] = { text, mark, s, at, seen }.
+const NP = (() => {
+  const W = 800, TOP = 56, MARGIN = 78;
+  const PAPERS = { white: "#FFFFFF", cream: "#FFFBEA", yellow: "#FFF5B8", blue: "#E3F0FF", green: "#E4F6E4", pink: "#FBE6EF", grey: "#EFEFEF" };
+  const PENS = ["#1D2C7A", "#111111", "#1F7A4D", "#7A2BB5", "#B05A00", "#0B6E99"];
+  const FONTS = { hand: "var(--hand), 'Comic Sans MS', cursive", clear: "var(--body), Arial, sans-serif", dys: "'Atkinson Hyperlegible', Verdana, sans-serif" };
+  const DEF = { pen: PENS[0], size: 3, paper: "cream", style: "lined", gap: 40, font: "hand", text: 1, left: false };
+  const set = () => Object.assign({}, DEF, state.npSet || {});
+  const pad = (key) => state.np && state.np[key];
+  const has = (key) => { const d = pad(key); return !!(d && ((d.s && d.s.length) || (d.t && d.t.trim()))); };
+  (() => { const st = document.createElement("style"); st.textContent = `
+.npbtn { float: right; margin: -2px 0 4px 8px; font: 800 13px var(--body); padding: 4px 10px; border-radius: 20px; border: 2px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; position: relative; }
+.npbtn.has { background: #EEF3FF; border-color: var(--blue); }
+.npbtn .dot { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; border-radius: 9px; background: var(--red); color: #fff; font: 800 11px/18px var(--body); padding: 0 4px; }
+.np-ov { position: fixed; inset: 0; z-index: 9500; background: rgba(20,24,40,.6); display: flex; justify-content: center; align-items: stretch; padding: 14px; }
+.np-win { width: min(980px, 100%); min-width: 0; max-width: 100%; display: flex; flex-direction: column; background: #EEE9DA; border: 2px solid var(--ink); border-radius: 12px; box-shadow: 6px 6px 0 var(--ink); overflow: hidden; }
+.np-head { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #fff; border-bottom: 2px solid var(--ink); }
+.np-head b { font: 800 17px var(--body); flex: 1; min-width: 0; }
+.np-q { padding: 8px 14px; background: #fff; border-bottom: 1px solid var(--line); font-size: 16px; line-height: 1.4; max-height: 22vh; overflow: auto; }
+.np-q .svgwrap svg { max-height: 18vh; width: auto; }
+.np-tools { display: flex; gap: 6px; padding: 8px 12px; flex-wrap: wrap; align-items: center; background: #F7F3E6; border-bottom: 1px solid #D8D0B8; }
+.np-win.left .np-tools { flex-direction: row-reverse; }
+.np-tools button, .np-head button { font: 800 14px var(--body); padding: 7px 11px; border-radius: 8px; border: 2px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; }
+.np-tools button.on { background: var(--ink); color: #fff; }
+.np-tools .sw { width: 26px; height: 26px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 2px var(--ink); cursor: pointer; padding: 0; }
+.np-tools .sw.on { box-shadow: 0 0 0 3px var(--blue); }
+.np-tools .sp { flex: 1; }
+.np-scroll { flex: 1; overflow: auto; padding: 18px; }
+.np-page { position: relative; margin: 0 auto; width: 100%; max-width: 860px; border-radius: 4px; box-shadow: 0 2px 0 #D9D2BC, 0 4px 0 #F6F1E2, 0 5px 0 #D9D2BC, 3px 9px 18px rgba(35,38,74,.25); touch-action: none; }
+.np-page::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: calc(var(--u) * 26px); background: repeating-linear-gradient(90deg, transparent 0 calc(var(--u) * 30px), rgba(60,60,60,.55) calc(var(--u) * 30px) calc(var(--u) * 42px), transparent calc(var(--u) * 42px) calc(var(--u) * 54px)); -webkit-mask: radial-gradient(circle at 50% 60%, #000 45%, transparent 50%) 0 0 / calc(var(--u) * 54px) 100%; mask: radial-gradient(circle at 50% 60%, #000 45%, transparent 50%) 0 0 / calc(var(--u) * 54px) 100%; pointer-events: none; }
+.np-page canvas { position: absolute; inset: 0; touch-action: none; }
+.np-page textarea { position: absolute; border: 0; outline: 0; resize: none; background: transparent; padding: 0; margin: 0; overflow: hidden; white-space: pre-wrap; }
+.np-page.mode-type textarea { z-index: 3; cursor: text; } .np-page.mode-type canvas.ink { pointer-events: none; }
+.np-page:not(.mode-type) textarea { pointer-events: none; }
+.np-more { display: block; margin: 14px auto 0; font: 800 14px var(--body); padding: 7px 14px; border-radius: 8px; border: 2px dashed var(--ink2); background: transparent; cursor: pointer; }
+.np-fb { margin: 0 auto 14px; max-width: 860px; border: 2px solid #D93A3A; background: #FFF1F1; border-radius: 8px; padding: 10px 12px; font: 600 16px/1.4 var(--body); }
+.np-fb b { color: #D93A3A; }
+.np-set { position: absolute; right: 14px; top: 110px; z-index: 5; width: min(360px, calc(100% - 28px)); background: #fff; border: 2px solid var(--ink); border-radius: 10px; box-shadow: 4px 4px 0 var(--ink); padding: 12px 14px; font: 600 14px var(--body); display: flex; flex-direction: column; gap: 10px; }
+.np-set .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.np-set .row > span { width: 100%; font-weight: 800; }
+.np-set button { font: 700 13px var(--body); padding: 5px 9px; border-radius: 6px; border: 2px solid var(--line); background: #fff; cursor: pointer; }
+.np-set button.on { border-color: var(--ink); background: var(--ink); color: #fff; }
+.np-q, .np-tools, .np-scroll { min-width: 0; } .np-q .katex-display, .np-q .svgwrap { overflow-x: auto; max-width: 100%; }
+@media (max-width: 600px) { .np-ov { padding: 4px; } .np-head b { font-size: 15px; } .np-tools button, .np-head button { padding: 6px 8px; font-size: 13px; } .np-tools .sw { width: 22px; height: 22px; } .np-scroll { padding: 10px 6px; } .np-set { top: 60px; right: 6px; width: calc(100% - 12px); max-height: 75vh; overflow: auto; } }
+.np-saved { font: 700 12px var(--body); color: var(--muted); }
+`; document.head.appendChild(st); })();
+
+  function paperCSS(S, u) {
+    const g = S.gap * u, top = TOP * u, col = S.style === "squared" ? "rgba(120,160,210,.45)" : "rgba(110,150,205,.75)";
+    const lines = S.style === "plain" ? "" : S.style === "squared"
+      ? `repeating-linear-gradient(180deg, transparent 0 ${g / 2 - 1}px, ${col} ${g / 2 - 1}px ${g / 2}px), repeating-linear-gradient(90deg, transparent 0 ${g / 2 - 1}px, ${col} ${g / 2 - 1}px ${g / 2}px),`
+      : `linear-gradient(90deg, transparent ${MARGIN * u - 4}px, #E79A9A ${MARGIN * u - 4}px ${MARGIN * u - 2.5}px, transparent ${MARGIN * u - 2.5}px), repeating-linear-gradient(180deg, transparent 0 ${g - 1.5}px, ${col} ${g - 1.5}px ${g}px),`;
+    return { background: `${lines} ${PAPERS[S.paper] || PAPERS.cream}`, pos: S.style === "lined" ? `0 0, 0 ${top}px` : "0 0, 0 0" };
+  }
+  // draw a notepad (and any teacher feedback) onto a canvas context, at scale k (page units → pixels)
+  function paint(ctx, d, k, opts = {}) {
+    const S = Object.assign({}, DEF, (opts.set || {})), h = (d && d.h) || 1000;
+    if (opts.paper) {
+      ctx.fillStyle = PAPERS[S.paper] || "#FFFBEA"; ctx.fillRect(0, 0, W * k, h * k);
+      if (S.style !== "plain") { ctx.strokeStyle = "rgba(110,150,205,.7)"; ctx.lineWidth = Math.max(1, k);
+        const g = S.style === "squared" ? S.gap / 2 : S.gap, y0 = S.style === "squared" ? 0 : TOP;
+        for (let y = y0 + g; y < h; y += g) { ctx.beginPath(); ctx.moveTo(0, y * k); ctx.lineTo(W * k, y * k); ctx.stroke(); }
+        if (S.style === "squared") for (let x = g; x < W; x += g) { ctx.beginPath(); ctx.moveTo(x * k, 0); ctx.lineTo(x * k, h * k); ctx.stroke(); }
+        else { ctx.strokeStyle = "#E79A9A"; ctx.beginPath(); ctx.moveTo((MARGIN - 3) * k, 0); ctx.lineTo((MARGIN - 3) * k, h * k); ctx.stroke(); } }
+    }
+    const strokes = (list) => (list || []).forEach((s) => { const p = s.p; if (!p || p.length < 2) return; ctx.strokeStyle = s.c; ctx.lineWidth = s.w * k; ctx.lineCap = ctx.lineJoin = "round"; ctx.beginPath(); ctx.moveTo(p[0] * k, p[1] * k); for (let i = 2; i < p.length; i += 2) ctx.lineTo(p[i] * k, p[i + 1] * k); if (p.length === 2) ctx.lineTo(p[0] * k + 0.1, p[1] * k); ctx.stroke(); });
+    if (d && d.t && opts.text) { // typed text, wrapped onto the lines
+      const fs = S.gap * 0.58 * S.text; ctx.fillStyle = d.tc || S.pen; const cssv = (v, f) => (getComputedStyle(document.body).getPropertyValue(v) || "").trim() || f;
+      ctx.font = `${fs * k}px ${S.font === "hand" ? cssv("--hand", "'Comic Sans MS', cursive") : S.font === "dys" ? "'Atkinson Hyperlegible', Verdana, sans-serif" : cssv("--body", "Arial, sans-serif")}`;
+      let y = TOP + S.gap * 0.84; const maxW = (W - MARGIN - 24) * k;
+      for (const para of d.t.split("\n")) { let line = ""; for (const w of para.split(" ")) { const t = line ? line + " " + w : w; if (ctx.measureText(t).width > maxW && line) { ctx.fillText(line, (MARGIN + 6) * k, y * k); y += S.gap; line = w; } else line = t; } ctx.fillText(line, (MARGIN + 6) * k, y * k); y += S.gap; }
+    }
+    strokes(d && d.s);
+    if (opts.fb && opts.fb.s) strokes(opts.fb.s);
+  }
+  function used(d, fb) { // how far down the page the work goes
+    let y = 0; const S = set(); [...(d.s || []), ...((fb && fb.s) || [])].forEach((st) => { for (let i = 1; i < st.p.length; i += 2) y = Math.max(y, st.p[i]); });
+    if (d.t) { const lines = d.t.split("\n").reduce((a, para) => a + Math.max(1, Math.ceil((para.length * S.gap * 0.58 * S.text * 0.52) / (W - MARGIN - 24))), 0); y = Math.max(y, TOP + lines * S.gap); }
+    return Math.min(d.h || 1000, Math.max(300, y + S.gap * 1.5));
+  }
+  function image(key, scale = 0.6, type = "image/jpeg") { // for the hand-in PDF
+    const d = pad(key); if (!d) return null; const cv = document.createElement("canvas"), h = used(d, state.npFb && state.npFb[key]); cv.width = W * scale; cv.height = h * scale;
+    paint(cv.getContext("2d"), d, scale, { paper: true, text: true, set: state.npSet, fb: state.npFb && state.npFb[key] }); return cv.toDataURL(type, 0.8);
+  }
+
+  // ---- the notepad window ----
+  function open(key, label, qHTML) {
+    const S = set(); state.np = state.np || {};
+    const d = state.np[key] || (state.np[key] = { s: [], t: "", h: 1000, v: 0 });
+    const fb = state.npFb && state.npFb[key];
+    const ov = document.createElement("div"); ov.className = "np-ov";
+    ov.innerHTML = `<div class="np-win${S.left ? " left" : ""}" role="dialog" aria-label="Notepad">
+      <div class="np-head"><b>📝 Notepad · ${esc(label)}</b><span class="np-saved" data-saved>Saved</span><button type="button" data-close>✓ Done</button></div>
+      <div class="np-q">${qHTML || ""}</div>
+      <div class="np-tools"><button type="button" data-tool="pen">✏️ Pen</button><button type="button" data-tool="type">⌨ Type</button><button type="button" data-tool="erase">🧽 Rubber</button>
+        <span data-sw></span><button type="button" data-undo>↶ Undo</button><button type="button" data-clear>🗑 Clear</button><span class="sp"></span><button type="button" data-set>⚙ Settings</button></div>
+      <div class="np-scroll">${fb && (fb.text || fb.mark) ? `<div class="np-fb"><b>Teacher:</b> ${fb.mark ? `<b>${fb.mark === "ok" ? "✓" : fb.mark === "no" ? "✗" : "½"}</b> ` : ""}${esc(fb.text || "")}</div>` : ""}<div class="np-page"><canvas class="fbl"></canvas><canvas class="ink"></canvas><textarea aria-label="Type your working" spellcheck="false"></textarea></div><button type="button" class="np-more" data-more>＋ More paper</button></div>
+    </div>`;
+    document.body.appendChild(ov);
+    if (fb && !fb.seen) { fb.seen = Date.now(); save(); badges(); }
+    const win = ov.querySelector(".np-win"), page = ov.querySelector(".np-page"), cv = ov.querySelector("canvas.ink"), fcv = ov.querySelector("canvas.fbl"), ta = ov.querySelector("textarea"), ctx = cv.getContext("2d");
+    let tool = "pen", u = 1, hist = [], cur = null, erasing = false, saveT = null;
+    const snap = () => JSON.stringify({ s: d.s, t: d.t });
+    const push = () => { hist.push(snap()); if (hist.length > 40) hist.shift(); };
+    const saved = (t) => (ov.querySelector("[data-saved]").textContent = t);
+    function persist() { d.v = (d.v || 0) + 1; d.upd = Date.now(); saved("Saving…"); clearTimeout(saveT); saveT = setTimeout(() => { save(); saved("Saved"); sync(key); badges(); }, 600); }
+    function layout() {
+      const S2 = set(); u = page.clientWidth / W; page.style.setProperty("--u", u);
+      page.style.height = d.h * u + "px"; const P = paperCSS(S2, u); page.style.background = P.background; page.style.backgroundPosition = P.pos;
+      const k = window.devicePixelRatio || 1;
+      [cv, fcv].forEach((c) => { c.width = page.clientWidth * k; c.height = d.h * u * k; c.style.width = page.clientWidth + "px"; c.style.height = d.h * u + "px"; });
+      const fs = S2.gap * 0.58 * S2.text * u;
+      Object.assign(ta.style, { left: (MARGIN + 6) * u + "px", top: (TOP + S2.gap * 0.18) * u + "px", width: (W - MARGIN - 24) * u + "px", height: (d.h - TOP - 10) * u + "px", fontSize: fs + "px", lineHeight: S2.gap * u + "px", fontFamily: FONTS[S2.font], color: d.tc || S2.pen });
+      ta.value = d.t || ""; win.classList.toggle("left", !!S2.left); render();
+    }
+    function render() {
+      const k = (window.devicePixelRatio || 1) * u;
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); paint(ctx, d, k);
+      const f2 = fcv.getContext("2d"); f2.setTransform(1, 0, 0, 1, 0, 0); f2.clearRect(0, 0, fcv.width, fcv.height); if (fb && fb.s) paint(f2, { s: fb.s }, k);
+      if (cur && cur.p.length) paint(ctx, { s: [cur] }, k);
+    }
+    const pos = (e) => { const r = cv.getBoundingClientRect(); return [Math.round(((e.clientX - r.left) / r.width) * W * 2) / 2, Math.round(((e.clientY - r.top) / r.height) * d.h * 2) / 2]; };
+    function eraseAt(x, y) { // rub out only the bits under the rubber, so work can be amended rather than restarted
+      const R2 = (set().size * 3 + 10) ** 2; let changed = false; const out = [];
+      for (const s of d.s) { let seg = []; const p = s.p;
+        for (let i = 0; i < p.length; i += 2) { if ((p[i] - x) ** 2 + (p[i + 1] - y) ** 2 <= R2) { changed = true; if (seg.length > 2) out.push({ c: s.c, w: s.w, p: seg }); seg = []; } else seg.push(p[i], p[i + 1]); }
+        if (seg.length >= 2) out.push({ c: s.c, w: s.w, p: seg }); }
+      if (changed) { d.s = out; render(); }
+      return changed;
+    }
+    cv.addEventListener("pointerdown", (e) => {
+      if (tool === "type") return; e.preventDefault(); cv.setPointerCapture(e.pointerId); push(); const [x, y] = pos(e);
+      if (tool === "erase") { erasing = true; if (!eraseAt(x, y)) hist.pop(); return; }
+      const S2 = set(); cur = { c: S2.pen, w: S2.size, p: [x, y] }; render();
+    });
+    cv.addEventListener("pointermove", (e) => {
+      if (erasing) { const [x, y] = pos(e); eraseAt(x, y); return; }
+      if (!cur) return; const [x, y] = pos(e), n = cur.p.length; if ((cur.p[n - 2] - x) ** 2 + (cur.p[n - 1] - y) ** 2 > 2) { cur.p.push(x, y); render(); }
+    });
+    const end = () => { if (erasing) { erasing = false; persist(); return; } if (!cur) return; d.s.push(cur); cur = null; render(); persist(); };
+    cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+    let typing = null; ta.addEventListener("input", () => { if (!typing) push(); clearTimeout(typing); typing = setTimeout(() => (typing = null), 1200); d.t = ta.value; d.tc = set().pen;
+      // keep adding paper while they type
+      if (ta.scrollHeight > ta.clientHeight + 2) { d.h += 400; layout(); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } persist(); });
+    function setTool(t) { tool = t; ov.querySelectorAll("[data-tool]").forEach((b) => b.classList.toggle("on", b.dataset.tool === t)); page.classList.toggle("mode-type", t === "type"); cv.style.cursor = t === "erase" ? "cell" : "crosshair"; if (t === "type") ta.focus(); }
+    function swatches() { const S2 = set(); ov.querySelector("[data-sw]").innerHTML = PENS.map((c) => `<button type="button" class="sw${c === S2.pen ? " on" : ""}" data-pen="${c}" style="background:${c}" aria-label="Pen colour"></button>`).join(""); ov.querySelectorAll("[data-pen]").forEach((b) => (b.onclick = () => { state.npSet = Object.assign(set(), { pen: b.dataset.pen }); save(); swatches(); ta.style.color = b.dataset.pen; if (tool === "erase") setTool("pen"); })); }
+    ov.querySelectorAll("[data-tool]").forEach((b) => (b.onclick = () => setTool(b.dataset.tool)));
+    ov.querySelector("[data-undo]").onclick = () => { const h = hist.pop(); if (!h) return; const o = JSON.parse(h); d.s = o.s; d.t = o.t; ta.value = d.t; render(); persist(); };
+    ov.querySelector("[data-clear]").onclick = () => { if (!d.s.length && !d.t) return; if (!confirmIn(ov, "Clear everything on this notepad?", () => { push(); d.s = []; d.t = ""; ta.value = ""; render(); persist(); })) return; };
+    ov.querySelector("[data-more]").onclick = () => { d.h += 500; layout(); persist(); ov.querySelector(".np-scroll").scrollBy({ top: 400, behavior: "smooth" }); };
+    ov.querySelector("[data-set]").onclick = () => settings(ov, () => { layout(); swatches(); });
+    const close = () => { clearTimeout(saveT); save(); sync(key); badges(); ov.remove(); removeEventListener("resize", layout); };
+    ov.querySelector("[data-close]").onclick = close; ov.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+    addEventListener("resize", layout); swatches(); setTool(d.t && !d.s.length ? "type" : "pen"); requestAnimationFrame(layout);
+    return { close, d };
+  }
+  // a small yes/no box inside the notepad, instead of a browser dialog (those are blocked inside Google Sites)
+  function confirmIn(ov, msg, yes) {
+    const b = document.createElement("div"); b.className = "np-set"; b.style.top = "60px";
+    b.innerHTML = `<div>${esc(msg)}</div><div class="row"><button type="button" class="on" data-y>Yes, clear it</button><button type="button" data-n>No</button></div>`;
+    ov.querySelector(".np-win").appendChild(b); b.querySelector("[data-y]").onclick = () => { b.remove(); yes(); }; b.querySelector("[data-n]").onclick = () => b.remove(); return false;
+  }
+  function settings(ov, done) {
+    const old = ov.querySelector(".np-set.cfg"); if (old) { old.remove(); return; }
+    const b = document.createElement("div"); b.className = "np-set cfg";
+    const row = (title, keyName, opts) => `<div class="row"><span>${title}</span>${opts.map(([v, t]) => `<button type="button" data-k="${keyName}" data-v="${v}" class="${String(set()[keyName]) === String(v) ? "on" : ""}">${t}</button>`).join("")}</div>`;
+    b.innerHTML = row("Pen size", "size", [[2, "Thin"], [3, "Medium"], [5, "Thick"], [8, "Extra thick"]]) +
+      row("Paper colour", "paper", Object.keys(PAPERS).map((p) => [p, `<i style="display:inline-block;width:12px;height:12px;border-radius:3px;border:1px solid #999;background:${PAPERS[p]};margin-right:4px;vertical-align:-1px"></i>${p[0].toUpperCase() + p.slice(1)}`])) +
+      row("Paper", "style", [["lined", "Lined"], ["squared", "Squared"], ["plain", "Plain"]]) +
+      row("Line spacing", "gap", [[32, "Narrow"], [40, "Normal"], [52, "Wide"], [64, "Extra wide"]]) +
+      row("Typing font", "font", [["hand", "Handwriting"], ["clear", "Clear"], ["dys", "Easy-read"]]) +
+      row("Typing size", "text", [[0.85, "Small"], [1, "Normal"], [1.2, "Large"]]) +
+      row("Tools on the", "left", [["false", "Right-handed"], ["true", "Left-handed"]]) +
+      `<div class="row"><button type="button" data-ok class="on">Done</button></div>`;
+    ov.querySelector(".np-win").appendChild(b);
+    b.querySelectorAll("[data-k]").forEach((x) => (x.onclick = () => { const v = x.dataset.v, k = x.dataset.k; state.npSet = Object.assign(set(), { [k]: k === "left" ? v === "true" : isNaN(+v) ? v : +v }); save(); b.querySelectorAll(`[data-k="${k}"]`).forEach((y) => y.classList.toggle("on", y === x)); done(); }));
+    b.querySelector("[data-ok]").onclick = () => b.remove();
+  }
+  // the 📝 buttons: show which questions have work, and which have new feedback
+  function badges() {
+    document.querySelectorAll("[data-np]").forEach((b) => {
+      const k = b.dataset.np, f = state.npFb && state.npFb[k], fresh = f && !f.seen;
+      b.classList.toggle("has", has(k)); b.innerHTML = `📝 Notepad${fresh ? `<span class="dot">1</span>` : ""}`; b.title = fresh ? "Your teacher left feedback" : has(k) ? "Open your working" : "Open a notepad for your working";
+    });
+  }
+  // live: send a notepad to the teacher a moment after it changes
+  const syncT = {};
+  function sync(key) {
+    if (!window.__live || !LIVE.url || !String(state.name || "").trim()) return;
+    clearTimeout(syncT[key]);
+    syncT[key] = setTimeout(() => { const d = pad(key); if (!d) return; const body = JSON.stringify({ t: "np", lesson: L.id, name: state.name, cls: state.cls, q: key, label: (QLABEL[key] || QLABEL[key.split("~")[0]] || key), data: JSON.stringify({ s: d.s, t: d.t, h: d.h, tc: d.tc, v: d.v, set: state.npSet || null }).slice(0, 95000) });
+      try { fetch(LIVE.url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body }).catch(() => {}); } catch (e) { /* offline */ } }, 1800);
+  }
+  function index() { const o = {}; Object.keys(state.np || {}).forEach((k) => { if (has(k)) o[k] = state.np[k].v || 1; }); return o; }
+  async function pullFeedback(fbIndex) { // the teacher has written on some notepads: fetch what's new
+    for (const [k, at] of Object.entries(fbIndex || {})) {
+      const mine = state.npFb && state.npFb[k]; if (mine && mine.at >= at) continue;
+      try { const r = await fetch(`${LIVE.url}?t=fbget&lesson=${encodeURIComponent(L.id)}&id=${encodeURIComponent(String(state.cls).toUpperCase() + "|" + state.name)}&q=${encodeURIComponent(k)}`), j = await r.json();
+        if (j && j.ok && j.fb) { state.npFb = state.npFb || {}; state.npFb[k] = Object.assign(j.fb, { seen: 0 }); save(); badges(); fbPill(k); } } catch (e) { /* try next time */ }
+    }
+  }
+  function fbPill(k) {
+    let p = document.getElementById("fbPill"); if (!p) { p = document.createElement("div"); p.id = "fbPill"; document.body.appendChild(p); }
+    p.innerHTML = `<span>💬 Your teacher left feedback on <b>${esc(QLABEL[k] || QLABEL[k.split("~")[0]] || "a question")}</b>.</span><button type="button" data-o>Open</button><button type="button" data-x>✕</button>`;
+    p.querySelector("[data-x]").onclick = () => p.remove();
+    p.querySelector("[data-o]").onclick = () => { p.remove(); const b = document.querySelector(`[data-np="${CSS.escape(k)}"]`); if (b) { b.closest(".q") && b.closest(".q").scrollIntoView({ block: "center" }); b.click(); } };
+  }
+  return { open, paint, image, has, badges, sync, index, pullFeedback, W, pad, set, PAPERS, used };
+})();
+// open a question's notepad from its 📝 button
+document.addEventListener("click", (e) => {
+  const b = e.target.closest && e.target.closest("[data-np]"); if (!b) return;
+  e.preventDefault(); e.stopPropagation(); gather();
+  const k = b.dataset.np, q = b.closest(".q"), qt = q && q.querySelector(".qt"), clone = qt ? qt.cloneNode(true) : null;
+  if (clone) clone.querySelectorAll("button, .wrongs").forEach((x) => x.remove());
+  const graph = q && q.querySelector(".svgwrap");
+  NP.open(k, QLABEL[k] || QLABEL[k.split("~")[0]] || "Question", (clone ? clone.innerHTML : "") + (graph ? graph.outerHTML : ""));
+}, true);
+
 // ---------- Live class: progress to the teacher's laptop, and hand-in to the teacher's Drive ----------
 // LIVE.url is the teacher's Google Apps Script web app (see the setup notes). Without it, none of this runs.
 const LIVE = {"url": ""};
@@ -4664,6 +4889,8 @@ const LIVE_IDLE = 90; // seconds without touching the lesson before a student sh
 @media (max-width: 640px) { .helpbox .hb-s { grid-template-columns: 22px 1fr; } .helpbox .hb-e { grid-column: 2; } }
 .askhelp.on { background: var(--amber); color: #fff; }
 #helpPill { position: fixed; right: 18px; bottom: 18px; z-index: 8000; max-width: min(440px, calc(100vw - 36px)); display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 2px solid var(--ink); border-radius: 12px; background: #FFF6DA; box-shadow: 4px 4px 0 var(--ink); font: 700 15px/1.35 var(--body); }
+#fbPill { position: fixed; right: 18px; bottom: 84px; z-index: 8000; max-width: min(440px, calc(100vw - 36px)); display: flex; align-items: center; gap: 8px; padding: 10px 14px; border: 2px solid #D93A3A; border-radius: 12px; background: #FFF1F1; box-shadow: 4px 4px 0 var(--ink); font: 700 15px/1.35 var(--body); }
+#fbPill button { font: 800 13px var(--body); padding: 4px 10px; border-radius: 6px; border: 2px solid var(--ink); background: #fff; cursor: pointer; flex: none; }
 #helpPill.seen { background: #EFFAF3; border-color: var(--green); }
 #helpPill button { font: 800 13px var(--body); padding: 4px 10px; border-radius: 6px; border: 2px solid var(--ink); background: #fff; cursor: pointer; flex: none; }
 .lv-alerts { display: flex; flex-direction: column; gap: 6px; padding: 10px 18px; border-bottom: 2px solid var(--line); max-height: 34%; overflow: auto; }
@@ -4722,19 +4949,19 @@ window.__live = (() => {
   function payload(t) {
     const rows = gather(), btn = document.querySelector('#student .tabs button[aria-pressed="true"]');
     const bu = typeof BUILDUP === "object" && BUILDUP ? Object.keys(BUILDUP).map((ci) => `${(state["bu" + ci] && state["bu" + ci].done) || 0}/${BUILDUP[ci].cards.length}`).join(" ") : "";
-    return { t, lesson: L.id, name: String(state.name || "").trim(), cls: String(state.cls || "").trim(), vis: document.hidden ? "hidden" : "visible", focus: document.hasFocus(), idle: Math.round((Date.now() - lastInput) / 1000), sec: btn ? btn.textContent.trim() : "", bu, r: rows.map((r) => (r.ok ? "1" : r.tried ? "2" : "0")).join(""), w: rows.map((r) => Math.min(9, r.wrong || 0)).join(""), help: state.help && !state.help.seen ? state.help : null };
+    return { t, lesson: L.id, name: String(state.name || "").trim(), cls: String(state.cls || "").trim(), vis: document.hidden ? "hidden" : "visible", focus: document.hasFocus(), idle: Math.round((Date.now() - lastInput) / 1000), sec: btn ? btn.textContent.trim() : "", bu, r: rows.map((r) => (r.ok ? "1" : r.tried ? "2" : "0")).join(""), w: rows.map((r) => Math.min(9, r.wrong || 0)).join(""), help: state.help && !state.help.seen ? state.help : null, np: NP.index() };
   }
   function send(t) {
     if (!started) return; const p = payload(t); if (!p.name) return; const body = JSON.stringify(p);
     if (t === "bye" && navigator.sendBeacon) { try { if (navigator.sendBeacon(LIVE.url, new Blob([body], { type: "text/plain" }))) return; } catch (e) { /* fall through */ } }
     try {
       fetch(LIVE.url, { method: "POST", headers: { "Content-Type": "text/plain" }, body, keepalive: true })
-        .then((r) => r.json()).then((j) => { if (j && j.ack && state.help && !state.help.seen && j.ack >= state.help.at) { state.help.seen = Date.now(); save(); helpPill(); } })
+        .then((r) => r.json()).then((j) => { if (j && j.ack && state.help && !state.help.seen && j.ack >= state.help.at) { state.help.seen = Date.now(); save(); helpPill(); } if (j && j.fb) NP.pullFeedback(j.fb); })
         .catch(() => fetch(LIVE.url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body }).catch(() => {}));
     } catch (e) { /* offline */ }
   }
   function beatSoon(ms = 1500) { if (!started) return; clearTimeout(soon); soon = setTimeout(() => send("beat"), ms); }
-  function start() { if (started) return beatSoon(100); started = true; send("beat"); timer = setInterval(() => send("beat"), 12000); addEventListener("pagehide", () => send("bye")); }
+  function start() { if (started) return beatSoon(100); started = true; send("beat"); Object.keys(state.np || {}).forEach((k) => NP.sync(k)); timer = setInterval(() => send("beat"), 12000); addEventListener("pagehide", () => send("bye")); }
   return { start, beatSoon, send };
 })();
 
@@ -4777,17 +5004,80 @@ function liveBar() {
   box.querySelector("button").onclick = go; [nm, cl].forEach((i) => i.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); }));
 }
 
+// the written working from every notepad, with any teacher feedback, for the hand-in sheet and PDF
+function padsHTML(plain) {
+  gather(); const keys = Object.keys(state.np || {}).filter((k) => NP.has(k)); if (!keys.length) return "";
+  return `<h3 style="margin:18px 0 6px">Written working (${keys.length} notepad${keys.length === 1 ? "" : "s"})</h3>` + keys.map((k) => { const f = state.npFb && state.npFb[k];
+    return `<div style="page-break-inside:avoid;margin:0 0 14px"><p style="margin:4px 0"><b>${esc(QLABEL[k] || QLABEL[k.split("~")[0]] || k)}</b>${f && (f.text || f.mark) ? ` · <span style="color:#c62828">Teacher: ${f.mark ? (f.mark === "ok" ? "✓ " : f.mark === "no" ? "✗ " : "½ ") : ""}${esc(f.text || "")}</span>` : ""}</p><img src="${NP.image(k, plain ? 0.5 : 0.6)}" alt="Notepad" style="width:${plain ? "15cm" : "100%"};max-width:640px;border:1px solid #ccc"></div>`; }).join("");
+}
 // a plain page for the PDF in the teacher's Drive (Google's converter ignores scripts and most styling)
 function handinHTML(name, cls, score) {
   const rows = gather(), plain = (t) => String(t || "").replace(/\$|\\[a-z]+|[{}]/gi, "");
   return `<html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;font-size:11pt;color:#222}h1{font-size:16pt;margin:0 0 4px}p{margin:2px 0 8px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #bbb;padding:4px 6px;text-align:left;font-size:10pt}th{background:#eee}.ok{color:#1a7f37;font-weight:bold}.no{color:#c62828;font-weight:bold}.small{color:#666;font-size:9pt}</style></head><body>` +
     `<h1>${esc(L.id)} ${esc(plain(L.title))}</h1><p><b>${esc(name)}</b> · ${esc(cls)} · ${esc(new Date().toLocaleString("en-GB"))}</p><p><b>${esc(score)}</b><br><span class="small">${rows.filter((r) => r.tried).length} of ${rows.length} questions tried</span></p>` +
     `<table><tr><th>Section</th><th>Question</th><th>Result</th></tr>${rows.map((r) => `<tr><td>${esc(r.sec)}</td><td>${esc(r.label)}</td><td class="${r.cls}">${esc(r.status)}${r.note ? `<br><span class="small">Their answer: ${esc(r.note)}</span>` : ""}</td></tr>`).join("")}</table>` +
-    `<p class="small">© J. Wilkinson 2026 · All rights reserved</p></body></html>`;
+    padsHTML(true) + `<p class="small">© J. Wilkinson 2026 · All rights reserved</p></body></html>`;
 }
 async function liveHandin(name, cls, score) {
   const res = await fetch(LIVE.url, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ t: "handin", lesson: L.id, name, cls, score, html: handinHTML(name, cls, score) }) });
   const j = await res.json(); if (!j || !j.ok) throw new Error((j && j.error) || "failed"); return j;
+}
+
+// ---------- teacher: a student's notepads, one at a time or as one document, with live feedback ----------
+async function npFetch(id) {
+  const key = (() => { try { return localStorage.getItem("jw-live-key") || ""; } catch (e) { return ""; } })();
+  const r = await fetch(`${LIVE.url}?t=nps&lesson=${encodeURIComponent(L.id)}&id=${encodeURIComponent(id)}&key=${encodeURIComponent(key)}`); return r.json();
+}
+function npCanvas(d, fb, width, crop) {
+  const set = Object.assign({}, d.set || {}), k = width / NP.W, cv = document.createElement("canvas"), h = crop ? Math.min(d.h || 1000, Math.max(300, (() => { let y = 0; [...(d.s || []), ...((fb && fb.s) || [])].forEach((st) => { for (let i = 1; i < st.p.length; i += 2) y = Math.max(y, st.p[i]); }); if (d.t) y = Math.max(y, 56 + (d.t.split("\n").length + Math.floor(d.t.length / 60)) * ((set.gap || 40))); return y + 60; })())) : d.h || 1000, dpr = window.devicePixelRatio || 1;
+  cv.width = width * dpr; cv.height = h * k * dpr; cv.style.width = width + "px"; cv.style.height = h * k + "px";
+  NP.paint(cv.getContext("2d"), d, k * dpr, { paper: true, text: true, set, fb }); return cv;
+}
+function npTeacherDoc(s, data) { // every notepad, in question order, as one document
+  const ov = document.createElement("div"); ov.className = "np-ov";
+  const keys = Object.keys(data.pads || {});
+  ov.innerHTML = `<div class="np-win"><div class="np-head"><b>📝 ${esc(s.name)} · ${esc(s.cls)} · all written work</b><button type="button" data-p>🖨 Print / PDF</button><button type="button" data-x>✕ Close</button></div><div class="np-scroll" data-list></div></div>`;
+  document.body.appendChild(ov);
+  const list = ov.querySelector("[data-list]"), w = Math.min(760, list.clientWidth - 40);
+  if (!keys.length) list.innerHTML = `<p style="font:700 17px var(--body);text-align:center">No written work yet.</p>`;
+  keys.forEach((k) => { const p = data.pads[k], d = JSON.parse(p.data || "{}"), fb = (data.fbs || {})[k];
+    const box = document.createElement("div"); box.style.cssText = "max-width:800px;margin:0 auto 22px";
+    box.innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><b style="font:800 17px var(--body);flex:1">${esc(p.label || k)}</b>${fb ? `<span style="color:#D93A3A;font:700 14px var(--body)">Feedback sent ${fb.mark ? (fb.mark === "ok" ? "✓" : fb.mark === "no" ? "✗" : "½") : ""}</span>` : ""}<button type="button" style="font:800 13px var(--body);padding:5px 10px;border-radius:6px;border:2px solid var(--ink);background:#fff">✏️ Feedback</button></div>`;
+    box.appendChild(npCanvas(d, fb, w, true)); box.querySelector("button").onclick = () => npTeacherOne(s, k, p, fb, () => { ov.remove(); npFetch(s.cls + "|" + s.name).then((j) => npTeacherDoc(s, j)); });
+    list.appendChild(box); });
+  ov.querySelector("[data-x]").onclick = () => ov.remove();
+  ov.querySelector("[data-p]").onclick = () => { const html = `<h2>${esc(L.id)} · ${esc(s.name)} · ${esc(s.cls)}</h2>` + [...list.children].map((b) => { const c = b.querySelector("canvas"); return c ? `<div style="page-break-inside:avoid;margin-bottom:14px"><p><b>${esc(b.querySelector("b").textContent)}</b></p><img src="${c.toDataURL("image/jpeg", 0.85)}" style="width:100%"></div>` : ""; }).join(""); if (!printCopy(html, `${L.id} ${s.name}`, "")) alert("Printing is blocked here."); };
+}
+function npTeacherOne(s, k, p, fb0, after) { // one notepad, with a red pen, a mark and a comment for the student
+  const d = JSON.parse(p.data || "{}"), fb = { s: (fb0 && fb0.s) || [], text: (fb0 && fb0.text) || "", mark: (fb0 && fb0.mark) || "" };
+  const ov = document.createElement("div"); ov.className = "np-ov";
+  ov.innerHTML = `<div class="np-win"><div class="np-head"><b>📝 ${esc(s.name)} · ${esc(p.label || k)}</b><button type="button" data-x>✕ Close</button></div>
+    <div class="np-tools"><button type="button" data-t="pen" class="on">🖍 Red pen</button><button type="button" data-t="rub">🧽 Rubber</button><button type="button" data-u>↶ Undo</button><span class="sp"></span>
+      <button type="button" data-m="ok">✓ Correct</button><button type="button" data-m="half">½ Partly</button><button type="button" data-m="no">✗ Not yet</button></div>
+    <div class="np-scroll"><div style="max-width:820px;margin:0 auto 12px;display:flex;gap:8px"><input data-c type="text" placeholder="Comment for the student, e.g. Check the sign of the gradient" style="flex:1;font:600 16px var(--body);padding:8px 10px;border:2px solid var(--ink);border-radius:8px"><button type="button" data-send style="font:800 15px var(--body);padding:8px 14px;border-radius:8px;border:2px solid #D93A3A;background:#D93A3A;color:#fff">Send feedback</button></div><div data-pg style="position:relative;max-width:820px;margin:0 auto"></div><p data-st style="text-align:center;font:700 14px var(--body)"></p></div></div>`;
+  document.body.appendChild(ov);
+  const host = ov.querySelector("[data-pg]"); let cv, tool = "pen", cur = null, hist = [];
+  const draw = () => { const w = host.clientWidth; host.innerHTML = ""; cv = npCanvas(d, fb, w); cv.style.touchAction = "none"; cv.style.cursor = "crosshair"; host.appendChild(cv); bind(); };
+  const pos = (e) => { const r = cv.getBoundingClientRect(); return [Math.round(((e.clientX - r.left) / r.width) * NP.W), Math.round(((e.clientY - r.top) / r.height) * (d.h || 1000))]; };
+  function bind() {
+    cv.onpointerdown = (e) => { e.preventDefault(); cv.setPointerCapture(e.pointerId); hist.push(JSON.stringify(fb.s)); const [x, y] = pos(e); if (tool === "rub") { rub(x, y); cur = { rub: 1 }; return; } cur = { c: "#D93A3A", w: 3, p: [x, y] }; };
+    cv.onpointermove = (e) => { if (!cur) return; const [x, y] = pos(e); if (cur.rub) return rub(x, y); cur.p.push(x, y); const ctx = cv.getContext("2d"), k = cv.width / NP.W; NP.paint(ctx, { s: [{ c: cur.c, w: cur.w, p: cur.p.slice(-4) }] }, k); };
+    cv.onpointerup = () => { if (cur && !cur.rub) fb.s.push(cur); cur = null; draw(); };
+  }
+  function rub(x, y) { const n = fb.s.length; fb.s = fb.s.filter((st) => { for (let i = 0; i < st.p.length; i += 2) if ((st.p[i] - x) ** 2 + (st.p[i + 1] - y) ** 2 < 300) return false; return true; }); if (fb.s.length !== n) draw(); }
+  ov.querySelectorAll("[data-t]").forEach((b) => (b.onclick = () => { tool = b.dataset.t; ov.querySelectorAll("[data-t]").forEach((x) => x.classList.toggle("on", x === b)); }));
+  const markUI = () => ov.querySelectorAll("[data-m]").forEach((b) => b.classList.toggle("on", b.dataset.m === fb.mark));
+  ov.querySelectorAll("[data-m]").forEach((b) => (b.onclick = () => { fb.mark = fb.mark === b.dataset.m ? "" : b.dataset.m; markUI(); }));
+  ov.querySelector("[data-u]").onclick = () => { const h = hist.pop(); if (h) { fb.s = JSON.parse(h); draw(); } };
+  const c = ov.querySelector("[data-c]"); c.value = fb.text;
+  ov.querySelector("[data-send]").onclick = async () => {
+    const st = ov.querySelector("[data-st]"); st.textContent = "Sending…"; fb.text = c.value.trim(); fb.at = Date.now();
+    const key = (() => { try { return localStorage.getItem("jw-live-key") || ""; } catch (e) { return ""; } })();
+    try { const r = await fetch(LIVE.url, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ t: "fb", key, lesson: L.id, id: s.cls + "|" + s.name, q: k, fb }) }); const j = await r.json(); if (!j.ok) throw new Error(j.error);
+      st.textContent = "✓ Sent. It appears on their notepad within a few seconds."; st.style.color = "#1F9D55"; } catch (e) { st.textContent = "Couldn't send. Check the key and try again."; st.style.color = "#D93A3A"; }
+  };
+  ov.querySelector("[data-x]").onclick = () => { ov.remove(); if (after) after(); };
+  markUI(); requestAnimationFrame(draw);
 }
 
 // ---------- the teacher's live class view ----------
@@ -4811,6 +5101,10 @@ function openLive() {
   const ago = (ms) => { const s2 = Math.max(0, Math.round(ms / 1000)); return s2 < 60 ? `${s2}s ago` : `${Math.round(s2 / 60)} min ago`; };
   async function ack(id) { try { await fetch(`${LIVE.url}?t=ack&lesson=${encodeURIComponent(L.id)}&id=${encodeURIComponent(id)}&key=${encodeURIComponent(keyGet())}`); } catch (e) { /* try again next poll */ } poll(); }
   const labels = gather().map((r) => [r.sec, r.label]);
+  // which notepad key goes with each row of the table (by its label)
+  const byLabel = {}; Object.entries(QLABEL).forEach(([k, lab]) => { byLabel[lab] = byLabel[lab] || k; });
+  const keysByLabel = labels.map(([sec, lab]) => byLabel[`${sec} · ${lab}`]);
+  const npKey = (s, base) => base && Object.keys(s.np || {}).filter((k) => k.split("~")[0] === base).sort((a, b) => (s.np[b] || 0) - (s.np[a] || 0))[0];
   let data = {}, picked = null, tm = null, alive = true;
   const keyGet = () => { try { return localStorage.getItem("jw-live-key") || ""; } catch (e) { return ""; } };
   function askKey(msg) {
@@ -4851,14 +5145,18 @@ function openLive() {
     firstPoll = false;
     if (!list.length) { grid.innerHTML = `<div class="lv-empty">No students yet. They appear when they type their name and class at the top of the lesson.</div>`; return; }
     grid.innerHTML = st.map(([s, x]) => { const code = s.r || "", ok = (code.match(/1/g) || []).length, bad = (code.match(/2/g) || []).length;
-      return `<div class="lv-card" data-id="${esc(s.cls + "|" + s.name)}" style="border-left-color:${x[2]}"><div class="n">${esc(s.name)}<span>${esc(s.cls)}</span></div><div class="s" style="color:${x[2]}">● ${x[1]}</div><div class="m">${s.sec ? `On <b>${esc(s.sec)}</b>` : ""}${s.bu ? ` · Build it up ${esc(s.bu)}` : ""}</div><div class="m">${ok} right · ${bad} wrong · ${code.length - ok - bad} not tried</div>${s.help && !(s.ack >= s.help.at) ? `<div class="hl">✋ Asked for help: ${esc(s.help.q)}</div>` : ""}${[...(s.w || "")].some((c, i) => +c >= STUCK && code[i] !== "1") ? `<div class="st">⚠️ Stuck on ${[...(s.w || "")].map((c, i) => (+c >= STUCK && code[i] !== "1" ? (labels[i] ? labels[i][1] : `Q${i + 1}`) : null)).filter(Boolean).map(esc).join(", ")}</div>` : ""}<div class="lv-bar">${[...code].map((c) => `<i class="${c === "1" ? "k" : c === "2" ? "w" : ""}"></i>`).join("")}</div></div>`; }).join("");
+      return `<div class="lv-card" data-id="${esc(s.cls + "|" + s.name)}" style="border-left-color:${x[2]}"><div class="n">${esc(s.name)}<span>${esc(s.cls)}</span></div><div class="s" style="color:${x[2]}">● ${x[1]}</div><div class="m">${s.sec ? `On <b>${esc(s.sec)}</b>` : ""}${s.bu ? ` · Build it up ${esc(s.bu)}` : ""}</div><div class="m">${ok} right · ${bad} wrong · ${code.length - ok - bad} not tried</div>${s.help && !(s.ack >= s.help.at) ? `<div class="hl">✋ Asked for help: ${esc(s.help.q)}</div>` : ""}${[...(s.w || "")].some((c, i) => +c >= STUCK && code[i] !== "1") ? `<div class="st">⚠️ Stuck on ${[...(s.w || "")].map((c, i) => (+c >= STUCK && code[i] !== "1" ? (labels[i] ? labels[i][1] : `Q${i + 1}`) : null)).filter(Boolean).map(esc).join(", ")}</div>` : ""}${s.np && Object.keys(s.np).length ? `<div class="m">📝 ${Object.keys(s.np).length} notepad${Object.keys(s.np).length === 1 ? "" : "s"} with working</div>` : ""}<div class="lv-bar">${[...code].map((c) => `<i class="${c === "1" ? "k" : c === "2" ? "w" : ""}"></i>`).join("")}</div></div>`; }).join("");
     grid.querySelectorAll(".lv-card").forEach((c) => (c.onclick = () => { picked = c.dataset.id; detail(); }));
     detail();
   }
   function detail() {
     const s = Object.values(data.students || {}).find((x) => x.cls + "|" + x.name === picked); if (!s) { det.hidden = true; return; }
     const code = s.r || ""; det.hidden = false;
-    det.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><b style="font:800 18px var(--body)">${esc(s.name)} · ${esc(s.cls)}</b><button type="button" data-c style="font:800 14px var(--body);padding:4px 10px;border:2px solid var(--ink);border-radius:6px;background:#fff">Close</button></div><table><tr><th>Section</th><th>Question</th><th>So far</th></tr>${labels.map(([sec, lab], i) => `<tr><td>${esc(sec)}</td><td>${esc(lab)}</td><td class="${code[i] === "1" ? "ok" : code[i] === "2" ? "no" : ""}">${code[i] === "1" ? "✓ Correct" : code[i] === "2" ? "✗ Not right yet" : "Not tried"}</td></tr>`).join("")}</table>`;
+    const nps = Object.keys(s.np || {});
+    det.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="font:800 18px var(--body);flex:1">${esc(s.name)} · ${esc(s.cls)}</b>${nps.length ? `<button type="button" data-all style="font:800 14px var(--body);padding:4px 10px;border:2px solid var(--blue);border-radius:6px;background:#EEF3FF">📝 All written work (${nps.length})</button>` : ""}<button type="button" data-c style="font:800 14px var(--body);padding:4px 10px;border:2px solid var(--ink);border-radius:6px;background:#fff">Close</button></div><table><tr><th>Section</th><th>Question</th><th>So far</th></tr>${labels.map(([sec, lab], i) => `<tr><td>${esc(sec)}</td><td>${esc(lab)}</td><td class="${code[i] === "1" ? "ok" : code[i] === "2" ? "no" : ""}">${code[i] === "1" ? "✓ Correct" : code[i] === "2" ? "✗ Not right yet" : "Not tried"}</td><td>${npKey(s, keysByLabel[i]) ? `<button type="button" data-one="${esc(npKey(s, keysByLabel[i]))}" style="font:800 12px var(--body);padding:2px 8px;border:2px solid var(--ink);border-radius:6px;background:#fff">📝 Open</button>` : ""}</td></tr>`).join("")}</table>`;
+    const id = s.cls + "|" + s.name, openAll = async () => { try { npTeacherDoc(s, await npFetch(id)); } catch (e) { alert("Couldn't load the notepads."); } };
+    if (det.querySelector("[data-all]")) det.querySelector("[data-all]").onclick = openAll;
+    det.querySelectorAll("[data-one]").forEach((b) => (b.onclick = async () => { try { const j = await npFetch(id), k = b.dataset.one; if (j.pads && j.pads[k]) npTeacherOne(s, k, j.pads[k], (j.fbs || {})[k]); else alert("That notepad hasn't arrived yet. Try again in a few seconds."); } catch (e) { alert("Couldn't load the notepad."); } }));
     det.querySelector("[data-c]").onclick = () => { picked = null; det.hidden = true; };
   }
   sel.onchange = draw;
