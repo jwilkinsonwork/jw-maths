@@ -1600,7 +1600,7 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
 
   function build(i) {
     const c = cards[i], Q = c.spec.make(); c.built = true;
-    c.el.innerHTML = `<div class="bu-head"><span class="bu-num">Card ${i + 1} of ${N}</span><b>${tex(c.spec.title)}</b>${c.spec.sub ? `<span class="bu-new">${tex(c.spec.sub)}</span>` : ""}</div><div class="bu-body"><div class="bu-g"></div><div class="bu-side"><div class="bu-q">${tex(Q.q)}</div>${c.spec.remind ? `<div class="bu-remind"><span class="bu-rtag">Reminder</span> ${c.spec.remind}</div>` : ""}<div class="bu-steps"></div><div class="bu-endslot"></div></div></div>`;
+    c.el.innerHTML = `<div class="bu-head"><span class="bu-num">Card ${i + 1} of ${N}</span><b>${tex(c.spec.title)}</b>${c.spec.sub ? `<span class="bu-new">${tex(c.spec.sub)}</span>` : ""}${LIVE.url && !big ? `<button type="button" class="askhelp" style="margin-left:auto;float:none" data-help="${esc(`Build it up · Card ${i + 1}: ${c.spec.title}`)}">✋ Help</button>` : ""}</div><div class="bu-body"><div class="bu-g"></div><div class="bu-side"><div class="bu-q">${tex(Q.q)}</div>${c.spec.remind ? `<div class="bu-remind"><span class="bu-rtag">Reminder</span> ${c.spec.remind}</div>` : ""}<div class="bu-steps"></div><div class="bu-endslot"></div></div></div>`;
     const G = buGrid(c.el.querySelector(".bu-g"), Q.line, big ? 440 : 390), ctx = { Q, G }; c.el.__bu = ctx;
     if (Q.tri) G.drawTri(Q.tri[0], Q.tri[1]);
     const box = c.el.querySelector(".bu-steps"), rows = [];
@@ -2738,7 +2738,7 @@ function withConfidence(card, key) {
 function qCard(key, num, numCol, qText, model, parts, extra = "", retry = null) {
   const st = state[key] || (state[key] = { v: [], tries: 0 });
   const el = document.createElement("div");
-  el.className = "q";
+  el.className = "q"; el.dataset.key = key;
   const inputs = (parts || []).map((p, i) => {
     const lab = p.label ? `<label>${esc(p.label)}</label>` : "";
     if (p.t === "yn") return `<div class="part" data-p="${i}">${lab}<button data-val="true">Yes</button><button data-val="false">No</button><span class="res"></span></div>`;
@@ -2746,7 +2746,7 @@ function qCard(key, num, numCol, qText, model, parts, extra = "", retry = null) 
     const ph = { num: "e.g. −1/2", eq: "e.g. y = 2x + 1", lines2: "e.g. y = 2x + 1", coords: "e.g. (1, 4), (2, 5)", text: "" }[p.t] || "";
     return `<div class="part" data-p="${i}">${lab}<input type="text" placeholder="${ph}" aria-label="${esc(p.label || "Answer")}"><span class="res"></span></div>`;
   }).join("");
-  el.innerHTML = `<div class="qt"><span class="qn" style="background:${numCol}">${num}</span>${retry && retry.look ? texLook(qText, retry.look) : tex(qText)}${retry ? `<span class="wrongs" aria-live="polite"></span>` : ""}</div>${extra && retry && retry.lookGraph ? extra.replace('class="svgwrap"', 'class="svgwrap lookg"') : extra}${parts ? inputs : `<textarea aria-label="Your working"></textarea>`}
+  el.innerHTML = `<div class="qt">${LIVE.url && !/^ex[AB]/.test(key) ? `<button type="button" class="askhelp" data-help title="Ask your teacher for help with this question">✋ Help</button>` : ""}<span class="qn" style="background:${numCol}">${num}</span>${retry && retry.look ? texLook(qText, retry.look) : tex(qText)}${retry ? `<span class="wrongs" aria-live="polite"></span>` : ""}</div>${extra && retry && retry.lookGraph ? extra.replace('class="svgwrap"', 'class="svgwrap lookg"') : extra}${parts ? inputs : `<textarea aria-label="Your working"></textarea>`}
     <div class="qactions">${parts ? `<button class="primary" data-check>Check</button>` : ""}<button data-show ${parts ? "hidden" : ""}>Show the answer</button>${retry ? `<button class="primary" data-new hidden>Try a similar question</button>` : ""}<span class="fb small"></span></div>${retry ? `<div class="model hint hidden"><b>Hint:</b> ${tex(retry.hint)}${retry.look || retry.lookGraph ? ` <span class="small" style="color:var(--amber)">Look at the highlighted part of the question.</span>` : ""}</div>` : ""}
     <div class="model hidden">${tex(model)}${parts ? "" : `<div class="qactions"><button data-self="1">I got it</button><button data-self="0">Not yet</button></div>`}</div>`;
   const parts$ = el.querySelectorAll(".part");
@@ -4083,9 +4083,11 @@ const FORM = /*FORM*/{ url: "", lesson: "", name: "", cls: "", score: "", detail
 // game scores: a Google Form whose responses go to the class sheet. Fill in the form URL and entry ids.
 const GAMEFORM = { url: "", name: "", lesson: "", score: "", accuracy: "", stage: "" };
 
+const QLABEL = {}; // question key → "Part 1 · Activity Q2", filled in by gather()
 function gather() {
   const rows = [];
   const add = (sec, label, key, total, kind) => {
+    QLABEL[key] = `${sec} · ${label}`;
     if (/^a\d/.test(key)) {
       const base = state[key] || {}, ver = base.ver || 0, cur = state[ver ? `${key}~${ver}` : key] || {};
       const runs = [...(base.hist || []), { ok: !!cur.ok, wrong: cur.wrongN || 0, tried: !!cur.tries }].filter((r) => r.tried);
@@ -4095,7 +4097,7 @@ function gather() {
       const first = runs[0], more = runs.slice(1);
       const status = word(first)[0].toUpperCase() + word(first).slice(1) + (more.length ? ` · then ${more.length} more with new numbers: ${more.map(mark).join(", ")}` : "");
       const ok = runs.some((r) => r.ok);
-      rows.push({ sec, label, status, cls: ok ? "ok" : "no", ok, tried: true, note: "" }); return;
+      rows.push({ sec, label, status, cls: ok ? "ok" : "no", ok, tried: true, note: "", wrong: cur.ok ? 0 : cur.wrongN || 0 }); return;
     }
     const ver = 0;
     const st = state[key];
@@ -4114,7 +4116,7 @@ function gather() {
       if (st.shown && !(st.ok && st.tries === 1)) status += ", looked at answer";
       if (/^ex[AB]/.test(key) && st.conf) { status += ` · sure: ${st.conf}/3`; if (st.conf === 3 && !st.ok) note = "Certain but wrong: check for a misconception"; else if (st.conf === 1 && st.ok) note = "Right but guessing"; }
     } else if (st && st.shown) status = "Looked at answer only";
-    rows.push({ sec, label, status, cls, ok: cls === "ok", tried: !!(st && st.tries), note });
+    rows.push({ sec, label, status, cls, ok: cls === "ok", tried: !!(st && st.tries), note, wrong: st && !st.ok ? st.tries || 0 : 0 });
   };
   L.doNow.forEach((_, i) => add("Do Now", `Q${i + 1}`, `dn${i}`));
   add("Key Words", "Match the definitions", "kwmatch");
@@ -4216,6 +4218,25 @@ const LIVE = {"url": ""};
 const LIVE_IDLE = 90; // seconds without touching the lesson before a student shows as idle
 (() => { const st = document.createElement("style"); st.textContent = `
 #livebar { margin: 0 0 12px; }
+.askhelp { float: right; margin: -2px 0 4px 10px; font: 800 13px var(--body); padding: 4px 10px; border-radius: 20px; border: 2px solid var(--amber); background: #FFF6DA; color: var(--ink); cursor: pointer; }
+.askhelp:hover { background: #FFE9A8; }
+.askhelp.on { background: var(--amber); color: #fff; }
+#helpPill { position: fixed; right: 18px; bottom: 18px; z-index: 8000; max-width: min(440px, calc(100vw - 36px)); display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 2px solid var(--ink); border-radius: 12px; background: #FFF6DA; box-shadow: 4px 4px 0 var(--ink); font: 700 15px/1.35 var(--body); }
+#helpPill.seen { background: #EFFAF3; border-color: var(--green); }
+#helpPill button { font: 800 13px var(--body); padding: 4px 10px; border-radius: 6px; border: 2px solid var(--ink); background: #fff; cursor: pointer; flex: none; }
+.lv-alerts { display: flex; flex-direction: column; gap: 6px; padding: 10px 18px; border-bottom: 2px solid var(--line); max-height: 34%; overflow: auto; }
+.lv-alerts:empty { display: none; }
+.lv-al { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px; font: 700 15px/1.35 var(--body); }
+.lv-al.help { background: #FFF6DA; border: 2px solid var(--amber); }
+.lv-al.stuck { background: #FDECEC; border: 2px solid #E8A0A0; }
+.lv-al.new { animation: lvnew 1s ease-in-out 3; }
+@keyframes lvnew { 50% { box-shadow: 0 0 0 6px rgba(255,190,60,.45); } }
+.lv-al .sp { flex: 1; }
+.lv-al button { font: 800 13px var(--body); padding: 4px 10px; border-radius: 6px; border: 2px solid var(--ink); background: #fff; cursor: pointer; }
+.lv-al .ago { color: var(--muted); font-size: 13px; }
+.lv-card .hl { font: 800 13px var(--body); color: #B8860B; } .lv-card .st { font: 800 13px var(--body); color: #D93A3A; }
+.lvb.on button.askhelp { background: #FFF6DA; border: 2px solid var(--amber); padding: 4px 10px; color: var(--ink); text-decoration: none; font-size: 13px; border-radius: 20px; }
+.lv-h label.snd { font: 700 14px var(--body); display: flex; align-items: center; gap: 4px; }
 .lvb { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; border: 2px solid var(--ink); border-radius: 8px; background: #FFF6DA; box-shadow: 3px 3px 0 var(--ink); font: 700 16px var(--body); }
 .lvb input { font: 700 16px var(--body); padding: 5px 8px; border: 2px solid var(--ink); border-radius: 6px; width: 170px; }
 .lvb input.c { width: 90px; }
@@ -4259,26 +4280,55 @@ window.__live = (() => {
   function payload(t) {
     const rows = gather(), btn = document.querySelector('#student .tabs button[aria-pressed="true"]');
     const bu = typeof BUILDUP === "object" && BUILDUP ? Object.keys(BUILDUP).map((ci) => `${(state["bu" + ci] && state["bu" + ci].done) || 0}/${BUILDUP[ci].cards.length}`).join(" ") : "";
-    return { t, lesson: L.id, name: String(state.name || "").trim(), cls: String(state.cls || "").trim(), vis: document.hidden ? "hidden" : "visible", focus: document.hasFocus(), idle: Math.round((Date.now() - lastInput) / 1000), sec: btn ? btn.textContent.trim() : "", bu, r: rows.map((r) => (r.ok ? "1" : r.tried ? "2" : "0")).join("") };
+    return { t, lesson: L.id, name: String(state.name || "").trim(), cls: String(state.cls || "").trim(), vis: document.hidden ? "hidden" : "visible", focus: document.hasFocus(), idle: Math.round((Date.now() - lastInput) / 1000), sec: btn ? btn.textContent.trim() : "", bu, r: rows.map((r) => (r.ok ? "1" : r.tried ? "2" : "0")).join(""), w: rows.map((r) => Math.min(9, r.wrong || 0)).join(""), help: state.help && !state.help.seen ? state.help : null };
   }
   function send(t) {
     if (!started) return; const p = payload(t); if (!p.name) return; const body = JSON.stringify(p);
     if (t === "bye" && navigator.sendBeacon) { try { if (navigator.sendBeacon(LIVE.url, new Blob([body], { type: "text/plain" }))) return; } catch (e) { /* fall through */ } }
-    try { fetch(LIVE.url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body, keepalive: true }).catch(() => {}); } catch (e) { /* offline */ }
+    try {
+      fetch(LIVE.url, { method: "POST", headers: { "Content-Type": "text/plain" }, body, keepalive: true })
+        .then((r) => r.json()).then((j) => { if (j && j.ack && state.help && !state.help.seen && j.ack >= state.help.at) { state.help.seen = Date.now(); save(); helpPill(); } })
+        .catch(() => fetch(LIVE.url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body }).catch(() => {}));
+    } catch (e) { /* offline */ }
   }
   function beatSoon(ms = 1500) { if (!started) return; clearTimeout(soon); soon = setTimeout(() => send("beat"), ms); }
   function start() { if (started) return beatSoon(100); started = true; send("beat"); timer = setInterval(() => send("beat"), 12000); addEventListener("pagehide", () => send("bye")); }
   return { start, beatSoon, send };
 })();
 
+// asking for help: one request at a time, named after the question it came from
+let lastQ = "";
+document.addEventListener("focusin", (e) => { const q = e.target.closest && e.target.closest("#student .q[data-key]"); if (q) lastQ = q.dataset.key; });
+document.addEventListener("click", (e) => {
+  const b = e.target.closest && e.target.closest("[data-help]"); if (!b || !window.__live) return;
+  e.preventDefault(); e.stopPropagation();
+  let what = b.dataset.help;
+  if (!what) { const q = b.closest(".q[data-key]"); if (q) { gather(); what = QLABEL[q.dataset.key] || QLABEL[q.dataset.key.split("~")[0]] || "a question"; } }
+  if (what === "general") { gather(); const t = document.querySelector('#student .tabs button[aria-pressed="true"]'); what = (lastQ && (QLABEL[lastQ] || QLABEL[lastQ.split("~")[0]])) || (t ? t.textContent.trim() : "the lesson"); }
+  askHelp(what);
+}, true);
+function askHelp(what) {
+  if (!String(state.name || "").trim()) { const bar = document.getElementById("livebar"); if (bar) bar.scrollIntoView({ block: "center" }); const i = bar && bar.querySelector("input"); if (i) i.focus(); return; }
+  state.help = { q: String(what).slice(0, 80), at: Date.now() }; save(); helpPill(); window.__live.beatSoon(50);
+}
+function helpPill() {
+  let p = document.getElementById("helpPill");
+  const h = state.help, sv = document.getElementById("student"), mode = !sv || sv.classList.contains("hidden");
+  if (!h || !window.__live || mode) { if (p) p.remove(); return; }
+  if (!p) { p = document.createElement("div"); p.id = "helpPill"; p.setAttribute("role", "status"); document.body.appendChild(p); }
+  p.className = h.seen ? "seen" : "";
+  p.innerHTML = h.seen ? `<span>👍 Your teacher has seen your request for help with <b>${esc(h.q)}</b>.</span><button type="button" data-x>OK</button>` : `<span>✋ You asked for help with <b>${esc(h.q)}</b>. Keep trying while you wait.</span><button type="button" data-x>Cancel</button>`;
+  p.querySelector("[data-x]").onclick = () => { delete state.help; save(); helpPill(); if (window.__live) window.__live.beatSoon(50); };
+}
+
 // the bar at the top of the student page: join with a name and class, and always shows that the teacher can see progress
 function liveBar() {
   const box = document.getElementById("livebar"); if (!box || !window.__live) return;
   const on = !!(String(state.name || "").trim() && String(state.cls || "").trim());
   if (on && !box.dataset.edit) {
-    box.innerHTML = `<div class="lvb on"><span class="lvdot"></span><span>Live: your teacher can see your progress in this lesson, ${esc(state.name)} · ${esc(state.cls)}.</span><button type="button">Not you?</button></div>`;
-    box.querySelector("button").onclick = () => { box.dataset.edit = "1"; liveBar(); };
-    window.__live.start(); return;
+    box.innerHTML = `<div class="lvb on"><span class="lvdot"></span><span>Live: your teacher can see your progress in this lesson, ${esc(state.name)} · ${esc(state.cls)}.</span><button type="button" data-me>Not you?</button><span style="flex:1"></span><button type="button" class="askhelp" data-help="general" style="float:none;margin:0;text-decoration:none">✋ I need help</button></div>`;
+    box.querySelector("[data-me]").onclick = () => { box.dataset.edit = "1"; liveBar(); };
+    window.__live.start(); helpPill(); return;
   }
   box.innerHTML = `<div class="lvb"><span>👋 Type your name and class to join the lesson:</span><input type="text" placeholder="Your name" aria-label="Your name" value="${esc(state.name || "")}"><input class="c" type="text" placeholder="Class" aria-label="Your class" value="${esc(state.cls || "")}"><button type="button">Join</button></div>`;
   const [nm, cl] = box.querySelectorAll("input"), go = () => { if (!nm.value.trim()) return nm.focus(); if (!cl.value.trim()) return cl.focus(); state.name = nm.value.trim(); state.cls = cl.value.trim().toUpperCase(); save(); delete box.dataset.edit; liveBar(); const h = document.querySelector("#hiName"), c = document.querySelector("#hiClass"); if (h) h.value = state.name; if (c) c.value = state.cls; };
@@ -4310,9 +4360,14 @@ function liveStatus(s, now) {
 }
 function openLive() {
   const ov = document.createElement("div"); ov.className = "lv-ov";
-  ov.innerHTML = `<div class="lv-p" role="dialog" aria-label="Live class"><div class="lv-h"><b class="t">📡 Live class · ${esc(L.id)}</b><label class="small">Class <select data-cls><option value="">All</option></select></label><button type="button" data-key>🔑 Key</button><button type="button" data-x>✕ Close</button></div><div class="lv-counts"></div><div class="lv-grid"><div class="lv-empty">Connecting…</div></div><div class="lv-det" hidden></div><div class="lv-note">Updates every 5 seconds. Students show here once they type their name and class at the top of the lesson. "Not on the lesson" means the lesson isn't the window they're using, for example another app or the page around the lesson.</div></div>`;
+  ov.innerHTML = `<div class="lv-p" role="dialog" aria-label="Live class"><div class="lv-h"><b class="t">📡 Live class · ${esc(L.id)}</b><label class="small">Class <select data-cls><option value="">All</option></select></label><label class="snd"><input type="checkbox" data-snd checked> 🔔 Sound</label><button type="button" data-key>🔑 Key</button><button type="button" data-x>✕ Close</button></div><div class="lv-counts"></div><div class="lv-alerts" aria-live="polite"></div><div class="lv-grid"><div class="lv-empty">Connecting…</div></div><div class="lv-det" hidden></div><div class="lv-note">✋ = a student asked for help (press On my way so they know you've seen it). ⚠️ = ${3} wrong answers in a row on the same question. Updates every 5 seconds. Students show here once they type their name and class at the top of the lesson. "Not on the lesson" means the lesson isn't the window they're using, for example another app or the page around the lesson.</div></div>`;
   document.body.appendChild(ov);
-  const grid = ov.querySelector(".lv-grid"), counts = ov.querySelector(".lv-counts"), det = ov.querySelector(".lv-det"), sel = ov.querySelector("[data-cls]");
+  const grid = ov.querySelector(".lv-grid"), counts = ov.querySelector(".lv-counts"), det = ov.querySelector(".lv-det"), sel = ov.querySelector("[data-cls]"), alerts = ov.querySelector(".lv-alerts");
+  const seenAlerts = new Set(); let firstPoll = true, ac = null, title0 = document.title;
+  function chime() { if (!ov.querySelector("[data-snd]").checked) return; try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); const t = ac.currentTime; [880, 1320].forEach((f, i) => { const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = f; o.type = "sine"; g.gain.setValueAtTime(0.0001, t + i * 0.16); g.gain.exponentialRampToValueAtTime(0.25, t + i * 0.16 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.16 + 0.5); o.connect(g).connect(ac.destination); o.start(t + i * 0.16); o.stop(t + i * 0.16 + 0.55); }); } catch (e) { /* no sound */ } }
+  const STUCK = 3; // wrong answers in a row on one question before it counts as stuck
+  const ago = (ms) => { const s2 = Math.max(0, Math.round(ms / 1000)); return s2 < 60 ? `${s2}s ago` : `${Math.round(s2 / 60)} min ago`; };
+  async function ack(id) { try { await fetch(`${LIVE.url}?t=ack&lesson=${encodeURIComponent(L.id)}&id=${encodeURIComponent(id)}&key=${encodeURIComponent(keyGet())}`); } catch (e) { /* try again next poll */ } poll(); }
   const labels = gather().map((r) => [r.sec, r.label]);
   let data = {}, picked = null, tm = null, alive = true;
   const keyGet = () => { try { return localStorage.getItem("jw-live-key") || ""; } catch (e) { return ""; } };
@@ -4339,9 +4394,22 @@ function openLive() {
     const list = all.filter((s) => !sel.value || s.cls === sel.value).sort((a, b) => a.name.localeCompare(b.name));
     const st = list.map((s) => [s, liveStatus(s, now)]), n = (k) => st.filter(([, x]) => x[0] === k).length;
     counts.innerHTML = [["ok", "Working", "#1F9D55"], ["idle", "Idle", "#D9A400"], ["away", "Elsewhere", "#E8833A"], ["gone", "Gone", "#8A93A8"]].map(([k, t, c]) => `<span class="lv-chip"><i style="background:${c}"></i>${t}: ${n(k)}</span>`).join("") + `<span class="lv-chip">${list.length} student${list.length === 1 ? "" : "s"}</span>`;
+    // alerts: help requests first, then questions students are stuck on
+    const helpers = list.filter((s) => s.help && s.help.at && !(s.ack >= s.help.at) && liveStatus(s, now)[0] !== "gone").sort((a, b) => a.help.at - b.help.at);
+    const stuck = {};
+    list.forEach((s) => { const w = s.w || "", r = s.r || ""; for (let i = 0; i < w.length; i++) if (+w[i] >= STUCK && r[i] !== "1") (stuck[i] || (stuck[i] = [])).push(s); });
+    const fresh = [];
+    const html = helpers.map((s) => { const id = `h|${s.cls}|${s.name}|${s.help.at}`; const nw = !seenAlerts.has(id); if (nw) { seenAlerts.add(id); fresh.push(id); }
+      return `<div class="lv-al help${nw && !firstPoll ? " new" : ""}">✋ <span><b>${esc(s.name)}</b> (${esc(s.cls)}) needs help with <b>${esc(s.help.q)}</b> <span class="ago">${ago(now - s.help.at)}</span></span><span class="sp"></span><button type="button" data-ack="${esc(s.cls + "|" + s.name)}">✓ On my way</button></div>`; }).concat(
+      Object.entries(stuck).sort((a, b) => b[1].length - a[1].length).map(([i, ss]) => { const lab = labels[i] ? `${labels[i][0]} · ${labels[i][1]}` : `Question ${+i + 1}`, id = `s|${i}|${ss.map((x) => x.name).sort().join(",")}`, nw = !seenAlerts.has(id); if (nw) { seenAlerts.add(id); fresh.push(id); }
+        return `<div class="lv-al stuck${nw && !firstPoll ? " new" : ""}">⚠️ <span><b>${ss.length === 1 ? esc(ss[0].name) + " is" : ss.length + " students are"}</b> stuck on <b>${esc(lab)}</b>${ss.length > 1 ? `: ${ss.map((x) => esc(x.name)).join(", ")}` : ` (${Math.max(...ss.map((x) => +x.w[i]))} wrong in a row)`}</span></div>`; })).join("");
+    alerts.innerHTML = html;
+    alerts.querySelectorAll("[data-ack]").forEach((b) => (b.onclick = () => { b.disabled = true; b.textContent = "…"; ack(b.dataset.ack); }));
+    if (fresh.length && !firstPoll) { chime(); document.title = `(${helpers.length || "!"}) ${title0}`; setTimeout(() => (document.title = title0), 8000); }
+    firstPoll = false;
     if (!list.length) { grid.innerHTML = `<div class="lv-empty">No students yet. They appear when they type their name and class at the top of the lesson.</div>`; return; }
     grid.innerHTML = st.map(([s, x]) => { const code = s.r || "", ok = (code.match(/1/g) || []).length, bad = (code.match(/2/g) || []).length;
-      return `<div class="lv-card" data-id="${esc(s.cls + "|" + s.name)}" style="border-left-color:${x[2]}"><div class="n">${esc(s.name)}<span>${esc(s.cls)}</span></div><div class="s" style="color:${x[2]}">● ${x[1]}</div><div class="m">${s.sec ? `On <b>${esc(s.sec)}</b>` : ""}${s.bu ? ` · Build it up ${esc(s.bu)}` : ""}</div><div class="m">${ok} right · ${bad} wrong · ${code.length - ok - bad} not tried</div><div class="lv-bar">${[...code].map((c) => `<i class="${c === "1" ? "k" : c === "2" ? "w" : ""}"></i>`).join("")}</div></div>`; }).join("");
+      return `<div class="lv-card" data-id="${esc(s.cls + "|" + s.name)}" style="border-left-color:${x[2]}"><div class="n">${esc(s.name)}<span>${esc(s.cls)}</span></div><div class="s" style="color:${x[2]}">● ${x[1]}</div><div class="m">${s.sec ? `On <b>${esc(s.sec)}</b>` : ""}${s.bu ? ` · Build it up ${esc(s.bu)}` : ""}</div><div class="m">${ok} right · ${bad} wrong · ${code.length - ok - bad} not tried</div>${s.help && !(s.ack >= s.help.at) ? `<div class="hl">✋ Asked for help: ${esc(s.help.q)}</div>` : ""}${[...(s.w || "")].some((c, i) => +c >= STUCK && code[i] !== "1") ? `<div class="st">⚠️ Stuck on ${[...(s.w || "")].map((c, i) => (+c >= STUCK && code[i] !== "1" ? (labels[i] ? labels[i][1] : `Q${i + 1}`) : null)).filter(Boolean).map(esc).join(", ")}</div>` : ""}<div class="lv-bar">${[...code].map((c) => `<i class="${c === "1" ? "k" : c === "2" ? "w" : ""}"></i>`).join("")}</div></div>`; }).join("");
     grid.querySelectorAll(".lv-card").forEach((c) => (c.onclick = () => { picked = c.dataset.id; detail(); }));
     detail();
   }
@@ -4353,7 +4421,7 @@ function openLive() {
   }
   sel.onchange = draw;
   ov.querySelector("[data-key]").onclick = () => askKey();
-  const close = () => { alive = false; clearTimeout(tm); ov.remove(); };
+  const close = () => { alive = false; clearTimeout(tm); ov.remove(); document.title = title0; };
   ov.querySelector("[data-x]").onclick = close; ov.addEventListener("click", (e) => { if (e.target === ov) close(); });
   poll();
 }
@@ -4446,7 +4514,7 @@ function mountDrawGraphs(host) {
         <div class="dg-eq"><span class="lbl">Draw the line</span><span data-eq></span></div>
         <div class="dg-score"><span>Right <b data-r>0</b></span><span>Streak <b data-s>0</b></span><span>Best <b data-b>0</b></span></div></div>
       <div class="dg-card dg-steps" data-steps></div>
-      <div class="dg-card"><div class="dg-act"><button type="button" class="go" data-go>✓ Check my line</button><button type="button" data-h>💡 Hint</button><button type="button" class="nx" data-n>Next equation ▶</button></div>
+      <div class="dg-card"><div class="dg-act"><button type="button" class="go" data-go>✓ Check my line</button><button type="button" data-h>💡 Hint</button><button type="button" class="nx" data-n>Next equation ▶</button>${LIVE.url ? `<button type="button" class="askhelp" style="float:none;margin:0" data-help="Draw graphs" data-dghelp>✋ Help</button>` : ""}</div>
         <div class="dg-fb" data-fb></div><div class="dg-hint" data-hint hidden></div></div>
       <div class="dg-card"><div class="dg-tools">
         <button type="button" data-t="ruler">📏 Ruler</button><button type="button" data-t="point">✖ Point</button><button type="button" data-t="pen">✏️ Pen</button>
@@ -4612,6 +4680,7 @@ function mountDrawGraphs(host) {
   function newQ(keep) {
     if (!keep) Q = drawQ(level); items = []; hintN = 0; wrongN = 0; solved = false; ans.innerHTML = ""; draw();
     q("[data-eq]").innerHTML = tex(Q.text); q("[data-hint]").hidden = true; fbSet(""); step = 0; stepsUI();
+    const hb = q("[data-dghelp]"); if (hb) hb.dataset.help = `Draw graphs · ${Q.text} (${mode === "assist" ? "assisted" : "unassisted"})`;
   }
   host.querySelectorAll("[data-t]").forEach((b) => (b.onclick = () => { tool = b.dataset.t; host.querySelectorAll("[data-t]").forEach((x) => x.classList.toggle("on", x === b)); q("[data-tip]").textContent = TIPS[tool]; }));
   host.querySelectorAll("[data-lv]").forEach((b) => (b.onclick = () => { level = st.level = b.dataset.lv; save(); host.querySelectorAll("[data-lv]").forEach((x) => x.classList.toggle("on", x === b)); newQ(); }));
@@ -4642,7 +4711,9 @@ function texLook(str, look) {
         if (has("eq", eqi)) return mk(tex(p.text));
         if (has("m", eqi) || has("c", eqi)) {
           const sp = p.text.match(/^(.*?=\s*)(.*)$/), terms = sp[2].match(/[+−-]?\s*[^+−-]+/g) || [sp[2]];
-          return tex(sp[1].trim()) + " " + terms.map((t) => { const h = tex(t.trim()), isX = /x/.test(t); return (isX ? has("m", eqi) : has("c", eqi)) ? mk(h) : h; }).join(" ");
+          return tex(sp[1].trim()) + " " + terms.map((t, k) => { const isX = /x/.test(t), sg = t.trim().match(/^([+−-])\s*(.*)$/);
+            const h = sg && k > 0 ? `${sg[1] === "+" ? "+" : "−"}&thinsp;${tex(sg[2])}` : tex(t.trim());
+            return (isX ? has("m", eqi) : has("c", eqi)) ? mk(h) : h; }).join(" ");
         }
         return tex(p.text);
       }
@@ -4673,6 +4744,7 @@ function setMode(m) {
   if (typeof a11yApply === "function") { a11yApply(); paceTick(); if (TR.on) { trRevertAll(); trAfterRender(); } }
   if (!t && !studentBuilt) { studentBuilt = true; buildStudent(); }
   if (t) { fit(); fitSlides(); if (location.hash.startsWith("#student")) setHash("#teacher"); }
+  if (typeof helpPill === "function") helpPill();
 }
 document.getElementById("lessonTitle").innerHTML = `${esc(L.id)} · ${tex(L.title)}`; titleCase(document.querySelector(".topbar"));
 document.getElementById("mTeacher").onclick = () => setMode("teacher");
