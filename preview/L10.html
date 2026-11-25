@@ -1298,7 +1298,7 @@ const INK = (() => {
   }
   // choose the reading that is a sensible answer: −3, 1/2, 0.5, 2x + 1, −x − 4 ...
   const NUM = "-?(\\d+(\\.\\d+)?|\\.\\d+)", EXPR = `${NUM}([/÷×]${NUM})?`;
-  const OK = { num: new RegExp(`^([mc]=)?${EXPR}(=${EXPR})*$`), eq: /^(y=)?(-?(\d*(\/\d+)?x)?([+-]\d+(\/\d+)?)?|-?\d+(\/\d+)?)$/ };
+  const OK = { num: new RegExp(`^([mc]=)?${EXPR}(=${EXPR})*$`), eq: /^(y=)?(-?(\d*(\/\d+)?x)?([+-]\d+(\/\d+)?)?|-?\d+(\/\d+)?)$|^x=-?\d+(\.\d+)?$/ };
   function decode(cands, mode) {
     let beam = [{ s: "", d: 0 }];
     for (const c of cands) { const nb = []; for (const b of beam) for (const o of c) nb.push({ s: b.s + o.ch, d: b.d + o.d }); nb.sort((a, b) => a.d - b.d); beam = nb.slice(0, 200); }
@@ -1497,6 +1497,9 @@ const INK = (() => {
 .bu-in input:disabled { background: transparent; border-color: var(--green); color: var(--green); }
 .bu-in button, .bu-end button { font: 800 15px var(--body); padding: 6px 14px; border-radius: 6px; border: 2px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
 .bu-end button.alt { background: #fff; color: var(--ink); }
+.bu-pick { font: 800 16px var(--body); padding: 6px 14px; border-radius: 8px; border: 2px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; }
+.bu-pick.sel { background: var(--ink); color: #fff; }
+.bu-step.done .bu-pick:not(.sel) { display: none; } .bu-step.done .bu-pick.sel { background: var(--green); border-color: var(--green); display: inline-block !important; }
 .bu-fb { grid-column: 2; font-size: 15px; line-height: 1.35; font-weight: 700; }
 .bu-fb.bad { color: var(--red); } .bu-fb.good { color: var(--green); }
 .bu-fb .bu-hint { display: block; margin-top: 4px; font-weight: 600; color: var(--ink); background: #FFF6DA; border-radius: 6px; padding: 5px 8px; }
@@ -1527,7 +1530,21 @@ const INK = (() => {
 @media (max-width: 600px) { #student .bu-dot { width: 12px; height: 12px; font-size: 0; border-width: 2px; } #student .bu-dots { gap: 7px; } #student .bu-dot.cur { outline-offset: 1px; } #student .bu-dot.lock { border-style: solid; background: #DCE2EE; border-color: #DCE2EE; } }
 `; document.head.appendChild(st); })();
 
-function buGrid(host, line, size) {
+// helpers for lessons writing Build it up cards
+const BU = {
+  R: (a, b) => a + Math.floor(Math.random() * (b - a + 1)),
+  pick: (a) => a[Math.floor(Math.random() * a.length)],
+  shuffle: (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; },
+  n: (v) => { const sg = v < 0 ? "−" : "", a = Math.abs(v); for (const d of [1, 2, 3, 4, 5]) { const t = a * d; if (Math.abs(t - Math.round(t)) < 1e-9) return d === 1 ? sg + Math.round(t) : `${sg}${Math.round(t)}/${d}`; } return sg + +a.toFixed(2); },
+  term: (m) => (m === 1 ? "x" : m === -1 ? "−x" : `${BU.n(m)}x`),
+  eq: (m, c) => (m === 0 ? `y = ${BU.n(c)}` : `y = ${BU.term(m)}${c ? (c > 0 ? ` + ${BU.n(c)}` : ` − ${BU.n(-c)}`) : ""}`),
+  pt: (p) => `(${BU.n(p.x)}, ${BU.n(p.y)})`,
+  latt: (m, c) => { const o = []; for (let x = -5; x <= 5; x++) { const y = m * x + c; if (Math.abs(y - Math.round(y)) < 1e-9 && Math.abs(y) <= 5) o.push({ x, y: Math.round(y) }); } return o; },
+  line: (ms, cs = [-4, -3, -2, -1, 1, 2, 3, 4], need = 3) => { for (let t = 0; t < 500; t++) { const m = BU.pick(ms), c = BU.pick(cs), L2 = BU.latt(m, c); if (L2.length >= need) return { m, c, L: L2 }; } return { m: 1, c: 1, L: BU.latt(1, 1) }; },
+  tri: (Ln, runs) => { const o = []; for (const p of Ln.L) for (const q of Ln.L) if (runs.includes(q.x - p.x) && Math.abs(q.y - p.y) <= 6) o.push([p, q]); return o.length ? BU.pick(o) : null; },
+  same: (a, b) => Math.abs(a - b) < 1e-9,
+};
+function buGrid(host, line, size, extra = {}) {
   const NS = "http://www.w3.org/2000/svg", R = 5.6, s = size / (2 * R), X = (x) => (x + R) * s, Y = (y) => (R - y) * s, uid = "bu" + Math.random().toString(36).slice(2, 8);
   let g = `<defs><clipPath id="${uid}"><rect x="${X(-5.3)}" y="${Y(5.3)}" width="${10.6 * s}" height="${10.6 * s}"/></clipPath></defs>`;
   for (let i = -5; i <= 5; i++) g += `<line class="bu-gl" x1="${X(i)}" y1="${Y(-5.3)}" x2="${X(i)}" y2="${Y(5.3)}"/><line class="bu-gl" x1="${X(-5.3)}" y1="${Y(i)}" x2="${X(5.3)}" y2="${Y(i)}"/>`;
@@ -1535,15 +1552,23 @@ function buGrid(host, line, size) {
   g += `<text class="bu-axl" x="${X(5.45)}" y="${Y(0) - 6}" text-anchor="end">x</text><text class="bu-axl" x="${X(0) + 7}" y="${Y(5.25)}">y</text>`;
   for (let i = -5; i <= 5; i++) if (i) g += `<text class="bu-tn" x="${X(i)}" y="${Y(0) + 15}" text-anchor="middle">${String(i).replace("-", "−")}</text><text class="bu-tn" x="${X(0) - 6}" y="${Y(i) + 4}" text-anchor="end">${String(i).replace("-", "−")}</text>`;
   g += `<text class="bu-tn" x="${X(0) - 6}" y="${Y(0) + 15}" text-anchor="end">0</text>`;
-  const { m, c } = line, lx = [4.4, -4.4, 3.4, -3.4, 2.4, -2.4, 1.4].find((x) => Math.abs(m * x + c) <= 4.4);
-  g += `<g clip-path="url(#${uid})"><line class="bu-line" x1="${X(-6)}" y1="${Y(-6 * m + c)}" x2="${X(6)}" y2="${Y(6 * m + c)}"/></g>`;
-  if (lx !== undefined) g += `<text class="bu-ll" x="${X(lx) + 8}" y="${Y(m * lx + c) - 8}">L</text>`;
+  const all = [Object.assign({ label: "L" }, line), ...(extra.lines || [])], COLS = ["var(--coral)", "var(--blue)", "var(--purple)"];
+  all.forEach((ln, i) => {
+    const col = ln.col || COLS[i % 3];
+    if (ln.x !== undefined) { g += `<g clip-path="url(#${uid})"><line class="bu-line" style="stroke:${col}" x1="${X(ln.x)}" y1="${Y(-6)}" x2="${X(ln.x)}" y2="${Y(6)}"/></g><text class="bu-ll" style="fill:${col}" x="${X(ln.x) + 8}" y="${Y(4.6)}">${ln.label}</text>`; return; }
+    const lx = [4.4, -4.4, 3.4, -3.4, 2.4, -2.4, 1.4, -1.4].find((x) => Math.abs(ln.m * x + ln.c) <= 4.4 && (i === 0 || Math.abs(x - 4.4) > 0.1 || all.length < 2));
+    g += `<g clip-path="url(#${uid})"><line class="bu-line" style="stroke:${col}" x1="${X(-6)}" y1="${Y(-6 * ln.m + ln.c)}" x2="${X(6)}" y2="${Y(6 * ln.m + ln.c)}"/></g>`;
+    if (lx !== undefined && ln.label) g += `<text class="bu-ll" style="fill:${col}" x="${X(i % 2 ? -lx : lx) + 8}" y="${Y(ln.m * (i % 2 ? -lx : lx) + ln.c) - 8}">${ln.label}</text>`;
+  });
+  (extra.points || []).forEach((p) => { g += `<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="6.5" fill="#fff" stroke="var(--ink)" stroke-width="3"/>${p.label ? `<text class="bu-rl" x="${X(p.x) + 10}" y="${Y(p.y) - 9}" fill="var(--ink)" paint-order="stroke" stroke="#fff" stroke-width="4">${p.label}</text>` : ""}`; });
+  let act = all[0];
   g += `<g class="bu-hot"></g><g class="bu-tri"></g><g class="bu-picks"></g><circle class="bu-hov" r="9" cx="-50" cy="-50"/>`;
   host.innerHTML = `<svg class="bu-svg" viewBox="0 0 ${size} ${size}" xmlns="${NS}" role="img" aria-label="Line L on a coordinate grid">${g}</svg>`;
-  const svg = host.firstElementChild, $g = (c) => svg.querySelector(c), onLine = (p) => Math.abs(m * p.x + c - p.y) < 1e-9;
+  const svg = host.firstElementChild, $g = (c) => svg.querySelector(c), onLine = (p) => (act.x !== undefined ? Math.abs(p.x - act.x) < 1e-9 : Math.abs(act.m * p.x + act.c - p.y) < 1e-9);
   const api = {
     tri: null, onLine,
-    lattice() { const out = []; for (let x = -5; x <= 5; x++) { const y = m * x + c; if (Math.abs(y - Math.round(y)) < 1e-9 && Math.abs(y) <= 5) out.push({ x, y: Math.round(y) }); } return out; },
+    lattice() { const out = []; if (act.x !== undefined) { for (let y = -5; y <= 5; y++) out.push({ x: act.x, y }); return out; } for (let x = -5; x <= 5; x++) { const y = act.m * x + act.c; if (Math.abs(y - Math.round(y)) < 1e-9 && Math.abs(y) <= 5) out.push({ x, y: Math.round(y) }); } return out; },
+    useLine(i) { act = all[i] || all[0]; },
     drawTri(p, q) {
       const [a, b] = p.x < q.x ? [p, q] : [q, p], up = b.y >= a.y;
       api.tri = { a, b, run: b.x - a.x, rise: b.y - a.y };
@@ -1598,8 +1623,8 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
 
   function build(i) {
     const c = cards[i], Q = c.spec.make(); c.built = true;
-    c.el.innerHTML = `<div class="bu-head"><span class="bu-num">Card ${i + 1} of ${N}</span><b>${tex(c.spec.title)}</b>${c.spec.sub ? `<span class="bu-new">${tex(c.spec.sub)}</span>` : ""}${!big ? `<button type="button" class="askhelp" style="margin-left:auto;float:none" data-buladder>💡 Help</button>` : ""}</div><div class="bu-body"><div class="bu-g"></div><div class="bu-side"><div class="bu-q">${tex(Q.q)}</div>${c.spec.remind ? `<div class="bu-remind"><span class="bu-rtag">Reminder</span> ${c.spec.remind}</div>` : ""}<div class="bu-steps"></div><div class="bu-endslot"></div></div></div>`;
-    const G = buGrid(c.el.querySelector(".bu-g"), Q.line, big ? 440 : 390), ctx = { Q, G }; c.el.__bu = ctx;
+    c.el.innerHTML = `<div class="bu-head"><span class="bu-num">Card ${i + 1} of ${N}</span><b>${tex(c.spec.title)}</b>${c.spec.sub ? `<span class="bu-new">${tex(c.spec.sub)}</span>` : ""}${!big ? `<button type="button" class="askhelp" style="margin-left:auto;float:none" data-buladder>💡 Help</button>` : ""}</div><div class="bu-body"><div class="bu-g"></div><div class="bu-side"><div class="bu-q">${tex(Q.q)}</div>${c.spec.remind || Q.remind ? `<div class="bu-remind"><span class="bu-rtag">Reminder</span> ${c.spec.remind || Q.remind}</div>` : ""}<div class="bu-steps"></div><div class="bu-endslot"></div></div></div>`;
+    const G = buGrid(c.el.querySelector(".bu-g"), Q.line, big ? 440 : 390, { lines: Q.lines, points: Q.points }), ctx = { Q, G }; c.el.__bu = ctx;
     if (Q.tri) G.drawTri(Q.tri[0], Q.tri[1]);
     const hl = c.el.querySelector("[data-buladder]"); let hlv = 0;
     if (hl) hl.onclick = () => {
@@ -1614,7 +1639,7 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
     const box = c.el.querySelector(".bu-steps"), rows = [];
     Q.steps.forEach((s, k) => {
       const r = document.createElement("div"); r.className = "bu-step locked";
-      const input = s.kind === "tri" ? "" : s.kind === "page" ? `<div class="bu-pageslot"></div>` : s.kind === "ink" ? `<label>${tex(s.pre || "")}</label><div class="bu-inkslot${s.as === "eq" ? " wide" : ""}"></div>` : `<label>${tex(s.pre || "")}</label><input type="text" class="${s.kind === "eq" ? "eq" : ""}" autocomplete="off" spellcheck="false" inputmode="text" aria-label="${esc((s.pre || "answer").replace("=", "").trim())}"><button type="button">Check</button><span class="bu-tries"></span>`;
+      const input = s.kind === "tri" ? "" : s.kind === "pick" ? s.options.map((o) => `<button type="button" class="bu-pick" data-v="${esc(String(o.v))}">${tex(o.t)}</button>`).join("") + `<span class="bu-tries"></span>` : s.kind === "page" ? `<div class="bu-pageslot"></div>` : s.kind === "ink" ? `<label>${tex(s.pre || "")}</label><div class="bu-inkslot${s.as === "eq" ? " wide" : ""}"></div>` : `<label>${tex(s.pre || "")}</label><input type="text" class="${s.kind === "eq" ? "eq" : ""}" autocomplete="off" spellcheck="false" inputmode="text" aria-label="${esc((s.pre || "answer").replace("=", "").trim())}"><button type="button">Check</button><span class="bu-tries"></span>`;
       if (s.kind === "tri") r.classList.add("tri");
       r.innerHTML = `<span class="bu-sn">${k + 1}</span><span class="bu-lab">${s.label}</span><div class="bu-in">${input}</div><div class="bu-fb"></div>`;
       box.appendChild(r); rows.push(r);
@@ -1634,7 +1659,8 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
         r.querySelector(".bu-in").insertAdjacentHTML("beforeend", `<span class="bu-tries"></span>`);
       }
       if (s.kind === "page") setupPage(k, r);
-      if (s.kind !== "tri" && s.kind !== "ink" && s.kind !== "page") { const inp = r.querySelector("input"); r.querySelector("button").onclick = () => check(k); inp.addEventListener("keydown", (e) => { if (e.key === "Enter") check(k); }); }
+      if (s.kind === "pick") r.querySelectorAll(".bu-pick").forEach((b) => (b.onclick = () => { if (!r.classList.contains("active")) return; r.querySelectorAll(".bu-pick").forEach((x) => x.classList.toggle("sel", x === b)); check(k, b.dataset.v, b.textContent); }));
+      if (s.kind !== "tri" && s.kind !== "ink" && s.kind !== "page" && s.kind !== "pick") { const inp = r.querySelector("input"); r.querySelector("button").onclick = () => check(k); inp.addEventListener("keydown", (e) => { if (e.key === "Enter") check(k); }); }
     });
     const fb = (k, html, cls) => { const f = rows[k].querySelector(".bu-fb"); f.className = "bu-fb " + (cls || ""); f.innerHTML = html; };
     function wrong(k, msg) {
@@ -1648,7 +1674,7 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
       if (k >= Q.steps.length) return finish();
       const s = Q.steps[k]; rows[k].className = "bu-step active" + (s.kind === "tri" ? " tri" : "");
       if (s.kind === "tri") {
-        G.clear(); let first = null; G.setPicking(true);
+        G.useLine(s.line || 0); G.clear(); let first = null; G.setPicking(true);
         fb(k, "Click the first point.", "");
         G.pick = (p) => {
           if (!p) return fb(k, "Click exactly on a grid corner (where two grid lines cross).", "bad");
@@ -1661,6 +1687,7 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
     }
     // { ok } or { ok: false, msg, form } (form = the answer isn't in a form we can mark)
     function judge(s, raw, kind) {
+      if (kind === "pick") { const a = typeof s.ans === "function" ? s.ans(ctx) : s.ans; return String(raw) === String(a) ? { ok: true } : { ok: false, msg: (s.why && s.why(raw, ctx)) || "Not that one. Look again." }; }
       if (kind === "num") {
         const a = typeof s.ans === "function" ? s.ans(ctx) : s.ans, close = (v) => Math.abs(v - a) < 1e-6;
         const val = (t) => { t = t.replace(/[−–]/g, "-"); if (s.loneMinus && t === "-") return -1; const m = t.match(/^(-?[\d.]+)([÷×:*])(-?[\d.]+)$/); if (m) { const p = parseNum(m[1]), q = parseNum(m[3]); return m[2] === "×" || m[2] === "*" ? p * q : p / q; } return parseNum(t); };
@@ -1673,7 +1700,12 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
         return { ok: false, msg: (s.why && s.why(v, ctx)) || "Not yet. Look at the graph again." };
       }
       const t = /=/.test(raw) ? raw : "y=" + raw, L2 = parseLine(t);
-      if (L2.error || Math.abs(L2.B) < 1e-12) return { ok: false, form: true, msg: "Write it like y = 2x + 1." };
+      if (L2.error) return { ok: false, form: true, msg: s.x !== undefined ? "Write it like x = 3." : "Write it like y = 2x + 1." };
+      if (s.x !== undefined) { // a vertical line, x = k
+        if (Math.abs(L2.B) < 1e-12 && Math.abs(L2.A) > 1e-12) return Math.abs(L2.C / L2.A - s.x) < 1e-6 ? { ok: true } : { ok: false, msg: "Right kind of line. Check the number: which x-coordinate do all the points share?" };
+        return { ok: false, msg: "This line is vertical: every point has the same x. Write it as x = …" };
+      }
+      if (Math.abs(L2.B) < 1e-12) return { ok: false, msg: s.m === 0 ? "This line is horizontal: every point has the same y. Write it as y = …" : "Write it like y = 2x + 1." };
       const m2 = -L2.A / L2.B, c2 = L2.C / L2.B, mOK = Math.abs(m2 - s.m) < 1e-6, cOK = Math.abs(c2 - s.c) < 1e-6;
       if (mOK && cOK) return { ok: true };
       if (Math.abs(m2 - s.c) < 1e-6 && Math.abs(c2 - s.m) < 1e-6) return { ok: false, msg: "m and c are swapped: m goes with x, c is the number on its own." };
@@ -1730,7 +1762,7 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
       const s = Q.steps[k]; rows[k].className = "bu-step done" + (s.kind === "tri" ? " tri" : "");
       const inp = rows[k].querySelector("input"); if (inp) inp.disabled = true;
       if (s.kind === "page") rows[k].querySelector(".bu-in").classList.add("pgdone");
-      if (s.kind === "page") rows[k].querySelector(".bu-in").innerHTML = `<div class="pg-sum">${s.lines.map((d) => `<span>${tex(d.pre)} ${esc(String(d.shown).replace(/^\s*[a-z]+\s*=\s*/i, "").replace(/-/g, "−"))} ✓</span>`).join("")}</div>`;
+      if (s.kind === "page") rows[k].querySelector(".bu-in").innerHTML = `<div class="pg-sum">${s.lines.map((d) => `<span>${tex(d.pre)} ${esc((/=\s*$/.test(d.pre) ? String(d.shown).replace(/^\s*[a-z]+\s*=\s*/i, "") : String(d.shown).replace(/=/, " = ")).replace(/-/g, "−"))} ✓</span>`).join("")}</div>`;
       if (s.kind === "ink") rows[k].querySelector(".bu-in").innerHTML = `<label>${tex(s.pre || "")}</label><span class="bu-val">${esc(String(s.lastShown).replace(/-/g, "−"))}</span>`;
       fb(k, s.kind === "tri" ? "✓ Triangle drawn." : s.kind === "page" ? "✓ All your working is correct." : "✓ Correct.", "good");
       activate(k + 1);
@@ -4895,8 +4927,18 @@ mark.look { background: none; color: inherit; padding: 0 1px; border-radius: 5px
 .bu-step.hinting .bu-lab b { background: #FFE27A; box-shadow: 0 0 0 3px #FFE27A; border-radius: 4px; animation: lookpulse 1.1s ease-in-out 3; }
 `; document.head.appendChild(st); })();
 
+function drawKind(q) {
+  if (q.kind) return q;
+  if (Math.abs(q.B) < 1e-12) return Object.assign(q, { kind: "vert", k: q.C / q.A });
+  if (Math.abs(q.A) < 1e-12) return Object.assign(q, { kind: "horiz", m: 0, c: q.C / q.B });
+  if (typeof q.m !== "number" || !/^\s*y\s*=/.test(q.text)) return Object.assign(q, { kind: "std", m: -q.A / q.B, c: q.C / q.B });
+  return Object.assign(q, { kind: "mc" });
+}
 function drawQ(level) {
-  if (typeof DRAWQ === "function") { try { const q = DRAWQ(level); if (q) return q; } catch (e) { /* fall back to y = mx + c */ } }
+  if (typeof DRAWQ === "function") { try { const q = DRAWQ(level); if (q) return drawKind(q); } catch (e) { /* fall back to y = mx + c */ } }
+  return drawKind(drawQ0(level));
+}
+function drawQ0(level) {
   const pick = (a) => a[Math.floor(Math.random() * a.length)];
   const M = { easy: [1, 2, 3, -1, -2], medium: [1, 2, 3, 4, -1, -2, -3, -4], hard: [0.5, -0.5, 1.5, -1.5, 1 / 3, -1 / 3, 2 / 3, -2 / 3, 2, -3] }[level] || [1, 2];
   const Cs = level === "easy" ? [-3, -2, -1, 1, 2, 3] : [-4, -3, -2, -1, 0, 1, 2, 3, 4];
@@ -4914,6 +4956,7 @@ function drawQ(level) {
 }
 
 function mountDrawGraphs(host) {
+  const num = (v) => String(+(+v).toFixed(2)).replace("-", "−");
   const R = 6, S = 560, PAD = 0.6, s = S / (2 * (R + PAD)), X = (x) => (x + R + PAD) * s, Y = (y) => (R + PAD - y) * s;
   const ux = (px) => px / s - R - PAD, uy = (py) => R + PAD - py / s;
   const st = state.draw || (state.draw = { right: 0, tried: 0, streak: 0, best: 0, level: "easy" });
@@ -5011,7 +5054,10 @@ function mountDrawGraphs(host) {
       ans.innerHTML = `<line x1="${X(-R)}" y1="${Y(yAt(-R))}" x2="${X(R)}" y2="${Y(yAt(R))}" stroke="#1F9D55" stroke-width="7" stroke-opacity=".35" stroke-linecap="round"/>`;
       return fbSet(`✓ Correct! That's ${Q.text}.${badPt ? " (One of your points isn't on the line, though.)" : ""} Press Next equation for another.`, "ok");
     }
-    if (Math.abs(seg.b.x - seg.a.x) < 0.2) return wrong("Your line is vertical. Lines like this one slope across. Plot c first, then use the gradient.");
+    if (Q.kind === "vert") return wrong(Math.abs(seg.b.x - seg.a.x) < 0.2 ? `Vertical is right, but it's in the wrong place. Every point on it has x = ${num(Q.k)}.` : "This line is vertical: every point on it has the same x-coordinate.");
+    if (Math.abs(seg.b.x - seg.a.x) < 0.2) return wrong(Q.kind === "horiz" ? "This line is horizontal, not vertical: every point has the same y-coordinate." : "Your line is vertical. Lines like this one slope across. Plot c first, then use the gradient.");
+    if (Q.kind === "horiz") { const msH = (seg.b.y - seg.a.y) / (seg.b.x - seg.a.x); return wrong(Math.abs(msH) > 0.15 ? "This line is horizontal: it's flat, with every point at the same height." : "Flat is right, but it's at the wrong height. Look at the number in the equation."); }
+    if (Q.kind === "std") { const msS = (seg.b.y - seg.a.y) / (seg.b.x - seg.a.x), csS = seg.a.y - msS * seg.a.x; return wrong(Math.abs(csS - Q.c) < 0.35 ? "It crosses the y-axis in the right place. Now put y = 0 to find where it crosses the x-axis." : "Put x = 0 to find where it crosses the y-axis, and y = 0 to find where it crosses the x-axis. Plot both, then rule the line."); }
     const ms = (seg.b.y - seg.a.y) / (seg.b.x - seg.a.x), cs = seg.a.y - ms * seg.a.x, mOK = Math.abs(ms - Q.m) < 0.2, cOK = Math.abs(cs - Q.c) < 0.35;
     if (mOK && !cOK) return wrong("The steepness is right, but your line crosses the y-axis in the wrong place. Look at c.");
     if (cOK && Math.sign(ms) !== Math.sign(Q.m) && Math.abs(Q.m) > 0.01) return wrong("It crosses the y-axis in the right place, but it slopes the wrong way. Look at the sign of m.");
@@ -5024,12 +5070,25 @@ function mountDrawGraphs(host) {
   const fracRR = () => { for (let run = 1; run <= 6; run++) { const rise = Q.m * run; if (Math.abs(rise - Math.round(rise)) < 1e-9) return { run, rise: Math.round(rise) }; } return { run: 1, rise: Q.m }; };
   function stepsUI() {
     const box = q("[data-steps]"); box.hidden = mode !== "assist"; if (box.hidden) return;
-    const rr = isMC() ? fracRR() : null;
-    const T = [
+    const rr = Q.kind === "mc" ? fracRR() : null, k = Q.kind;
+    const T = k === "vert" ? [
+      `Every point on this line has <b>x = ${num(Q.k)}</b>. Plot a point with that x-coordinate (any y).`,
+      `Plot another point with <b>x = ${num(Q.k)}</b>, higher up or lower down.`,
+      "Rule a <b>line</b> through your two points with the ruler, right across the grid. It should be vertical.",
+    ] : k === "horiz" ? [
+      "Plot where the line crosses the <i>y</i>-axis. Every point on it has the same <i>y</i>: the number in the equation.",
+      "Plot another point with the same <i>y</i>-coordinate, further along.",
+      "Rule a <b>line</b> through your two points with the ruler, right across the grid. It should be horizontal.",
+    ] : k === "std" ? [
+      "Find where it crosses the <i>y</i>-axis: put <b>x = 0</b> into the equation and work out <i>y</i>. Plot that point.",
+      "Find where it crosses the <i>x</i>-axis: put <b>y = 0</b> into the equation and work out <i>x</i>. Plot that point.",
+      "Rule a <b>line</b> through your two points with the ruler, right across the grid. The ruler snaps to your points.",
+    ] : [
       "Plot the <b>y-intercept</b>: the point where the line crosses the <i>y</i>-axis. It's the highlighted number, <b>c</b>.",
       `Use <b>rise and run</b> to plot the next point. The gradient <b>m</b> is highlighted: from your point go ${rr && rr.run > 1 ? "<b>run</b> across (the bottom of the fraction)" : "<b>1</b> across"}, then <b>rise</b> ${Q.m < 0 ? "<b>down</b>, because m is negative" : "up"}.`,
       "Rule a <b>line</b> through your two points with the ruler, right across the grid. The ruler snaps to your points.",
     ];
+    if (k !== "mc") { box.innerHTML = T.map((t, i) => `<div class="dg-step${i < step ? " done" : i === step && !solved ? " on" : ""}"><i class="n">${i < step || solved ? "✓" : i + 1}</i><span>${t}</span></div>`).join(""); if (!solved) setTool(step < 2 ? "point" : "ruler"); return; }
     box.innerHTML = T.map((t, i) => `<div class="dg-step${i < step ? " done" : i === step && !solved ? " on" : ""}"><i class="n">${i < step || solved ? "✓" : i + 1}</i><span>${t}</span></div>`).join("");
     if (isMC() && !solved) q("[data-eq]").innerHTML = eqHTML(step === 0 ? "c" : step === 1 ? "m" : "");
     if (!solved) setTool(step < 2 ? "point" : "ruler");
@@ -5039,7 +5098,8 @@ function mountDrawGraphs(host) {
     setTimeout(() => { const i = items.indexOf(it); if (i >= 0) { items.splice(i, 1); draw(); } }, 900);
   }
   function assistPoint(it) {
-    if (solved || !isMC()) return;
+    if (solved) return;
+    if (Q.kind !== "mc") return assistOther(it);
     if (step === 0) {
       if (it.x === 0 && same(it.y, Q.c)) { step = 1; fbSet("✓ That's the y-intercept. Now use rise and run.", "ok"); return stepsUI(); }
       if (it.y === 0 && same(it.x, Q.c)) return bounce(it, "That's on the x-axis. The y-intercept is on the y-axis (the vertical one).");
@@ -5055,13 +5115,36 @@ function mountDrawGraphs(host) {
       return bounce(it, "Count again from the y-intercept: across by the run, then up or down by the rise.");
     }
   }
+  function assistOther(it) {
+    const on = (p) => Math.abs(Q.A * p.x + Q.B * p.y - Q.C) < 1e-6, pts = items.filter((t) => t.k === "pt" && t !== it);
+    if (step >= 2) return;
+    if (Q.kind === "vert") {
+      if (!on(it)) return bounce(it, `Every point on this line has x = ${num(Q.k)}. Look at the x-coordinate of your point.`);
+      if (step === 1 && pts.some((p) => on(p) && p.y === it.y)) return bounce(it, "That's the same point. Plot one higher up or lower down.");
+      step++; fbSet(step === 1 ? "✓ Now plot another one." : "✓ Good. Now rule a line through them.", "ok"); return stepsUI();
+    }
+    if (Q.kind === "horiz") {
+      if (step === 0 && !(it.x === 0 && on(it))) return bounce(it, it.x === 0 ? "Right axis, wrong place: the number in the equation is the y-coordinate." : "Start on the y-axis, where x = 0.");
+      if (step === 1 && (!on(it) || it.x === 0)) return bounce(it, "Keep the same y-coordinate and move along.");
+      step++; fbSet(step === 1 ? "✓ Now another point with the same y." : "✓ Good. Now rule a line through them.", "ok"); return stepsUI();
+    }
+    // other forms: the two axis crossings
+    const yi = { x: 0, y: Q.C / Q.B }, xi = { x: Q.C / Q.A, y: 0 }, same2 = (a, b) => Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6;
+    if (step === 0) {
+      if (same2(it, yi)) { step = 1; fbSet("✓ That's where it crosses the y-axis.", "ok"); return stepsUI(); }
+      if (same2(it, xi)) return bounce(it, "That's where it crosses the x-axis, which is the next step. First put x = 0 to find the y-axis crossing.");
+      return bounce(it, it.x !== 0 ? "On the y-axis x = 0. Put x = 0 into the equation." : "Put x = 0 into the equation and work out y again.");
+    }
+    if (same2(it, xi)) { step = 2; fbSet("✓ Good. Now rule a line through your two points.", "ok"); return stepsUI(); }
+    return bounce(it, it.y !== 0 ? "On the x-axis y = 0. Put y = 0 into the equation." : "Put y = 0 into the equation and work out x again.");
+  }
   function assistLine(ln) {
-    if (solved || !isMC() || step < 2) { if (!solved && step < 2) bounce(ln, "Plot your points first."); return; }
+    if (solved || step < 2) { if (!solved && step < 2) bounce(ln, "Plot your points first."); return; }
     const pts = items.filter((t) => t.k === "pt"), d = (p) => Math.abs(Q.A * p.x + Q.B * p.y - Q.C) / Math.hypot(Q.A, Q.B);
     const on = d(ln.a) <= 0.3 && d(ln.b) <= 0.3;
     if (!on) return bounce(ln, "Line the ruler up with both of your points. It snaps to them.");
     if (Math.hypot(ln.b.x - ln.a.x, ln.b.y - ln.a.y) < 5) return bounce(ln, "Through both points, yes. Now make it longer: rule it right across the grid.");
-    step = 3; solved = true; st.tried++; st.right++; st.streak++; st.best = Math.max(st.best, st.streak); save(); score();
+    step = 3; solved = true; void pts; st.tried++; st.right++; st.streak++; st.best = Math.max(st.best, st.streak); save(); score();
     ans.innerHTML = `<line x1="${X(-R)}" y1="${Y(yAt(-R))}" x2="${X(R)}" y2="${Y(yAt(R))}" stroke="#1F9D55" stroke-width="7" stroke-opacity=".35" stroke-linecap="round"/>`;
     q("[data-eq]").innerHTML = tex(Q.text); fbSet(`✓ Correct! That's ${Q.text}. Press Next equation for another.`, "ok"); stepsUI();
     void pts;
@@ -5069,6 +5152,7 @@ function mountDrawGraphs(host) {
   function replay() { // after Undo, Clear or the rubber: work out which step they're on from what's left
     if (mode !== "assist" || solved) return;
     step = 0; const pts = items.filter((t) => t.k === "pt");
+    if (Q.kind !== "mc") { const on = (p) => Math.abs(Q.A * p.x + Q.B * p.y - Q.C) < 1e-6; step = Math.min(2, pts.filter(on).length); items = items.filter((t) => t.k !== "ln" || step === 2); draw(); return stepsUI(); }
     if (pts.some((p) => p.x === 0 && same(p.y, Q.c))) step = 1;
     if (step === 1 && pts.some((p) => p.x !== 0 && same(p.y, Q.m * p.x + Q.c))) step = 2;
     items = items.filter((t) => t.k !== "ln" || step === 2); draw(); stepsUI();
@@ -5078,7 +5162,7 @@ function mountDrawGraphs(host) {
   function score() { q("[data-r]").textContent = st.right; q("[data-s]").textContent = st.streak; q("[data-b]").textContent = st.best; }
   // hints point at the part of the equation to use, one step at a time
   function eqHTML(look) {
-    if (typeof Q.m !== "number") return tex(Q.text);
+    if (Q.kind !== "mc" || !/^\s*y\s*=/.test(Q.text)) return tex(Q.text);
     const m = Q.text.match(/^(y\s*=\s*)(.*)$/), terms = m[2].match(/[+−-]?\s*[^+−-]+/g) || [m[2]];
     return tex(m[1].trim()) + " " + terms.map((t) => { const h = tex(t.trim()), isX = /x/.test(t); return (isX && look === "m") || (!isX && look === "c") ? `<mark class="look on">${h}</mark>` : h; }).join(" ");
   }
@@ -5086,7 +5170,9 @@ function mountDrawGraphs(host) {
     const tb = q("[data-dghelp]"); if (tb && (hintN >= 1 || mode === "assist")) tb.hidden = false; // after the hints, they can ask the teacher
     if (mode === "assist") { const h = q("[data-hint]"); h.hidden = false; const T = ["The y-intercept is always on the y-axis, the vertical line through 0. Count up from 0 if c is positive, down if it's negative.", "From your first point, count the run across to the right first. Then count the rise: up if m is positive, down if it's negative.", "Lay the ruler so it covers both of your points, then drag it right across the grid."]; h.innerHTML = `💡 ${T[Math.min(step, 2)]}`; const on = q(".dg-step.on"); if (on) { on.classList.remove("hinting"); void on.offsetWidth; on.classList.add("hinting"); } return; }
     hintN = Math.min(hintN + 1, 2); const h = q("[data-hint]"); h.hidden = false;
-    if (typeof Q.m !== "number") { h.innerHTML = "💡 Find two points that fit the equation, plot them, then rule a line through them."; return; }
+    if (Q.kind === "vert") { h.innerHTML = `💡 x = ${num(Q.k)} means every point has x-coordinate ${num(Q.k)}. Plot two of them, then rule a vertical line.`; return; }
+    if (Q.kind === "horiz") { h.innerHTML = "💡 y = a number means every point has that y-coordinate. Plot two of them, then rule a flat line."; return; }
+    if (Q.kind === "std") { h.innerHTML = hintN === 1 ? "💡 Put x = 0 into the equation: that gives where the line crosses the y-axis." : "💡 Now put y = 0: that gives where it crosses the x-axis. Plot both points and rule a line through them."; return; }
     if (hintN === 1) { q("[data-eq]").innerHTML = eqHTML("c"); h.innerHTML = `💡 Start with the highlighted part: it's <b>c</b>, where your line crosses the <i>y</i>-axis. ${Q.c ? "" : "(No number on its own means c = 0.)"} Plot that point first.`; const yx = svg.querySelector(".dg-yax"); yx.setAttribute("stroke", "#F2B200"); yx.setAttribute("stroke-width", "6"); setTimeout(() => { yx.setAttribute("stroke", "#23264A"); yx.setAttribute("stroke-width", "2"); }, 2500); }
     else { q("[data-eq]").innerHTML = eqHTML("m"); h.innerHTML = `💡 Now the highlighted part: it's <b>m</b>, the gradient. From your first point, go 1 across and ${Q.m < 0 ? "<b>down</b>" : "up"} by m${Number.isInteger(Q.m) ? "" : " (for a fraction, rise over run: ½ is 2 across, 1 up)"}. Plot a few points, then rule a line through them.`; }
   }
@@ -5122,17 +5208,17 @@ function texLook(str, look) {
     if (p.math) {
       if (/=/.test(p.text)) {
         eqi++;
-        if (has("eq", eqi)) return mk(tex(p.text));
+        if (has("eq", eqi) || ((has("m", eqi) || has("c", eqi)) && (p.text.match(/=/g) || []).length > 1)) return mk(tex(p.text));
         if (has("m", eqi) || has("c", eqi)) {
           const sp = p.text.match(/^(.*?=\s*)(.*)$/), terms = sp[2].match(/[+−-]?\s*[^+−-]+/g) || [sp[2]];
-          return tex(sp[1].trim()) + " " + terms.map((t, k) => { const isX = /x/.test(t), sg = t.trim().match(/^([+−-])\s*(.*)$/);
+          return tex(sp[1].trim()) + " " + terms.map((t, k) => { const isX = /[a-z]/i.test(t), sg = t.trim().match(/^([+−-])\s*(.*)$/);
             const h = sg && k > 0 ? `${sg[1] === "+" ? "+" : "−"}&thinsp;${tex(sg[2])}` : tex(t.trim());
             return (isX ? has("m", eqi) : has("c", eqi)) ? mk(h) : h; }).join(" ");
         }
         return tex(p.text);
       }
       if (/^\(/.test(p.text) && look.includes("pt")) return mk(tex(p.text));
-      if (look.includes("num") && /^[−-]?[\d½⅓¼]/.test(p.text)) return mk(tex(p.text));
+      if (look.includes("num") && /^[−-]?[\d½⅓⅔¼¾⅕⅛]/.test(p.text)) return mk(tex(p.text));
       return tex(p.text);
     }
     let h = esc(p.text);
