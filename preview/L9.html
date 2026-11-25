@@ -4478,9 +4478,10 @@ function handinSection() {
 const NP = (() => {
   const W = 800, TOP = 56, MARGIN = 78;
   const PAPERS = { white: "#FFFFFF", cream: "#FFFBEA", yellow: "#FFF5B8", blue: "#E3F0FF", green: "#E4F6E4", pink: "#FBE6EF", grey: "#EFEFEF" };
-  const PENS = ["#1D2C7A", "#111111", "#1F7A4D", "#7A2BB5", "#B05A00", "#0B6E99"];
+  const PENS = ["#1D2C7A", "#111111", "#1565C0", "#7A2BB5", "#B0186E", "#B05A00"]; // no greens: green pen is the teacher's
   const FONTS = { hand: "var(--hand), 'Comic Sans MS', cursive", clear: "var(--body), Arial, sans-serif", dys: "'Atkinson Hyperlegible', Verdana, sans-serif" };
   const DEF = { pen: PENS[0], size: 3, paper: "cream", style: "lined", gap: 40, font: "hand", text: 1, left: false };
+  try { if (state.npSet && state.npSet.pen && !PENS.includes(state.npSet.pen)) state.npSet.pen = PENS[0]; } catch (e) {}
   const set = () => Object.assign({}, DEF, state.npSet || {});
   const pad = (key) => state.np && state.np[key];
   const has = (key) => { const d = pad(key); return !!(d && ((d.s && d.s.length) || (d.t && d.t.trim()))); };
@@ -4509,8 +4510,8 @@ const NP = (() => {
 .np-page.mode-type textarea { z-index: 3; cursor: text; } .np-page.mode-type canvas.ink { pointer-events: none; }
 .np-page:not(.mode-type) textarea { pointer-events: none; }
 .np-more { display: block; margin: 14px auto 0; font: 800 14px var(--body); padding: 7px 14px; border-radius: 8px; border: 2px dashed var(--ink2); background: transparent; cursor: pointer; }
-.np-fb { margin: 0 auto 14px; max-width: 860px; border: 2px solid #D93A3A; background: #FFF1F1; border-radius: 8px; padding: 10px 12px; font: 600 16px/1.4 var(--body); }
-.np-fb b { color: #D93A3A; }
+.np-fb { margin: 0 auto 14px; max-width: 860px; border: 2px solid #1E8E3E; background: #EEF8F0; border-radius: 8px; padding: 10px 12px; font: 600 16px/1.4 var(--body); }
+.np-fb b { color: #1E8E3E; }
 .np-set { position: absolute; right: 14px; top: 110px; z-index: 5; width: min(360px, calc(100% - 28px)); background: #fff; border: 2px solid var(--ink); border-radius: 10px; box-shadow: 4px 4px 0 var(--ink); padding: 12px 14px; font: 600 14px var(--body); display: flex; flex-direction: column; gap: 10px; }
 .np-set .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .np-set .row > span { width: 100%; font-weight: 800; }
@@ -4709,7 +4710,7 @@ const LIVE_IDLE = 90; // seconds without touching the lesson before a student sh
 @media (max-width: 640px) { .helpbox .hb-s { grid-template-columns: 22px 1fr; } .helpbox .hb-e { grid-column: 2; } }
 .askhelp.on { background: var(--amber); color: #fff; }
 #helpPill { position: fixed; right: 18px; bottom: 18px; z-index: 8000; max-width: min(440px, calc(100vw - 36px)); display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 2px solid var(--ink); border-radius: 12px; background: #FFF6DA; box-shadow: 4px 4px 0 var(--ink); font: 700 15px/1.35 var(--body); }
-#fbPill { position: fixed; right: 18px; bottom: 84px; z-index: 8000; max-width: min(440px, calc(100vw - 36px)); display: flex; align-items: center; gap: 8px; padding: 10px 14px; border: 2px solid #D93A3A; border-radius: 12px; background: #FFF1F1; box-shadow: 4px 4px 0 var(--ink); font: 700 15px/1.35 var(--body); }
+#fbPill { position: fixed; right: 18px; bottom: 84px; z-index: 8000; max-width: min(440px, calc(100vw - 36px)); display: flex; align-items: center; gap: 8px; padding: 10px 14px; border: 2px solid #1E8E3E; border-radius: 12px; background: #EEF8F0; box-shadow: 4px 4px 0 var(--ink); font: 700 15px/1.35 var(--body); }
 #fbPill button { font: 800 13px var(--body); padding: 4px 10px; border-radius: 6px; border: 2px solid var(--ink); background: #fff; cursor: pointer; flex: none; }
 #helpPill.seen { background: #EFFAF3; border-color: var(--green); }
 #helpPill button { font: 800 13px var(--body); padding: 4px 10px; border-radius: 6px; border: 2px solid var(--ink); background: #fff; cursor: pointer; flex: none; }
@@ -4828,7 +4829,7 @@ function liveBar() {
 function padsHTML(plain) {
   gather(); const keys = Object.keys(state.np || {}).filter((k) => NP.has(k)); if (!keys.length) return "";
   return `<h3 style="margin:18px 0 6px">Written working (${keys.length} notepad${keys.length === 1 ? "" : "s"})</h3>` + keys.map((k) => { const f = state.npFb && state.npFb[k];
-    return `<div style="page-break-inside:avoid;margin:0 0 14px"><p style="margin:4px 0"><b>${esc(QLABEL[k] || QLABEL[k.split("~")[0]] || k)}</b>${f && (f.text || f.mark) ? ` · <span style="color:#c62828">Teacher: ${f.mark ? (f.mark === "ok" ? "✓ " : f.mark === "no" ? "✗ " : "½ ") : ""}${esc(f.text || "")}</span>` : ""}</p><img src="${NP.image(k, plain ? 0.5 : 0.6)}" alt="Notepad" style="width:${plain ? "15cm" : "100%"};max-width:640px;border:1px solid #ccc"></div>`; }).join("");
+    return `<div style="page-break-inside:avoid;margin:0 0 14px"><p style="margin:4px 0"><b>${esc(QLABEL[k] || QLABEL[k.split("~")[0]] || k)}</b>${f && (f.text || f.mark) ? ` · <span style="color:#1E8E3E">Teacher: ${f.mark ? (f.mark === "ok" ? "✓ " : f.mark === "no" ? "✗ " : "½ ") : ""}${esc(f.text || "")}</span>` : ""}</p><img src="${NP.image(k, plain ? 0.5 : 0.6)}" alt="Notepad" style="width:${plain ? "15cm" : "100%"};max-width:640px;border:1px solid #ccc"></div>`; }).join("");
 }
 // a plain page for the PDF in the teacher's Drive (Google's converter ignores scripts and most styling)
 function handinHTML(name, cls, score) {
@@ -4862,29 +4863,31 @@ function npTeacherDoc(s, data) { // every notepad, in question order, as one doc
   if (!keys.length) list.innerHTML = `<p style="font:700 17px var(--body);text-align:center">No written work yet.</p>`;
   keys.forEach((k) => { const p = data.pads[k], d = JSON.parse(p.data || "{}"), fb = (data.fbs || {})[k];
     const box = document.createElement("div"); box.style.cssText = "max-width:800px;margin:0 auto 22px";
-    box.innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><b style="font:800 17px var(--body);flex:1">${esc(p.label || k)}</b>${fb ? `<span style="color:#D93A3A;font:700 14px var(--body)">Feedback sent ${fb.mark ? (fb.mark === "ok" ? "✓" : fb.mark === "no" ? "✗" : "½") : ""}</span>` : ""}<button type="button" style="font:800 13px var(--body);padding:5px 10px;border-radius:6px;border:2px solid var(--ink);background:#fff">✏️ Feedback</button></div>`;
+    box.innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><b style="font:800 17px var(--body);flex:1">${esc(p.label || k)}</b>${fb ? `<span style="color:#1E8E3E;font:700 14px var(--body)">Feedback sent ${fb.mark ? (fb.mark === "ok" ? "✓" : fb.mark === "no" ? "✗" : "½") : ""}</span>` : ""}<button type="button" style="font:800 13px var(--body);padding:5px 10px;border-radius:6px;border:2px solid var(--ink);background:#fff">✏️ Feedback</button></div>`;
     box.appendChild(npCanvas(d, fb, w, true)); box.querySelector("button").onclick = () => npTeacherOne(s, k, p, fb, () => { ov.remove(); npFetch(s.cls + "|" + s.name).then((j) => npTeacherDoc(s, j)); });
     list.appendChild(box); });
   ov.querySelector("[data-x]").onclick = () => ov.remove();
   ov.querySelector("[data-p]").onclick = () => { const html = `<h2>${esc(L.id)} · ${esc(s.name)} · ${esc(s.cls)}</h2>` + [...list.children].map((b) => { const c = b.querySelector("canvas"); return c ? `<div style="page-break-inside:avoid;margin-bottom:14px"><p><b>${esc(b.querySelector("b").textContent)}</b></p><img src="${c.toDataURL("image/jpeg", 0.85)}" style="width:100%"></div>` : ""; }).join(""); if (!printCopy(html, `${L.id} ${s.name}`, "")) alert("Printing is blocked here."); };
 }
-function npTeacherOne(s, k, p, fb0, after) { // one notepad, with a red pen, a mark and a comment for the student
+const TPENS = ["#0B5D2A", "#1E8E3E", "#34B05C", "#7CC242", "#00897B"]; // the teacher's greens
+function npTeacherOne(s, k, p, fb0, after) { // one notepad, with a green pen, a mark and a comment for the student
   const d = JSON.parse(p.data || "{}"), fb = { s: (fb0 && fb0.s) || [], text: (fb0 && fb0.text) || "", mark: (fb0 && fb0.mark) || "" };
   const ov = document.createElement("div"); ov.className = "np-ov";
   ov.innerHTML = `<div class="np-win"><div class="np-head"><b>📝 ${esc(s.name)} · ${esc(p.label || k)}</b><button type="button" data-x>✕ Close</button></div>
-    <div class="np-tools"><button type="button" data-t="pen" class="on">🖍 Red pen</button><button type="button" data-t="rub">🧽 Rubber</button><button type="button" data-u>↶ Undo</button><span class="sp"></span>
+    <div class="np-tools"><button type="button" data-t="pen" class="on">🖍 Green pen</button>${TPENS.map((c, i) => `<button type="button" class="sw${i === 1 ? " on" : ""}" data-tc="${c}" style="background:${c}" aria-label="Green pen shade ${i + 1}"></button>`).join("")}<button type="button" data-t="rub">🧽 Rubber</button><button type="button" data-u>↶ Undo</button><span class="sp"></span>
       <button type="button" data-m="ok">✓ Correct</button><button type="button" data-m="half">½ Partly</button><button type="button" data-m="no">✗ Not yet</button></div>
-    <div class="np-scroll"><div style="max-width:820px;margin:0 auto 12px;display:flex;gap:8px"><input data-c type="text" placeholder="Comment for the student, e.g. Check the sign of the gradient" style="flex:1;font:600 16px var(--body);padding:8px 10px;border:2px solid var(--ink);border-radius:8px"><button type="button" data-send style="font:800 15px var(--body);padding:8px 14px;border-radius:8px;border:2px solid #D93A3A;background:#D93A3A;color:#fff">Send feedback</button></div><div data-pg style="position:relative;max-width:820px;margin:0 auto"></div><p data-st style="text-align:center;font:700 14px var(--body)"></p></div></div>`;
+    <div class="np-scroll"><div style="max-width:820px;margin:0 auto 12px;display:flex;gap:8px"><input data-c type="text" placeholder="Comment for the student, e.g. Check the sign of the gradient" style="flex:1;font:600 16px var(--body);padding:8px 10px;border:2px solid var(--ink);border-radius:8px"><button type="button" data-send style="font:800 15px var(--body);padding:8px 14px;border-radius:8px;border:2px solid #1E8E3E;background:#1E8E3E;color:#fff">Send feedback</button></div><div data-pg style="position:relative;max-width:820px;margin:0 auto"></div><p data-st style="text-align:center;font:700 14px var(--body)"></p></div></div>`;
   document.body.appendChild(ov);
-  const host = ov.querySelector("[data-pg]"); let cv, tool = "pen", cur = null, hist = [];
+  const host = ov.querySelector("[data-pg]"); let cv, tool = "pen", cur = null, hist = [], tcol = TPENS[1];
   const draw = () => { const w = host.clientWidth; host.innerHTML = ""; cv = npCanvas(d, fb, w); cv.style.touchAction = "none"; cv.style.cursor = "crosshair"; host.appendChild(cv); bind(); };
   const pos = (e) => { const r = cv.getBoundingClientRect(); return [Math.round(((e.clientX - r.left) / r.width) * NP.W), Math.round(((e.clientY - r.top) / r.height) * (d.h || 1000))]; };
   function bind() {
-    cv.onpointerdown = (e) => { e.preventDefault(); cv.setPointerCapture(e.pointerId); hist.push(JSON.stringify(fb.s)); const [x, y] = pos(e); if (tool === "rub") { rub(x, y); cur = { rub: 1 }; return; } cur = { c: "#D93A3A", w: 3, p: [x, y] }; };
+    cv.onpointerdown = (e) => { e.preventDefault(); cv.setPointerCapture(e.pointerId); hist.push(JSON.stringify(fb.s)); const [x, y] = pos(e); if (tool === "rub") { rub(x, y); cur = { rub: 1 }; return; } cur = { c: tcol, w: 3, p: [x, y] }; };
     cv.onpointermove = (e) => { if (!cur) return; const [x, y] = pos(e); if (cur.rub) return rub(x, y); cur.p.push(x, y); const ctx = cv.getContext("2d"), k = cv.width / NP.W; NP.paint(ctx, { s: [{ c: cur.c, w: cur.w, p: cur.p.slice(-4) }] }, k); };
     cv.onpointerup = () => { if (cur && !cur.rub) fb.s.push(cur); cur = null; draw(); };
   }
   function rub(x, y) { const n = fb.s.length; fb.s = fb.s.filter((st) => { for (let i = 0; i < st.p.length; i += 2) if ((st.p[i] - x) ** 2 + (st.p[i + 1] - y) ** 2 < 300) return false; return true; }); if (fb.s.length !== n) draw(); }
+  ov.querySelectorAll("[data-tc]").forEach((b) => (b.onclick = () => { tcol = b.dataset.tc; tool = "pen"; ov.querySelectorAll("[data-tc]").forEach((x) => x.classList.toggle("on", x === b)); ov.querySelectorAll("[data-t]").forEach((x) => x.classList.toggle("on", x.dataset.t === "pen")); }));
   ov.querySelectorAll("[data-t]").forEach((b) => (b.onclick = () => { tool = b.dataset.t; ov.querySelectorAll("[data-t]").forEach((x) => x.classList.toggle("on", x === b)); }));
   const markUI = () => ov.querySelectorAll("[data-m]").forEach((b) => b.classList.toggle("on", b.dataset.m === fb.mark));
   ov.querySelectorAll("[data-m]").forEach((b) => (b.onclick = () => { fb.mark = fb.mark === b.dataset.m ? "" : b.dataset.m; markUI(); }));
