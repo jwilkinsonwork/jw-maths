@@ -1600,9 +1600,19 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
 
   function build(i) {
     const c = cards[i], Q = c.spec.make(); c.built = true;
-    c.el.innerHTML = `<div class="bu-head"><span class="bu-num">Card ${i + 1} of ${N}</span><b>${tex(c.spec.title)}</b>${c.spec.sub ? `<span class="bu-new">${tex(c.spec.sub)}</span>` : ""}${LIVE.url && !big ? `<button type="button" class="askhelp" style="margin-left:auto;float:none" data-help="${esc(`Build it up · Card ${i + 1}: ${c.spec.title}`)}">✋ Help</button>` : ""}</div><div class="bu-body"><div class="bu-g"></div><div class="bu-side"><div class="bu-q">${tex(Q.q)}</div>${c.spec.remind ? `<div class="bu-remind"><span class="bu-rtag">Reminder</span> ${c.spec.remind}</div>` : ""}<div class="bu-steps"></div><div class="bu-endslot"></div></div></div>`;
+    c.el.innerHTML = `<div class="bu-head"><span class="bu-num">Card ${i + 1} of ${N}</span><b>${tex(c.spec.title)}</b>${c.spec.sub ? `<span class="bu-new">${tex(c.spec.sub)}</span>` : ""}${!big ? `<button type="button" class="askhelp" style="margin-left:auto;float:none" data-buladder>💡 Help</button>` : ""}</div><div class="bu-body"><div class="bu-g"></div><div class="bu-side"><div class="bu-q">${tex(Q.q)}</div>${c.spec.remind ? `<div class="bu-remind"><span class="bu-rtag">Reminder</span> ${c.spec.remind}</div>` : ""}<div class="bu-steps"></div><div class="bu-endslot"></div></div></div>`;
     const G = buGrid(c.el.querySelector(".bu-g"), Q.line, big ? 440 : 390), ctx = { Q, G }; c.el.__bu = ctx;
     if (Q.tri) G.drawTri(Q.tri[0], Q.tri[1]);
+    const hl = c.el.querySelector("[data-buladder]"); let hlv = 0;
+    if (hl) hl.onclick = () => {
+      const k = rows.findIndex((r) => r.classList.contains("active")), s0 = Q.steps[k];
+      if (hlv === 0 && s0 && (s0.hint || (s0.lines && s0.lines.some((d) => d.hint)))) {
+        const h = s0.hint || s0.lines.filter((d) => !d.ok).map((d) => d.hint).filter(Boolean)[0];
+        fb(k, `<span class="bu-hint">💡 ${tex(h)}</span>`, ""); if (s0.flash) G.flash(s0.flash); rows[k].classList.add("hinting"); hlv = 1;
+        hl.textContent = LIVE.url ? "✋ Ask my teacher" : "💡 Help"; return;
+      }
+      if (LIVE.url) { askHelp(`Build it up · Card ${i + 1}: ${c.spec.title}`); hl.textContent = "✋ Asked"; hl.classList.add("on"); }
+    };
     const box = c.el.querySelector(".bu-steps"), rows = [];
     Q.steps.forEach((s, k) => {
       const r = document.createElement("div"); r.className = "bu-step locked";
@@ -2746,8 +2756,9 @@ function qCard(key, num, numCol, qText, model, parts, extra = "", retry = null) 
     const ph = { num: "e.g. −1/2", eq: "e.g. y = 2x + 1", lines2: "e.g. y = 2x + 1", coords: "e.g. (1, 4), (2, 5)", text: "" }[p.t] || "";
     return `<div class="part" data-p="${i}">${lab}<input type="text" placeholder="${ph}" aria-label="${esc(p.label || "Answer")}"><span class="res"></span></div>`;
   }).join("");
-  el.innerHTML = `<div class="qt">${LIVE.url && !/^ex[AB]/.test(key) ? `<button type="button" class="askhelp" data-help title="Ask your teacher for help with this question">✋ Help</button>` : ""}<span class="qn" style="background:${numCol}">${num}</span>${retry && retry.look ? texLook(qText, retry.look) : tex(qText)}${retry ? `<span class="wrongs" aria-live="polite"></span>` : ""}</div>${extra && retry && retry.lookGraph ? extra.replace('class="svgwrap"', 'class="svgwrap lookg"') : extra}${parts ? inputs : `<textarea aria-label="Your working"></textarea>`}
-    <div class="qactions">${parts ? `<button class="primary" data-check>Check</button>` : ""}<button data-show ${parts ? "hidden" : ""}>Show the answer</button>${retry ? `<button class="primary" data-new hidden>Try a similar question</button>` : ""}<span class="fb small"></span></div>${retry ? `<div class="model hint hidden"><b>Hint:</b> ${tex(retry.hint)}${retry.look || retry.lookGraph ? ` <span class="small" style="color:var(--amber)">Look at the highlighted part of the question.</span>` : ""}</div>` : ""}
+  const ladder = !/^ex[AB]/.test(key) && (LIVE.url || (retry && (retry.hint || retry.how)));
+  el.innerHTML = `<div class="qt">${ladder ? `<button type="button" class="askhelp" data-ladder title="Get help with this question">💡 Help</button>` : ""}<span class="qn" style="background:${numCol}">${num}</span>${retry && retry.look ? texLook(qText, retry.look) : tex(qText)}${retry ? `<span class="wrongs" aria-live="polite"></span>` : ""}</div>${extra && retry && retry.lookGraph ? extra.replace('class="svgwrap"', 'class="svgwrap lookg"') : extra}${parts ? inputs : `<textarea aria-label="Your working"></textarea>`}
+    <div class="qactions">${parts ? `<button class="primary" data-check>Check</button>` : ""}<button data-show ${parts ? "hidden" : ""}>Show the answer</button>${retry ? `<button class="primary" data-new hidden>Try a similar question</button>` : ""}<span class="fb small"></span></div>${retry ? `<div class="model hint hidden"><b>Hint:</b> ${tex(retry.hint)}${retry.look || retry.lookGraph ? ` <span class="small" style="color:var(--amber)">Look at the highlighted part of the question.</span>` : ""}</div>` : ""}<div class="helpbox" hidden></div>
     <div class="model hidden">${tex(model)}${parts ? "" : `<div class="qactions"><button data-self="1">I got it</button><button data-self="0">Not yet</button></div>`}</div>`;
   const parts$ = el.querySelectorAll(".part");
   parts$.forEach((pe, i) => {
@@ -2774,8 +2785,8 @@ function qCard(key, num, numCol, qText, model, parts, extra = "", retry = null) 
       const w = Math.min(st.wrongN || 0, 3);
       const badge = el.querySelector(".wrongs");
       badge.innerHTML = !w ? "" : `${"✗".repeat(w)} <span>${w} of 3 wrong</span>${all ? ` <b class="then-ok">then ✓</b>` : ""}`;
-      el.querySelector(".hint").classList.toggle("hidden", all || w < 2);
-      el.classList.toggle("hinting", !all && w >= 2);
+      el.querySelector(".hint").classList.toggle("hidden", all || (w < 2 && !st.helpLvl));
+      el.classList.toggle("hinting", !all && (w >= 2 || st.helpLvl >= 1));
       if (!all && w >= 3) {
         showModel(); el.querySelector("[data-new]").hidden = false; el.querySelector("[data-new]").textContent = "Try a similar question"; el.querySelector("[data-check]").disabled = true;
         el.querySelector(".fb").textContent = "Three wrong: read the answer below, then try a similar question.";
@@ -2798,6 +2809,35 @@ function qCard(key, num, numCol, qText, model, parts, extra = "", retry = null) 
   el.querySelector("[data-show]").onclick = () => { showModel(); st.shown = true; save(); };
   el.querySelectorAll("[data-self]").forEach((b) => (b.onclick = () => { st.ok = b.dataset.self === "1"; save(); b.parentElement.querySelectorAll("button").forEach((x) => x.classList.toggle("sel", x === b)); }));
   if (retry) { const nb = el.querySelector("[data-new]"); nb.onclick = retry.onNew; }
+  const lb = el.querySelector("[data-ladder]");
+  if (lb) {
+    const levels = [];
+    if (retry && retry.hint) levels.push("hint");
+    if (retry && retry.how && retry.how.steps) levels.push("steps");
+    if (LIVE.url) levels.push("teacher");
+    const label = (lvl) => ({ hint: "💡 Help", steps: "📋 Show me the steps", teacher: "✋ Ask my teacher" })[levels[lvl]] || "✋ Ask my teacher";
+    const hb = el.querySelector(".helpbox");
+    const showUpTo = (lvl) => {
+      const has = (k) => levels.indexOf(k) > -1 && levels.indexOf(k) < lvl;
+      if (has("hint")) { el.querySelector(".hint").classList.remove("hidden"); el.classList.add("hinting"); }
+      if (has("steps")) {
+        hb.hidden = false;
+        hb.innerHTML = `<div class="hb-t">📋 How to: ${tex(retry.how.title)}</div>${retry.how.steps.map(([a, b], i) => `<div class="hb-s"><b>${i + 1}</b><span>${tex(a)}</span><span class="hb-e">${tex(b)}</span></div>`).join("")}${levels.includes("teacher") ? `<div class="hb-more">Still stuck after trying the steps? Press <b>✋ Ask my teacher</b>.</div>` : `<div class="hb-more">Still stuck? Put your hand up.</div>`}`;
+      }
+      lb.textContent = lvl < levels.length ? label(lvl) : levels.includes("teacher") ? "✋ Asked" : "📋 Steps shown";
+      lb.classList.toggle("on", lvl >= levels.length);
+    };
+    if (st.helpLvl) showUpTo(Math.min(st.helpLvl, levels.length - (levels.includes("teacher") ? 1 : 0)));
+    else lb.textContent = label(0);
+    lb.onclick = (e) => {
+      e.stopPropagation();
+      const cur = st.helpLvl || 0, next = levels[cur];
+      if (!next) return;
+      if (next === "teacher") { gather(); askHelp(QLABEL[key] || QLABEL[key.split("~")[0]] || "a question"); st.helpLvl = cur + 1; save(); showUpTo(st.helpLvl); return; }
+      st.helpLvl = cur + 1; save(); showUpTo(st.helpLvl);
+      if (next === "steps") hb.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    };
+  }
   if (st.tries) mark(true);
   if (st.shown) showModel();
   return el;
@@ -4220,6 +4260,12 @@ const LIVE_IDLE = 90; // seconds without touching the lesson before a student sh
 #livebar { margin: 0 0 12px; }
 .askhelp { float: right; margin: -2px 0 4px 10px; font: 800 13px var(--body); padding: 4px 10px; border-radius: 20px; border: 2px solid var(--amber); background: #FFF6DA; color: var(--ink); cursor: pointer; }
 .askhelp:hover { background: #FFE9A8; }
+.helpbox { margin-top: 10px; border: 2px dashed var(--amber); border-radius: 8px; background: #FFFBEE; padding: 10px 12px; }
+.helpbox .hb-t { font: 800 16px var(--body); margin-bottom: 6px; }
+.helpbox .hb-s { display: grid; grid-template-columns: 22px 1fr minmax(120px, 40%); gap: 8px; padding: 5px 0; border-top: 1px solid #F1E3B8; font-size: 15px; line-height: 1.35; }
+.helpbox .hb-s b { color: var(--coral); } .helpbox .hb-e { color: var(--ink2); font-style: italic; }
+.helpbox .hb-more { margin-top: 8px; font-size: 14px; color: var(--ink2); }
+@media (max-width: 640px) { .helpbox .hb-s { grid-template-columns: 22px 1fr; } .helpbox .hb-e { grid-column: 2; } }
 .askhelp.on { background: var(--amber); color: #fff; }
 #helpPill { position: fixed; right: 18px; bottom: 18px; z-index: 8000; max-width: min(440px, calc(100vw - 36px)); display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 2px solid var(--ink); border-radius: 12px; background: #FFF6DA; box-shadow: 4px 4px 0 var(--ink); font: 700 15px/1.35 var(--body); }
 #helpPill.seen { background: #EFFAF3; border-color: var(--green); }
@@ -4303,7 +4349,7 @@ document.addEventListener("click", (e) => {
   const b = e.target.closest && e.target.closest("[data-help]"); if (!b || !window.__live) return;
   e.preventDefault(); e.stopPropagation();
   let what = b.dataset.help;
-  if (!what) { const q = b.closest(".q[data-key]"); if (q) { gather(); what = QLABEL[q.dataset.key] || QLABEL[q.dataset.key.split("~")[0]] || "a question"; } }
+  if (what === "general" && lastQ) { const qe = document.querySelector(`#student .q[data-key="${CSS.escape(lastQ)}"] [data-ladder]`); if (qe && qe.offsetParent && !qe.classList.contains("on")) { qe.closest(".q").scrollIntoView({ block: "center", behavior: "smooth" }); qe.click(); return; } }
   if (what === "general") { gather(); const t = document.querySelector('#student .tabs button[aria-pressed="true"]'); what = (lastQ && (QLABEL[lastQ] || QLABEL[lastQ.split("~")[0]])) || (t ? t.textContent.trim() : "the lesson"); }
   askHelp(what);
 }, true);
@@ -4481,6 +4527,7 @@ mark.look { background: none; color: inherit; padding: 0 1px; border-radius: 5px
 .hinting mark.look, mark.look.on { background: #FFE27A; box-shadow: 0 0 0 3px #FFE27A; animation: lookpulse 1.1s ease-in-out 3; }
 @keyframes lookpulse { 50% { box-shadow: 0 0 0 7px rgba(255,214,77,.55); } }
 .hinting .svgwrap.lookg { outline: 4px solid #FFD64D; outline-offset: 3px; border-radius: 10px; animation: lookpulse 1.1s ease-in-out 3; }
+.dg-step.hinting { box-shadow: 0 0 0 3px #FFE27A; animation: lookpulse 1.1s ease-in-out 3; }
 .bu-step.hinting .bu-lab b { background: #FFE27A; box-shadow: 0 0 0 3px #FFE27A; border-radius: 4px; animation: lookpulse 1.1s ease-in-out 3; }
 `; document.head.appendChild(st); })();
 
@@ -4514,7 +4561,7 @@ function mountDrawGraphs(host) {
         <div class="dg-eq"><span class="lbl">Draw the line</span><span data-eq></span></div>
         <div class="dg-score"><span>Right <b data-r>0</b></span><span>Streak <b data-s>0</b></span><span>Best <b data-b>0</b></span></div></div>
       <div class="dg-card dg-steps" data-steps></div>
-      <div class="dg-card"><div class="dg-act"><button type="button" class="go" data-go>✓ Check my line</button><button type="button" data-h>💡 Hint</button><button type="button" class="nx" data-n>Next equation ▶</button>${LIVE.url ? `<button type="button" class="askhelp" style="float:none;margin:0" data-help="Draw graphs" data-dghelp>✋ Help</button>` : ""}</div>
+      <div class="dg-card"><div class="dg-act"><button type="button" class="go" data-go>✓ Check my line</button><button type="button" data-h>💡 Hint</button><button type="button" class="nx" data-n>Next equation ▶</button>${LIVE.url ? `<button type="button" class="askhelp" style="float:none;margin:0" data-dghelp>✋ Ask my teacher</button>` : ""}</div>
         <div class="dg-fb" data-fb></div><div class="dg-hint" data-hint hidden></div></div>
       <div class="dg-card"><div class="dg-tools">
         <button type="button" data-t="ruler">📏 Ruler</button><button type="button" data-t="point">✖ Point</button><button type="button" data-t="pen">✏️ Pen</button>
@@ -4672,6 +4719,8 @@ function mountDrawGraphs(host) {
     return tex(m[1].trim()) + " " + terms.map((t) => { const h = tex(t.trim()), isX = /x/.test(t); return (isX && look === "m") || (!isX && look === "c") ? `<mark class="look on">${h}</mark>` : h; }).join(" ");
   }
   function showHint() {
+    const tb = q("[data-dghelp]"); if (tb && (hintN >= 1 || mode === "assist")) tb.hidden = false; // after the hints, they can ask the teacher
+    if (mode === "assist") { const h = q("[data-hint]"); h.hidden = false; const T = ["The y-intercept is always on the y-axis, the vertical line through 0. Count up from 0 if c is positive, down if it's negative.", "From your first point, count the run across to the right first. Then count the rise: up if m is positive, down if it's negative.", "Lay the ruler so it covers both of your points, then drag it right across the grid."]; h.innerHTML = `💡 ${T[Math.min(step, 2)]}`; const on = q(".dg-step.on"); if (on) { on.classList.remove("hinting"); void on.offsetWidth; on.classList.add("hinting"); } return; }
     hintN = Math.min(hintN + 1, 2); const h = q("[data-hint]"); h.hidden = false;
     if (typeof Q.m !== "number") { h.innerHTML = "💡 Find two points that fit the equation, plot them, then rule a line through them."; return; }
     if (hintN === 1) { q("[data-eq]").innerHTML = eqHTML("c"); h.innerHTML = `💡 Start with the highlighted part: it's <b>c</b>, where your line crosses the <i>y</i>-axis. ${Q.c ? "" : "(No number on its own means c = 0.)"} Plot that point first.`; const yx = svg.querySelector(".dg-yax"); yx.setAttribute("stroke", "#F2B200"); yx.setAttribute("stroke-width", "6"); setTimeout(() => { yx.setAttribute("stroke", "#23264A"); yx.setAttribute("stroke-width", "2"); }, 2500); }
@@ -4680,7 +4729,7 @@ function mountDrawGraphs(host) {
   function newQ(keep) {
     if (!keep) Q = drawQ(level); items = []; hintN = 0; wrongN = 0; solved = false; ans.innerHTML = ""; draw();
     q("[data-eq]").innerHTML = tex(Q.text); q("[data-hint]").hidden = true; fbSet(""); step = 0; stepsUI();
-    const hb = q("[data-dghelp]"); if (hb) hb.dataset.help = `Draw graphs · ${Q.text} (${mode === "assist" ? "assisted" : "unassisted"})`;
+    const hb = q("[data-dghelp]"); if (hb) { hb.textContent = "✋ Ask my teacher"; hb.classList.remove("on"); hb.hidden = true; }
   }
   host.querySelectorAll("[data-t]").forEach((b) => (b.onclick = () => { tool = b.dataset.t; host.querySelectorAll("[data-t]").forEach((x) => x.classList.toggle("on", x === b)); q("[data-tip]").textContent = TIPS[tool]; }));
   host.querySelectorAll("[data-lv]").forEach((b) => (b.onclick = () => { level = st.level = b.dataset.lv; save(); host.querySelectorAll("[data-lv]").forEach((x) => x.classList.toggle("on", x === b)); newQ(); }));
@@ -4690,11 +4739,12 @@ function mountDrawGraphs(host) {
   function setMode(m) {
     mode = st.mode = m; save();
     host.querySelectorAll("[data-md]").forEach((x) => x.classList.toggle("on", x.dataset.md === m));
-    q("[data-go]").hidden = q("[data-h]").hidden = m === "assist";
+    q("[data-go]").hidden = m === "assist"; q("[data-h]").hidden = false;
     newQ(true);
   }
   host.querySelectorAll("[data-md]").forEach((b) => (b.onclick = () => setMode(b.dataset.md)));
-  q("[data-go]").onclick = check; q("[data-h]").onclick = showHint; q("[data-n]").onclick = () => newQ();
+  q("[data-go]").onclick = check; q("[data-h]").onclick = showHint;
+  if (q("[data-dghelp]")) q("[data-dghelp]").onclick = () => { askHelp(`Draw graphs · ${Q.text} (${mode === "assist" ? "assisted" : "unassisted"})`); q("[data-dghelp]").textContent = "✋ Asked"; q("[data-dghelp]").classList.add("on"); }; q("[data-n]").onclick = () => newQ();
   host.querySelector('[data-t="ruler"]').click(); score(); setMode(mode);
   return { check, get Q() { return Q; }, items: () => items, setItems: (a) => { items = a; draw(); } };
 }
