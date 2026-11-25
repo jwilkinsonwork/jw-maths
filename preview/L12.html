@@ -4872,6 +4872,11 @@ document.addEventListener("keydown", (e) => {
 (() => { const st = document.createElement("style"); st.textContent = `
 .dg { display: grid; grid-template-columns: minmax(0, 560px) minmax(260px, 1fr); gap: 18px; align-items: start; }
 @media (max-width: 900px) { .dg { grid-template-columns: 1fr; } }
+.dg-left { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.dg-paper { width: 100%; max-width: 560px; }
+.dg-eqtop { display: none; align-self: stretch; align-items: center; justify-content: center; gap: 10px; border: 2px solid var(--ink); border-radius: 8px; background: #fff; padding: 4px 10px; font-size: 24px; min-height: 44px; }
+.dg-eqtop .lbl { font: 800 12px var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+@media (max-width: 900px) { .dg-eqtop { display: flex; } }
 .dg-paper { position: relative; border: 2px solid var(--ink); border-radius: 6px; background: #FFFEF8; box-shadow: 4px 4px 0 var(--ink); touch-action: none; user-select: none; -webkit-user-select: none; }
 .dg-paper svg { display: block; width: 100%; height: auto; touch-action: none; }
 .dg-side { display: flex; flex-direction: column; gap: 12px; }
@@ -4944,7 +4949,7 @@ function mountDrawGraphs(host) {
   const st = state.draw || (state.draw = { right: 0, tried: 0, streak: 0, best: 0, level: "easy" });
   let level = st.level || "easy", Q = drawQ(level), tool = "ruler", items = [], hintN = 0, wrongN = 0, solved = false;
   let mode = st.mode || "assist", step = 0;
-  host.innerHTML = `<div class="dg"><div class="dg-paper"><svg viewBox="0 0 ${S} ${S}" role="img" aria-label="Graph paper"></svg></div>
+  host.innerHTML = `<div class="dg"><div class="dg-left"><div class="dg-eqtop" aria-hidden="true"><span class="lbl">Draw</span><span data-eqtop></span></div><div class="dg-paper"><svg viewBox="0 0 ${S} ${S}" role="img" aria-label="Graph paper"></svg></div></div>
     <div class="dg-side">
       <div class="dg-card"><div class="dg-mode" role="group" aria-label="Question type"><button type="button" data-md="assist">🧭 Assisted</button><button type="button" data-md="free">✏️ Unassisted</button></div><div class="dg-lv">${["easy", "medium", "hard"].map((l) => `<button type="button" data-lv="${l}" class="${l === level ? "on" : ""}">${l[0].toUpperCase() + l.slice(1)}</button>`).join("")}</div>
         <div class="dg-eq"><span class="lbl">Draw the line</span><span data-eq></span></div>
@@ -4958,6 +4963,21 @@ function mountDrawGraphs(host) {
         <p class="dg-tip" data-tip></p></div>
     </div></div>`;
   const svg = host.querySelector("svg"), q = (sel) => host.querySelector(sel);
+  // the whole grid always fits on the screen, under the lesson's sticky bars, so a line can be ruled corner to corner
+  const paperEl = host.querySelector(".dg-paper"), eqTop = host.querySelector("[data-eqtop]"), eqMain = host.querySelector("[data-eq]");
+  const stickyH = () => { const tb = document.querySelector("#student .tabs"), bar = document.querySelector(".topbar"); let h = 0; if (bar && getComputedStyle(bar).position !== "static") h = Math.max(h, bar.getBoundingClientRect().height); if (tb && getComputedStyle(tb).position === "sticky") h = Math.max(h, (parseFloat(getComputedStyle(tb).top) || 0) + tb.getBoundingClientRect().height); return h; };
+  function fit() {
+    if (!host.offsetParent) return; const narrow = innerWidth <= 900, top = host.querySelector(".dg-eqtop"), extra = narrow && top ? top.getBoundingClientRect().height + 8 : 0;
+    const room = innerHeight - stickyH() - extra - 14, colW = host.querySelector(".dg-left").clientWidth;
+    paperEl.style.width = Math.round(Math.max(240, Math.min(560, colW, room))) + "px";
+  }
+  function inView() { // bring the whole grid (and, on narrow screens, the equation above it) into view
+    if (!host.offsetParent) return; fit(); const first = innerWidth <= 900 ? host.querySelector(".dg-eqtop") : paperEl, r1 = first.getBoundingClientRect(), r2 = paperEl.getBoundingClientRect(), sh = stickyH();
+    if (r1.top < sh + 2 || r2.bottom > innerHeight - 2) window.scrollTo({ top: Math.max(0, scrollY + r1.top - sh - 8), behavior: "smooth" });
+  }
+  if (eqMain && eqTop) { const copy = () => (eqTop.innerHTML = eqMain.innerHTML); new MutationObserver(copy).observe(eqMain, { childList: true, subtree: true, characterData: true }); copy(); }
+  addEventListener("resize", fit); if (window.ResizeObserver) new ResizeObserver(fit).observe(host);
+  let wasShown = false; setInterval(() => { const shown = !!host.offsetParent; if (shown && !wasShown) setTimeout(inView, 60); wasShown = shown; }, 300);
   const TIPS = { ruler: "Press where the line starts and drag to where it ends. The ruler snaps to your points.", point: "Tap to plot a point. Points snap to the grid corners.", pen: "Draw freehand. For a straight line, use the ruler.", rubber: "Drag over anything to rub it out." };
   // graph paper
   let g = `<defs><pattern id="dgsm" width="${s / 5}" height="${s / 5}" patternUnits="userSpaceOnUse" x="${X(0)}" y="${Y(0)}"><path d="M ${s / 5} 0 L 0 0 0 ${s / 5}" fill="none" stroke="#E3ECF5" stroke-width=".6"/></pattern></defs>`;
@@ -5160,7 +5180,7 @@ function mountDrawGraphs(host) {
   }
   function newQ(keep) {
     if (!keep) Q = drawQ(level); items = []; hintN = 0; wrongN = 0; solved = false; ans.innerHTML = ""; draw();
-    q("[data-eq]").innerHTML = tex(Q.text); q("[data-hint]").hidden = true; fbSet(""); step = 0; stepsUI();
+    q("[data-eq]").innerHTML = tex(Q.text); q("[data-hint]").hidden = true; fbSet(""); step = 0; stepsUI(); if (typeof inView === "function") setTimeout(inView, 30);
     const hb = q("[data-dghelp]"); if (hb) { hb.textContent = "✋ Ask my teacher"; hb.classList.remove("on"); hb.hidden = true; }
   }
   host.querySelectorAll("[data-t]").forEach((b) => (b.onclick = () => { tool = b.dataset.t; host.querySelectorAll("[data-t]").forEach((x) => x.classList.toggle("on", x === b)); q("[data-tip]").textContent = TIPS[tool]; }));
