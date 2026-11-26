@@ -298,6 +298,13 @@ button.primary { background: var(--ink); color: #fff; border-color: var(--ink); 
 .ty-n { font: 700 32px var(--display); text-align: right; }
 .ty-sub { width: 52px; font-size: 26px; border-radius: 8px; }
 .ty-row.right .ty-add { border-color: #1E8E4E; background: #DDF5E5; } .ty-row.right .ty-bar i { background: #1E8E4E; }
+.smc-opt.ok { background: #E3F6EC !important; border-color: var(--teal) !important; box-shadow: 0 0 0 3px var(--teal); }
+.smc-opt.no { background: #FDE8E8 !important; border-color: var(--coral) !important; color: var(--ink) !important; } .smc-opt.no .smc-t, .smc-opt.no .smc-t * { color: var(--ink) !important; }
+.smc-opt:disabled { cursor: default; opacity: 1; }
+.smc-fb { margin-top: 10px; padding: 10px 14px; border-radius: 10px; background: #F1F3F8; font-size: 18px; line-height: 1.45; }
+.smc-fb.good { background: #E3F6EC; } .smc-fb.bad { background: #FDE8E8; }
+.smc-fb[hidden] { display: none; }
+.ty-revnote { margin-top: 8px; }
 .ty-live { font: 800 14px var(--body); padding: 5px 12px; border: 2px solid var(--blue); border-radius: 8px; background: #EEF3FF; color: var(--blue); cursor: pointer; }
 .ty-live.on { background: #fff; color: var(--ink); border-color: var(--ink); }
 .ty-lbar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 8px 12px; margin: 0 0 8px; background: #EEF3FF; border-radius: 10px; font: 700 15px var(--body); }
@@ -2115,8 +2122,26 @@ function wireCloze(root, onCheck) {
   });
 }
 // ---------- student page: multiple choice with no feedback (a stand-in for mini whiteboards) ----------
+// the teacher pressed Show the Verdict: mark the answer on the student's own card (and lock it)
+function markReveal(el, m) {
+  const on = !!(m.__id && state.mcRev && state.mcRev[m.__id]), ai = letters.indexOf(m.ans), st = state[el.dataset.key] || {}, me = st.pick;
+  el.classList.toggle("rev", on);
+  el.querySelectorAll(".smc-opt").forEach((b) => { const i = +b.dataset.i; b.classList.toggle("ok", on && i === ai); b.classList.toggle("no", on && i === me && me !== ai); b.disabled = on; });
+  let fb = el.querySelector(".smc-fb"); if (!fb) { fb = document.createElement("div"); fb.className = "smc-fb"; el.appendChild(fb); }
+  const why = (i) => String((m.why || [])[i] || "").replace(/^✓\s*/, "");
+  fb.hidden = !on; if (!on) return;
+  fb.className = "smc-fb " + (me === ai ? "good" : me === undefined ? "" : "bad");
+  fb.innerHTML = me === ai ? `✓ Correct! The answer is <b>${letters[ai]}</b>. ${tex(why(ai))}` : me === undefined ? `The answer is <b>${letters[ai]}</b>. ${tex(why(ai))}`
+    : `✗ Not this time. You chose <b>${letters[me]}</b>: ${tex(why(me))}<br>The answer is <b>${letters[ai]}</b>. ${tex(why(ai))}`;
+}
+function applyReveals(rev) {
+  const next = rev || {}, prev = state.mcRev || {};
+  if (JSON.stringify(Object.keys(next).sort()) === JSON.stringify(Object.keys(prev).sort())) return;
+  state.mcRev = next; save();
+  document.querySelectorAll(".smc[data-mcid]").forEach((el) => el.__m && markReveal(el, el.__m));
+}
 function studentMCQ(m, key, num) {
-  const el = document.createElement("div"); el.className = "q smc";
+  const el = document.createElement("div"); el.className = "q smc"; el.dataset.key = key; if (m.__id) el.dataset.mcid = m.__id; el.__m = m;
   const st = state[key] || {};
   const opts = m.graphs
     ? m.graphs.map((g, i) => `<button type="button" class="smc-opt smc-g" data-i="${i}" aria-pressed="false"><span class="smc-l">${letters[i]}</span><span class="svgwrap">${graph(g, 260)}</span></button>`).join("")
@@ -2127,8 +2152,8 @@ function studentMCQ(m, key, num) {
     el.querySelector(".smc-big").textContent = i === undefined ? "?" : letters[i];
     el.querySelector(".smc-show").classList.toggle("set", i !== undefined);
   };
-  el.querySelectorAll(".smc-opt").forEach((b) => (b.onclick = () => { const i = +b.dataset.i; state[key] = { pick: i }; if (m.__id) { state.mcp = state.mcp || {}; state.mcp[m.__id] = [i, Date.now()]; } save(); pick(i); if (window.__live) window.__live.beatSoon(400); }));
-  pick(st.pick);
+  el.querySelectorAll(".smc-opt").forEach((b) => (b.onclick = () => { if (el.classList.contains("rev")) return; const i = +b.dataset.i; state[key] = { pick: i }; if (m.__id) { state.mcp = state.mcp || {}; state.mcp[m.__id] = [i, Date.now()]; } save(); pick(i); if (window.__live) window.__live.beatSoon(400); }));
+  pick(st.pick); markReveal(el, m);
   return el;
 }
 // ---------- student page: whiteboard with pen and eraser ----------
@@ -2231,9 +2256,20 @@ function openTally(slideEl, ti) {
     const go = pct >= 75;
     verdict.innerHTML = `<div class="ty-call ${go ? "go" : "stop"}">${go ? "Move on" : "Reteach"}: <b>${pct}%</b> chose the right answer, <b>${letters[ai]}</b>.</div>` +
       (wrong.length ? `<div class="ty-why">${wrong.slice(0, 2).map(([v, i]) => `<div><b>${letters[i]}</b> (${v} student${v === 1 ? "" : "s"}${live && who[i].length ? `: ${who[i].slice(0, 8).map(esc).join(", ")}${who[i].length > 8 ? "…" : ""}` : ""}): ${tex((m.why || [])[i] || "")}</div>`).join("")}</div>` : "") +
-      (m.notes ? `<div class="ty-note"><b>Teacher note:</b> ${tex(m.notes)}</div>` : "");
-    if (!fromDraw) draw();
+      (m.notes ? `<div class="ty-note"><b>Teacher note:</b> ${tex(m.notes)}</div>` : "") + (LIVE.url ? `<div class="ty-revnote small muted">${fromDraw && md.__rv ? md.__rv : ""}</div>` : "");
+    if (!fromDraw) { draw(); reveal(true); }
   };
+  // students' pages: show (or hide again) the answer on their own cards
+  async function reveal(on) {
+    md.__rv = "";
+    const key = (() => { try { return localStorage.getItem("jw-live-key") || ""; } catch (e) { return ""; } })();
+    if (!LIVE.url || !key || !m.__id) return;
+    const note = () => md.querySelector(".ty-revnote");
+    try { const j = await (await fetch(LIVE.url, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ t: "reveal", key, lesson: L.id, q: m.__id, cls: live ? cls : "", on: on ? 1 : 0 }) })).json(); if (!j.ok) throw new Error(j.error);
+      if (on) md.__rv = `📱 The answer is now showing on students' pages${live && cls ? ` (${cls})` : ""}.`;
+      if (on && note()) note().textContent = `📱 The answer is now showing on students' pages${live && cls ? ` (${cls})` : ""}.`; }
+    catch (e) { if (on && note()) note().textContent = "Couldn't show the answer on students' pages. Check your Live class key."; }
+  }
   // live: everyone's choice on the student page, refreshed every 4 seconds
   async function poll() {
     clearTimeout(pollT); if (!live || !md.isConnected) return;
@@ -2270,10 +2306,10 @@ function openTally(slideEl, ti) {
     if (e.target === md || e.target.closest(".kw-close")) { md.remove(); clearTimeout(pollT); document.removeEventListener("keydown", keys); return; }
     const b = e.target.closest("button"); if (!b) return;
     if (b.classList.contains("ty-live")) return setLive(!live);
-    if (b.classList.contains("ty-fresh")) { since = Date.now(); poll(); return; }
+    if (b.classList.contains("ty-fresh")) { since = Date.now(); reveal(false); poll(); return; }
     if (b.classList.contains("ty-add")) { if (live) { const i = +b.dataset.i; openWho.has(i) ? openWho.delete(i) : openWho.add(i); draw(); } else add(+b.dataset.i, 1); }
     if (b.classList.contains("ty-sub")) add(+b.dataset.i, -1);
-    if (b.classList.contains("ty-reset")) { if (live) { since = Date.now(); poll(); } else manual.fill(0); verdict.hidden = true; q(".ty-panel").classList.remove("v"); md.querySelectorAll(".ty-row").forEach((r) => r.classList.remove("right")); draw(); }
+    if (b.classList.contains("ty-reset")) { reveal(false); if (live) { since = Date.now(); poll(); } else manual.fill(0); verdict.hidden = true; q(".ty-panel").classList.remove("v"); md.querySelectorAll(".ty-row").forEach((r) => r.classList.remove("right")); draw(); }
     if (b.classList.contains("ty-show")) show(false);
   });
   draw();
@@ -4821,7 +4857,7 @@ window.__live = (() => {
     if (t === "bye" && navigator.sendBeacon) { try { if (navigator.sendBeacon(LIVE.url, new Blob([body], { type: "text/plain" }))) return; } catch (e) { /* fall through */ } }
     try {
       fetch(LIVE.url, { method: "POST", headers: { "Content-Type": "text/plain" }, body, keepalive: true })
-        .then((r) => r.json()).then((j) => { if (j && j.ack && state.help && !state.help.seen && j.ack >= state.help.at) { state.help.seen = Date.now(); save(); helpPill(); } if (j && j.fb) NP.pullFeedback(j.fb); if (j && j.wt) NP.watched(j.wt, j.now); })
+        .then((r) => r.json()).then((j) => { if (j && j.ack && state.help && !state.help.seen && j.ack >= state.help.at) { state.help.seen = Date.now(); save(); helpPill(); } if (j && j.fb) NP.pullFeedback(j.fb); if (j && j.wt) NP.watched(j.wt, j.now); if (j && j.rev) applyReveals(j.rev); })
         .catch(() => fetch(LIVE.url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body }).catch(() => {}));
     } catch (e) { /* offline */ }
   }
