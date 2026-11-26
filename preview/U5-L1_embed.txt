@@ -5754,6 +5754,206 @@ document.addEventListener("click", (e) => {
   NP.open(k, QLABEL[k] || QLABEL[k.split("~")[0]] || "Question", (clone ? clone.innerHTML : "") + (graph ? graph.outerHTML : ""));
 }, true);
 
+// ---------- shared board: the teacher interrupts one student; both write on the same board at once ----------
+// Logical board is 1600 × 1000. The teacher owns the paper and the objects (grids, dot paper, tables);
+// each person owns their own writing (the teacher's layer "t", the student's layer "s").
+const BOARD = (() => {
+  const BW = 1600, BH = 1000, G = 40;
+  const PAPERS = [["plain", "Plain"], ["lined", "Lined"], ["squared", "Squared"], ["dots", "Square dots"], ["iso", "Isometric dots"]];
+  const TPEN = ["#0B5D2A", "#1E8E3E", "#7CC242", "#111111", "#1565C0", "#C62828"], SPEN = ["#1D2C7A", "#111111", "#1565C0", "#7A2BB5", "#B0186E", "#B05A00"];
+  const css = document.createElement("style"); css.textContent = `
+.sb-ov { position: fixed; inset: 0; z-index: 9800; background: rgba(20,24,44,.55); display: flex; align-items: center; justify-content: center; padding: 10px; }
+.sb-win { width: 100%; height: 100%; max-width: 1500px; background: #fff; border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,.35); position: relative; }
+.sb-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 2px solid var(--ink); flex-wrap: wrap; }
+.sb-head b { font: 800 18px var(--body); } .sb-head .st { font: 700 13px var(--body); color: var(--muted); flex: 1; }
+.sb-tools { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 6px 12px; background: #F6F7FB; border-bottom: 1px solid var(--line); }
+.sb-tools button, .sb-head button { font: 800 14px var(--body); padding: 5px 10px; border: 2px solid var(--ink); border-radius: 8px; background: #fff; cursor: pointer; }
+.sb-tools button.on { background: var(--ink); color: #fff; }
+.sb-tools .sw { width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 2px #C9CFDB; }
+.sb-tools .sw.on { box-shadow: 0 0 0 3px var(--ink); }
+.sb-tools .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+.sb-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; background: #E9ECF3; position: relative; }
+.sb-board { position: relative; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.15); touch-action: none; }
+.sb-board canvas, .sb-board svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.sb-board svg { pointer-events: none; } .sb-board.moving svg { pointer-events: auto; }
+.sb-obj { cursor: move; } .sb-obj.sel rect.frame { stroke: var(--blue); stroke-width: 4; stroke-dasharray: 10 6; }
+.sb-pop { position: absolute; top: 96px; right: 14px; z-index: 5; width: min(360px, calc(100% - 28px)); max-height: calc(100% - 110px); overflow: auto; background: #fff; border: 2px solid var(--ink); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.2); padding: 0 14px 12px; }
+.sb-pop .h { position: sticky; top: 0; background: #fff; display: flex; align-items: center; gap: 8px; padding: 10px 0 8px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+.sb-pop .h b { flex: 1; font: 800 16px var(--body); }
+.sb-pop .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0; font: 700 14px var(--body); }
+.sb-pop .row > span { width: 100%; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+.sb-pop button { font: 800 14px var(--body); padding: 5px 10px; border: 2px solid var(--ink); border-radius: 8px; background: #fff; cursor: pointer; }
+.sb-pop button.on { background: var(--ink); color: #fff; }
+.sb-pop input[type=number] { width: 70px; font: 700 16px var(--body); padding: 4px 6px; border: 2px solid var(--ink); border-radius: 6px; }
+.sb-pill { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 9700; background: var(--ink); color: #fff; border-radius: 30px; padding: 10px 16px; font: 800 16px var(--body); display: flex; gap: 10px; align-items: center; box-shadow: 0 6px 20px rgba(0,0,0,.3); }
+.sb-pill button { font: 800 15px var(--body); padding: 5px 12px; border-radius: 20px; border: 0; background: #FFE66D; cursor: pointer; }
+`; document.head.appendChild(css);
+
+  // ---- drawing helpers ----
+  function paper(ctx, kind, k) {
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, BW * k, BH * k);
+    const line = (x1, y1, x2, y2, c, w) => { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x1 * k, y1 * k); ctx.lineTo(x2 * k, y2 * k); ctx.stroke(); };
+    const dot = (x, y, r) => { ctx.beginPath(); ctx.arc(x * k, y * k, r * k, 0, 7); ctx.fill(); };
+    if (kind === "lined") for (let y = G * 2; y < BH; y += G) line(0, y, BW, y, "rgba(110,150,205,.6)", Math.max(1, k));
+    if (kind === "squared") { for (let y = G; y < BH; y += G) line(0, y, BW, y, "#DCE5F2", Math.max(1, k)); for (let x = G; x < BW; x += G) line(x, 0, x, BH, "#DCE5F2", Math.max(1, k)); }
+    if (kind === "dots") { ctx.fillStyle = "#7C86A2"; for (let y = G; y < BH; y += G) for (let x = G; x < BW; x += G) dot(x, y, 2.6); }
+    if (kind === "iso") { ctx.fillStyle = "#7C86A2"; const dx = G * Math.sqrt(3) / 2; for (let i = 0, x = G / 2; x < BW; x += dx, i++) for (let y = (i % 2 ? G : G / 2); y < BH; y += G) dot(x, y, 2.6); }
+  }
+  function strokes(ctx, list, k) {
+    (list || []).forEach((s) => { const p = s.p; if (!p || p.length < 2) return; ctx.strokeStyle = s.c; ctx.lineWidth = s.w * k; ctx.lineCap = ctx.lineJoin = "round"; ctx.beginPath(); ctx.moveTo(p[0] * k, p[1] * k);
+      if (p.length === 2) ctx.lineTo(p[0] * k + 0.1, p[1] * k); for (let i = 2; i < p.length; i += 2) ctx.lineTo(p[i] * k, p[i + 1] * k); ctx.stroke(); });
+  }
+  // the objects as SVG in board units
+  function objSVG(o, sel) {
+    const { x, y, w, h } = o; let g = "";
+    if (o.k === "grid") { // a coordinate grid with axes and numbers
+      const r = o.r || 6, n = 2 * r, s = Math.min(w, h) / (n + 1.2), ox = x + (w - n * s) / 2, oy = y + (h - n * s) / 2, X = (v) => ox + (v + r) * s, Y = (v) => oy + (r - v) * s, fs = Math.max(11, s * 0.42);
+      for (let i = -r; i <= r; i++) g += `<line x1="${X(i)}" y1="${Y(-r)}" x2="${X(i)}" y2="${Y(r)}" stroke="#C9D6E8" stroke-width="1.2"/><line x1="${X(-r)}" y1="${Y(i)}" x2="${X(r)}" y2="${Y(i)}" stroke="#C9D6E8" stroke-width="1.2"/>`;
+      g += `<line x1="${X(-r)}" y1="${Y(0)}" x2="${X(r)}" y2="${Y(0)}" stroke="#23264A" stroke-width="2.4"/><line x1="${X(0)}" y1="${Y(-r)}" x2="${X(0)}" y2="${Y(r)}" stroke="#23264A" stroke-width="2.4"/>`;
+      for (let i = -r; i <= r; i++) if (i) g += `<text x="${X(i)}" y="${Y(0) + fs + 3}" font-size="${fs}" text-anchor="middle" fill="#4A5070" font-weight="700" font-family="Nunito,sans-serif">${String(i).replace("-", "−")}</text><text x="${X(0) - 5}" y="${Y(i) + fs / 3}" font-size="${fs}" text-anchor="end" fill="#4A5070" font-weight="700" font-family="Nunito,sans-serif">${String(i).replace("-", "−")}</text>`;
+      g += `<text x="${X(r) + 6}" y="${Y(0) + 5}" font-size="${fs * 1.3}" font-style="italic" fill="#23264A">x</text><text x="${X(0) + 6}" y="${Y(r) - 4}" font-size="${fs * 1.3}" font-style="italic" fill="#23264A">y</text>`;
+    } else if (o.k === "sq") { for (let yy = y + G / 2; yy < y + h; yy += G) for (let xx = x + G / 2; xx < x + w; xx += G) g += `<circle cx="${xx}" cy="${yy}" r="3" fill="#4A5070"/>`; }
+    else if (o.k === "iso") { const dx = G * Math.sqrt(3) / 2; for (let i = 0, xx = x + G / 2; xx < x + w; xx += dx, i++) for (let yy = y + (i % 2 ? G : G / 2); yy < y + h; yy += G) g += `<circle cx="${xx}" cy="${yy}" r="3" fill="#4A5070"/>`; }
+    else if (o.k === "table") { const R = o.rows || 3, C = o.cols || 3; g += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#23264A" stroke-width="2.4"/>`;
+      for (let i = 1; i < R; i++) g += `<line x1="${x}" y1="${y + (h * i) / R}" x2="${x + w}" y2="${y + (h * i) / R}" stroke="#23264A" stroke-width="${i === 1 && o.head ? 3 : 1.6}"/>`;
+      for (let j = 1; j < C; j++) g += `<line x1="${x + (w * j) / C}" y1="${y}" x2="${x + (w * j) / C}" y2="${y + h}" stroke="#23264A" stroke-width="1.6"/>`; }
+    const frame = o.k === "table" ? "" : `<rect class="frame" x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#B9C2D6" stroke-width="1.5"/>`;
+    const handle = sel ? `<rect class="sb-h" x="${x + w - 16}" y="${y + h - 16}" width="32" height="32" rx="6" fill="var(--blue)" style="cursor:nwse-resize"/><g class="sb-del" style="cursor:pointer"><circle cx="${x + w}" cy="${y}" r="17" fill="var(--coral)"/><text x="${x + w}" y="${y + 7}" font-size="22" text-anchor="middle" fill="#fff" font-weight="800">✕</text></g>` : "";
+    return `<g class="sb-obj${sel ? " sel" : ""}" data-id="${o.id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#fff" fill-opacity="0.94"/>${frame}${g}${handle}</g>`;
+  }
+  // rub out only the bits under the rubber
+  function eraseIn(list, x, y, r) {
+    let changed = false; const out = [];
+    for (const s of list) { let seg = []; const p = s.p;
+      for (let i = 0; i < p.length; i += 2) { if ((p[i] - x) ** 2 + (p[i + 1] - y) ** 2 <= r * r) { changed = true; if (seg.length >= 2) out.push({ c: s.c, w: s.w, p: seg }); seg = []; } else seg.push(p[i], p[i + 1]); }
+      if (seg.length >= 2) out.push({ c: s.c, w: s.w, p: seg }); }
+    return changed ? out : null;
+  }
+
+  // ---- one board on screen. role: "t" (teacher) or "s" (student) ----
+  // io: { send(who, data), poll() → { t, s, o, on } }, onEnd(), onHide()
+  function open(role, title, io, opts = {}) {
+    const T = role === "t", mine = role, theirs = T ? "s" : "t";
+    const S = { paper: "squared", objs: [], [mine]: [], [theirs]: [], v: { t: 0, s: 0, o: 0 } };
+    let pen = (T ? TPEN : SPEN)[T ? 1 : 0], size = 4, tool = "pen", cur = null, hist = [], sel = null, alive = true, pushT = {}, last = { t: "", s: "", o: "" };
+    const ov = document.createElement("div"); ov.className = "sb-ov";
+    ov.innerHTML = `<div class="sb-win" role="dialog" aria-label="Shared board"><div class="sb-head"><b>${esc(title)}</b><span class="st" data-st>Connecting…</span>${T ? `<button type="button" data-end>✕ End for both of us</button>` : `<button type="button" data-hide>✕ Close</button>`}</div>
+      <div class="sb-tools"><button type="button" data-t="pen" class="on">✏️ Pen</button><button type="button" data-t="rub">🧽 Rubber</button>${T ? `<button type="button" data-t="move">✋ Move / resize</button>` : ""}<button type="button" data-u>↶ Undo</button><button type="button" data-clr>🗑 Clear my writing</button>
+        <span class="sep"></span><span data-sw></span>${T ? `<span class="sep"></span><button type="button" data-add="grid">➕ Coordinate grid</button><button type="button" data-add="sq">➕ Square dots</button><button type="button" data-add="iso">➕ Isometric dots</button><button type="button" data-add="table">➕ Table</button>` : ""}<span class="sep"></span><button type="button" data-set>⚙ Settings</button></div>
+      <div class="sb-stage"><div class="sb-board"><canvas class="bg"></canvas><svg viewBox="0 0 ${BW} ${BH}" preserveAspectRatio="none"></svg><canvas class="ink"></canvas></div></div></div>`;
+    document.body.appendChild(ov);
+    const q = (x) => ov.querySelector(x), board = q(".sb-board"), bg = q("canvas.bg"), ink = q("canvas.ink"), svg = q("svg"), stage = q(".sb-stage");
+    const status = (t, c) => { q("[data-st]").textContent = t; q("[data-st]").style.color = c || ""; };
+    let k = 1;
+    function fit() { const r = stage.getBoundingClientRect(), sc = Math.min((r.width - 16) / BW, (r.height - 16) / BH); board.style.width = BW * sc + "px"; board.style.height = BH * sc + "px"; const d = window.devicePixelRatio || 1; k = sc * d; [bg, ink].forEach((c) => { c.width = BW * k; c.height = BH * k; }); drawAll(); }
+    function drawAll() { paper(bg.getContext("2d"), S.paper, k); svg.innerHTML = S.objs.map((o) => objSVG(o, T && tool === "move" && sel === o.id)).join(""); inkDraw(); bindObjs(); }
+    function inkDraw() { const c = ink.getContext("2d"); c.clearRect(0, 0, ink.width, ink.height); strokes(c, S[theirs], k); strokes(c, S[mine], k); if (cur) strokes(c, [cur], k); }
+    const swatches = () => { q("[data-sw]").innerHTML = (T ? TPEN : SPEN).map((c) => `<button type="button" class="sw${c === pen ? " on" : ""}" data-pen="${c}" style="background:${c}" aria-label="Pen colour"></button>`).join(""); q("[data-sw]").querySelectorAll("[data-pen]").forEach((b) => (b.onclick = () => { pen = b.dataset.pen; if (tool !== "pen") setTool("pen"); swatches(); })); };
+    function setTool(t) { tool = t; ov.querySelectorAll("[data-t]").forEach((b) => b.classList.toggle("on", b.dataset.t === t)); board.classList.toggle("moving", t === "move"); ink.style.pointerEvents = t === "move" ? "none" : "auto"; if (t !== "move") sel = null; drawAll(); }
+    const pos = (e) => { const r = ink.getBoundingClientRect(); return [Math.round(((e.clientX - r.left) / r.width) * BW), Math.round(((e.clientY - r.top) / r.height) * BH)]; };
+    const snap = () => { hist.push(JSON.stringify({ m: S[mine], o: T ? S.objs : null, p: S.paper })); if (hist.length > 50) hist.shift(); };
+    // send what changed: my writing, and (teacher) the paper and objects
+    function push(what) { clearTimeout(pushT[what]); pushT[what] = setTimeout(async () => { const data = what === "o" ? JSON.stringify({ paper: S.paper, objs: S.objs }) : JSON.stringify(S[mine]); if (data === last[what]) return; try { await io.send(what, data); last[what] = data; status(T ? "● Live on their screen" : "● Live with your teacher", "#1F9D55"); } catch (e) { status("Can't reach the live server. Trying again…", "#D93A3A"); pushT[what] = setTimeout(() => push(what), 2000); } }, 300); }
+    ink.addEventListener("pointerdown", (e) => { if (tool === "move") return; e.preventDefault(); ink.setPointerCapture(e.pointerId); snap(); const [x, y] = pos(e);
+      if (tool === "rub") { cur = { rub: true }; const o = eraseIn(S[mine], x, y, size * 3 + 14); if (o) { S[mine] = o; inkDraw(); } return; }
+      cur = { c: pen, w: size, p: [x, y] }; inkDraw(); });
+    ink.addEventListener("pointermove", (e) => { if (!cur) return; const [x, y] = pos(e); if (cur.rub) { const o = eraseIn(S[mine], x, y, size * 3 + 14); if (o) { S[mine] = o; inkDraw(); } return; } const n = cur.p.length; if ((cur.p[n - 2] - x) ** 2 + (cur.p[n - 1] - y) ** 2 > 4) { cur.p.push(x, y); inkDraw(); } });
+    const up = () => { if (!cur) return; if (!cur.rub && cur.p.length >= 2) S[mine].push(cur); cur = null; inkDraw(); push(mine); };
+    ink.addEventListener("pointerup", up); ink.addEventListener("pointercancel", up);
+    // teacher: move, resize and delete objects
+    function bindObjs() {
+      if (!T || tool !== "move") return;
+      svg.querySelectorAll(".sb-obj").forEach((g) => {
+        g.onpointerdown = (e) => { e.preventDefault(); e.stopPropagation(); const o = S.objs.find((x) => x.id === g.dataset.id); if (!o) return;
+          if (e.target.closest(".sb-del")) { snap(); S.objs = S.objs.filter((x) => x !== o); sel = null; drawAll(); push("o"); return; }
+          snap(); sel = o.id; const resize = !!e.target.closest(".sb-h"), r = svg.getBoundingClientRect(), x0 = e.clientX, y0 = e.clientY, start = { ...o }, sc = BW / r.width;
+          svg.setPointerCapture(e.pointerId);
+          svg.onpointermove = (ev) => { const dx = (ev.clientX - x0) * sc, dy = (ev.clientY - y0) * sc;
+            if (resize) { o.w = Math.max(120, Math.min(BW - o.x, start.w + dx)); o.h = Math.max(100, Math.min(BH - o.y, start.h + dy)); if (o.k === "grid") o.h = o.w = Math.min(o.w, o.h, BH - o.y, BW - o.x); }
+            else { o.x = Math.max(0, Math.min(BW - o.w, start.x + dx)); o.y = Math.max(0, Math.min(BH - o.h, start.y + dy)); }
+            o.x = Math.round(o.x); o.y = Math.round(o.y); o.w = Math.round(o.w); o.h = Math.round(o.h); svg.innerHTML = S.objs.map((x) => objSVG(x, x.id === sel)).join(""); };
+          svg.onpointerup = () => { svg.onpointermove = null; svg.onpointerup = null; drawAll(); push("o"); };
+          drawAll(); };
+      });
+    }
+    function add(kind, extra = {}) {
+      snap(); const id = "o" + Date.now().toString(36), n = S.objs.length, base = { grid: [520, 520], sq: [560, 400], iso: [560, 420], table: [600, 300] }[kind];
+      S.objs.push(Object.assign({ id, k: kind, x: 60 + (n % 4) * 60, y: 60 + (n % 4) * 40, w: base[0], h: base[1] }, extra)); sel = id; setTool("move"); push("o");
+    }
+    // settings: paper (teacher), pen size; always closeable
+    function settings() {
+      if (q(".sb-pop")) return q(".sb-pop").remove();
+      const p = document.createElement("div"); p.className = "sb-pop";
+      p.innerHTML = `<div class="h"><b>⚙ Settings</b><button type="button" data-x>✕ Close</button></div>
+        ${T ? `<div class="row"><span>Paper (for both of you)</span>${PAPERS.map(([v, t]) => `<button type="button" data-paper="${v}" class="${S.paper === v ? "on" : ""}">${t}</button>`).join("")}</div>` : `<div class="row"><span>Paper</span>Your teacher chooses the paper.</div>`}
+        <div class="row"><span>Pen size</span>${[[2, "Fine"], [4, "Medium"], [7, "Thick"], [11, "Marker"]].map(([v, t]) => `<button type="button" data-size="${v}" class="${size === v ? "on" : ""}">${t}</button>`).join("")}</div>
+        <div class="row"><span>Pen colour</span>${(T ? TPEN : SPEN).map((c) => `<button type="button" data-pc="${c}" class="${pen === c ? "on" : ""}" style="width:34px;height:34px;padding:0;border-radius:50%;background:${c};border-color:${pen === c ? "var(--ink)" : "#fff"};box-shadow:0 0 0 2px #C9CFDB" aria-label="Pen colour"></button>`).join("")}</div>
+        <div class="row"><span>Rubber</span><button type="button" data-rub>🧽 Use the rubber</button> <span style="width:auto;text-transform:none;letter-spacing:0;font-size:13px">It rubs out only your own writing.</span></div>`;
+      q(".sb-win").appendChild(p);
+      p.querySelector("[data-x]").onclick = () => p.remove();
+      p.querySelectorAll("[data-paper]").forEach((b) => (b.onclick = () => { snap(); S.paper = b.dataset.paper; drawAll(); push("o"); p.remove(); settings(); }));
+      p.querySelectorAll("[data-size]").forEach((b) => (b.onclick = () => { size = +b.dataset.size; p.remove(); settings(); }));
+      p.querySelectorAll("[data-pc]").forEach((b) => (b.onclick = () => { pen = b.dataset.pc; setTool("pen"); swatches(); p.remove(); settings(); }));
+      p.querySelector("[data-rub]").onclick = () => { setTool("rub"); p.remove(); };
+      p.addEventListener("keydown", (e) => { if (e.key === "Escape") p.remove(); });
+    }
+    function tableAsk() {
+      if (q(".sb-pop")) q(".sb-pop").remove();
+      const p = document.createElement("div"); p.className = "sb-pop";
+      p.innerHTML = `<div class="h"><b>➕ Table</b><button type="button" data-x>✕ Close</button></div><div class="row"><label>Rows <input type="number" min="1" max="12" value="3" data-r></label><label>Columns <input type="number" min="1" max="10" value="4" data-c></label></div><div class="row"><label><input type="checkbox" data-hd checked> Heading row</label></div><div class="row"><button type="button" data-ok class="on">Add the table</button></div>`;
+      q(".sb-win").appendChild(p); p.querySelector("[data-x]").onclick = () => p.remove();
+      p.querySelector("[data-ok]").onclick = () => { const R = Math.max(1, Math.min(12, +p.querySelector("[data-r]").value || 3)), C = Math.max(1, Math.min(10, +p.querySelector("[data-c]").value || 3)); add("table", { rows: R, cols: C, head: p.querySelector("[data-hd]").checked, w: Math.min(1400, C * 150), h: Math.min(900, R * 70) }); p.remove(); };
+    }
+    ov.querySelectorAll("[data-t]").forEach((b) => (b.onclick = () => setTool(b.dataset.t)));
+    q("[data-u]").onclick = () => { const h = hist.pop(); if (!h) return; const o = JSON.parse(h); S[mine] = o.m; if (T) { S.objs = o.o; S.paper = o.p; push("o"); } drawAll(); push(mine); };
+    q("[data-clr]").onclick = () => { if (!S[mine].length) return; snap(); S[mine] = []; inkDraw(); push(mine); };
+    q("[data-set]").onclick = settings;
+    ov.querySelectorAll("[data-add]").forEach((b) => (b.onclick = () => (b.dataset.add === "table" ? tableAsk() : add(b.dataset.add))));
+    if (T) q("[data-end]").onclick = () => { alive = false; ov.remove(); removeEventListener("resize", fit); opts.onEnd && opts.onEnd(); };
+    else q("[data-hide]").onclick = () => { ov.style.display = "none"; opts.onHide && opts.onHide(); };
+    // the other person's writing (and the teacher's paper and objects) arrive every 1.2 seconds
+    async function follow() {
+      while (alive) {
+        try { const j = await io.poll(); if (!alive) break;
+          if (j && j.ok) { if (!T && !j.on) { alive = false; ov.remove(); removeEventListener("resize", fit); opts.onEnd && opts.onEnd(); break; }
+            let redraw = false;
+            if (j[theirs] !== undefined && j[theirs] !== last["in" + theirs]) { last["in" + theirs] = j[theirs]; try { S[theirs] = JSON.parse(j[theirs] || "[]"); } catch (e) { /* ignore */ } redraw = true; }
+            if (!T && j.o !== undefined && j.o !== last.ino) { last.ino = j.o; try { const o = JSON.parse(j.o || "{}"); S.paper = o.paper || "squared"; S.objs = o.objs || []; } catch (e) { /* ignore */ } fit(); }
+            if (redraw) inkDraw();
+            if (q("[data-st]").textContent === "Connecting…") status(T ? "● Live on their screen" : "● Live with your teacher", "#1F9D55"); } }
+        catch (e) { status("Can't reach the live server. Trying again…", "#D93A3A"); }
+        await new Promise((r) => setTimeout(r, 1200));
+      }
+    }
+    addEventListener("resize", fit); swatches(); requestAnimationFrame(() => { fit(); if (T) push("o"); follow(); });
+    return {
+      show() { ov.style.display = ""; fit(); },
+      close() { alive = false; ov.remove(); removeEventListener("resize", fit); },
+      image() { const c = document.createElement("canvas"), kk = 0.5; c.width = BW * kk; c.height = BH * kk; const x = c.getContext("2d"); paper(x, S.paper, kk);
+        const img = new Image(); return new Promise((res) => { img.onload = () => { x.drawImage(img, 0, 0, c.width, c.height); strokes(x, S.t, kk); strokes(x, S.s, kk); res(c.toDataURL("image/jpeg", 0.75)); }; img.onerror = () => { strokes(x, S.t, kk); strokes(x, S.s, kk); res(c.toDataURL("image/jpeg", 0.75)); };
+          img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${BW} ${BH}">${S.objs.map((o) => objSVG(o, false)).join("").replace(/var\(--[a-z]+\)/g, "#2F5BD3")}</svg>`); }); },
+    };
+  }
+  return { open };
+})();
+
+// the student's side: the teacher has interrupted; show the board over everything until the teacher ends it
+const SBOARD = (() => {
+  let b = null, pill = null, active = false;
+  const id = () => String(state.cls || "").toUpperCase() + "|" + state.name;
+  const io = {
+    send: async (who, data) => { const r = await fetch(LIVE.url, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ t: "brd", lesson: L.id, name: state.name, cls: state.cls, who, data }) }); const j = await r.json(); if (!j.ok) throw new Error("no"); },
+    poll: async () => (await fetch(`${LIVE.url}?t=brd&lesson=${encodeURIComponent(L.id)}&id=${encodeURIComponent(id())}`)).json(),
+  };
+  const showPill = (on) => { if (!on) { if (pill) pill.remove(); pill = null; return; } if (pill) return; pill = document.createElement("div"); pill.className = "sb-pill"; pill.innerHTML = `<span>🖐 Your teacher's board is open</span><button type="button">Open it</button>`; document.body.appendChild(pill); pill.querySelector("button").onclick = () => { showPill(false); b && b.show(); }; };
+  function start() {
+    if (active) return; active = true;
+    b = BOARD.open("s", "🖐 Your teacher's board: write together", io, { onHide: () => showPill(true),
+      onEnd: async () => { active = false; showPill(false); try { const img = await b.image(); state.boards = (state.boards || []).slice(-2); state.boards.push({ at: Date.now(), img }); save(); } catch (e) { /* the picture isn't essential */ } } });
+  }
+  return { check(on) { if (on && !active) start(); }, get active() { return active; } };
+})();
+
 // ---------- Live class: progress to the teacher's laptop, and hand-in to the teacher's Drive ----------
 // LIVE.url is the teacher's Google Apps Script web app (see the setup notes). Without it, none of this runs.
 const LIVE = {"url": "https://script.google.com/macros/s/AKfycbx-tl0PShy6reyBB2uDzr3ZH8914NP3MgEzGuEXHmgfPf1QzQOYESF49XF8YTOZTMh6/exec"};
@@ -5853,7 +6053,7 @@ window.__live = (() => {
     if (t === "bye" && navigator.sendBeacon) { try { if (navigator.sendBeacon(LIVE.url, new Blob([body], { type: "text/plain" }))) return; } catch (e) { /* fall through */ } }
     try {
       fetch(LIVE.url, { method: "POST", headers: { "Content-Type": "text/plain" }, body, keepalive: true })
-        .then((r) => r.json()).then((j) => { if (j && j.ack && state.help && !state.help.seen && j.ack >= state.help.at) { state.help.seen = Date.now(); save(); helpPill(); } if (j && j.fb) NP.pullFeedback(j.fb); if (j && j.wt) NP.watched(j.wt, j.now); if (j && j.rev) applyReveals(j.rev); })
+        .then((r) => r.json()).then((j) => { if (j && j.ack && state.help && !state.help.seen && j.ack >= state.help.at) { state.help.seen = Date.now(); save(); helpPill(); } if (j && j.fb) NP.pullFeedback(j.fb); if (j && j.wt) NP.watched(j.wt, j.now); if (j && j.rev) applyReveals(j.rev); if (j && j.int) SBOARD.check(true); })
         .catch(() => fetch(LIVE.url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body }).catch(() => {}));
     } catch (e) { /* offline */ }
   }
@@ -5908,10 +6108,11 @@ function goneNote(d) {
   const tm = (t) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), typed = g.filter((x) => x.t).slice(-3);
   return `<p style="margin:2px 0 4px;font-size:9.5pt;color:#8A5A00">🗑 Removed from this page ${g.length} time${g.length === 1 ? "" : "s"} (last at ${tm(g[g.length - 1].at)}). Removed writing is shown faded.${d.goneCut ? " The oldest removals were too big to keep." : ""}</p>${typed.map((x) => `<p style="margin:0 0 4px;font-size:9.5pt;color:#8A5A00">Deleted typing at ${tm(x.at)}: “${esc(x.t.slice(0, 400))}”</p>`).join("")}`;
 }
+function boardsHTML() { const b = state.boards || []; return b.length ? `<h3 style="margin:18px 0 6px">Working with my teacher (shared board)</h3>` + b.map((x) => `<div style="page-break-inside:avoid;margin:0 0 14px"><p style="margin:4px 0" class="small">${new Date(x.at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</p><img src="${x.img}" alt="Shared board" style="width:100%;max-width:640px;border:1px solid #ccc"></div>`).join("") : ""; }
 function padsHTML(plain) {
-  gather(); const keys = Object.keys(state.np || {}).filter((k) => NP.has(k)); if (!keys.length) return "";
+  gather(); const keys = Object.keys(state.np || {}).filter((k) => NP.has(k)); if (!keys.length) return boardsHTML();
   return `<h3 style="margin:18px 0 6px">Written working (${keys.length} notepad${keys.length === 1 ? "" : "s"})</h3>` + keys.map((k) => { const f = state.npFb && state.npFb[k];
-    return `<div style="page-break-inside:avoid;margin:0 0 14px"><p style="margin:4px 0"><b>${esc(QLABEL[k] || QLABEL[k.split("~")[0]] || k)}</b>${f ? ` · <span style="color:#1E8E3E">marked by the teacher (in green on the page)</span>` : ""}</p>${plain ? goneNote(state.np[k]) : ""}<img src="${NP.image(k, plain ? 0.5 : 0.6, "image/jpeg", !!plain)}" alt="Notepad" style="width:${plain ? "15cm" : "100%"};max-width:640px;border:1px solid #ccc"></div>`; }).join("");
+    return `<div style="page-break-inside:avoid;margin:0 0 14px"><p style="margin:4px 0"><b>${esc(QLABEL[k] || QLABEL[k.split("~")[0]] || k)}</b>${f ? ` · <span style="color:#1E8E3E">marked by the teacher (in green on the page)</span>` : ""}</p>${plain ? goneNote(state.np[k]) : ""}<img src="${NP.image(k, plain ? 0.5 : 0.6, "image/jpeg", !!plain)}" alt="Notepad" style="width:${plain ? "15cm" : "100%"};max-width:640px;border:1px solid #ccc"></div>`; }).join("") + boardsHTML();
 }
 // a plain page for the PDF in the teacher's Drive (Google's converter ignores scripts and most styling)
 function handinHTML(name, cls, score) {
@@ -6146,13 +6347,14 @@ function openLive() {
     const code = s.r || "", id = sid(s), an = answers[id] || {}; det.hidden = false;
     const nps = Object.keys(s.np || {}), top = det.scrollTop;
     const res = (i) => (code[i] === "1" ? `<span class="ok">✓ Correct</span>` : code[i] === "2" ? `<span class="no">✗ Not right yet</span>` : `<span class="muted">Not tried</span>`);
-    det.innerHTML = `<div class="lv-dh"><b>${esc(s.name)} · ${esc(s.cls)}</b><span class="muted small">Click a question to see their answer and write on their notepad.</span>${nps.length ? `<button type="button" data-all>📝 All written work (${nps.length})</button>` : ""}<button type="button" data-c>Close</button></div>
+    det.innerHTML = `<div class="lv-dh"><b>${esc(s.name)} · ${esc(s.cls)}</b><span class="muted small">Click a question to see their answer and write on their notepad.</span><button type="button" data-sb title="Open a board over ${esc(s.name)}'s screen that you both write on">🖐 Shared board</button>${nps.length ? `<button type="button" data-all>📝 All written work (${nps.length})</button>` : ""}<button type="button" data-c>Close</button></div>
       <table class="lv-qs"><tr><th>Section</th><th>Question</th><th>So far</th><th>Their answer</th><th></th></tr>${labels.map(([sec, lab], i) => { const b = keysByLabel[i], a = b && an[b], hasPad = !!npKey(s, b), open = openRows.has(i);
         return `<tr class="lv-qr${open ? " open" : ""}" data-row="${i}"><td>${esc(sec)}</td><td>${esc(lab)}</td><td>${res(i)}${a && a.w ? ` <span class="small muted">(${a.w} wrong)</span>` : a && a.t > 1 && a.ok === 1 ? ` <span class="small muted">(${a.t} tries)</span>` : ""}</td><td class="lv-ans">${a && a.a ? esc(a.a) : a && a.dr ? "📈 graph" : ""}</td><td>${hasPad ? "📝" : ""}${looking.has(`${id}|${i}`) ? " 👀" : ""}</td></tr>${open ? `<tr class="lv-qx"><td colspan="5">${rowDetail(s, i, a)}</td></tr>` : ""}`; }).join("")}</table>`;
     det.scrollTop = top;
     if (det.querySelector("[data-all]")) det.querySelector("[data-all]").onclick = async () => { try { npTeacherDoc(s, await npFetch(id)); } catch (e) { alert("Couldn't load the notepads."); } };
     det.querySelectorAll("[data-row]").forEach((r) => (r.onclick = () => { const i = +r.dataset.row; openRows.has(i) ? openRows.delete(i) : openRows.add(i); detail(); }));
     det.querySelectorAll("[data-pad]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); openPad(s, +b.dataset.pad); }));
+    det.querySelector("[data-sb]").onclick = () => sharedBoard(s);
     det.querySelector("[data-c]").onclick = () => { picked = null; det.hidden = true; grid.querySelectorAll(".lv-card").forEach((x) => x.classList.remove("on")); };
   }
   function rowDetail(s, i, a) {
@@ -6161,6 +6363,13 @@ function openLive() {
     return `<div class="lv-qd">${q ? `<div class="lv-qq">${tex(q)}</div>` : `<div class="muted">They haven't opened this question yet.</div>`}
       ${a ? `<div class="lv-qa"><b>Their answer:</b> ${a.a ? esc(a.a) : `<span class="muted">nothing typed</span>`}${a.t ? ` <span class="small muted">· ${a.t} ${a.t === 1 ? "check" : "checks"}${a.sh ? " · looked at the answer" : ""}</span>` : ""}</div>` : ""}${dr}
       <div class="lv-qb"><button type="button" data-pad="${i}">📝 ${hasPad ? "Open their notepad" : "Write a note on their notepad"}</button></div></div>`;
+  }
+  // interrupt one student: a board over their screen that you both write on
+  async function sharedBoard(s) {
+    const id = sid(s), setInt = (on) => livePost({ t: "int", id, on: on ? 1 : 0 });
+    try { const j = await setInt(true); if (!j.ok) throw new Error(j.error); } catch (e) { alert("Couldn't reach the live server. Check your key and try again."); return; }
+    BOARD.open("t", `🖐 Shared board with ${s.name} (${s.cls})`, { send: async (who, data) => { const j = await livePost({ t: "brd", id, who, data }); if (!j.ok) throw new Error("no"); }, poll: () => liveGet({ t: "brd", id }) },
+      { onEnd: () => setInt(false).catch(() => {}) });
   }
   // every student's latest notepad at a glance, refreshing every few seconds; click one to open it
   function openWall() {
