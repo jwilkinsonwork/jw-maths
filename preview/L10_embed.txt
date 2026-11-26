@@ -4619,7 +4619,7 @@ function answersNow() {
     const st = state[k] || {}, Q = QTEXT[k], parts = Q.parts || [];
     const a = parts.length ? parts.map((p, i) => { const v = (st.v || [])[i]; if (v === undefined || v === null || v === "") return ""; const val = p.t === "yn" ? (v ? "Yes" : "No") : p.t === "choice" ? txt(p.opts[v]) : txt(v); return (p.label ? p.label.replace(/[:\s]+$/, "") + ": " : "") + val; }).filter(Boolean).join("  ·  ") : txt(st.work).trim();
     const dr = st.dr && st.dr.some(Boolean) ? st.dr : null;
-    if (!a && !st.tries && !dr && st.ok === undefined && !st.shown) return;
+    if (!a && !st.tries && !dr && st.ok === undefined && !st.shown) { out[base] = { k, q: txt(Q.q).slice(0, 400), ok: -1, t: 0 }; return; } // seen but not answered: the teacher still needs the question
     out[base] = { k, q: txt(Q.q).slice(0, 400), a: a.slice(0, 300), ok: st.ok === true ? 1 : st.tries || st.ok === false ? 0 : -1, t: st.tries || 0, w: st.wrongN || 0, sh: st.shown ? 1 : 0, dr: dr || undefined, lines: dr && st.drq ? st.drq : undefined };
   });
   return out;
@@ -4725,6 +4725,19 @@ const NP = (() => {
 .dgm-win { width: min(1200px, 100%); }
 .dgm { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px; background: var(--page, #FBFAF6); }
 .drawbtn { border-color: var(--blue); }
+.np-gone { max-width: 860px; margin: 0 auto 8px; padding: 8px 12px; border: 2px dashed #C98A00; border-radius: 8px; background: #FFF8E6; font: 600 14px var(--body); color: #7A5200; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.np-gone[hidden] { display: none; } .np-gone .tx { flex-basis: 100%; font-size: 13px; }
+.np-gone button { font: 800 13px var(--body); padding: 3px 10px; border: 2px solid #C98A00; border-radius: 6px; background: #fff; cursor: pointer; }
+.lv-wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; padding: 14px 18px; overflow: auto; flex: 1; align-content: start; }
+.lv-tile { border: 2px solid var(--ink); border-radius: 10px; background: #fff; cursor: pointer; overflow: hidden; display: flex; flex-direction: column; }
+.lv-tile:hover { box-shadow: 0 0 0 3px var(--blue); }
+.lv-tile .th { display: flex; gap: 6px; align-items: baseline; padding: 6px 10px; border-bottom: 1px solid var(--line); font: 800 15px var(--body); }
+.lv-tile .th span { font: 600 12px var(--body); color: var(--muted); } .lv-tile .th .sp { flex: 1; }
+.lv-tile .tq { padding: 3px 10px; font: 700 12px var(--body); color: var(--ink2); }
+.lv-tile .pv { height: 320px; overflow: hidden; background: #FFFBEA; }
+.lv-tile .pv canvas { display: block; }
+.lv-tile .gn { padding: 3px 10px; font: 700 12px var(--body); color: #8A5A00; background: #FFF8E6; }
+.lv-tile.fresh { border-color: #1F9D55; }
 .np-qlab { font: 800 12px var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
 .np-tools { display: flex; gap: 6px; padding: 8px 12px; flex-wrap: wrap; align-items: center; background: #F7F3E6; border-bottom: 1px solid #D8D0B8; }
 .np-win.left .np-tools { flex-direction: row-reverse; }
@@ -4786,6 +4799,7 @@ const NP = (() => {
       let y = TOP + S.gap * 0.84; const maxW = (W - MARGIN - 24) * k;
       for (const para of d.t.split("\n")) { let line = ""; for (const w of para.split(" ")) { const t = line ? line + " " + w : w; if (ctx.measureText(t).width > maxW && line) { ctx.fillText(line, (MARGIN + 6) * k, y * k); y += S.gap; line = w; } else line = t; } ctx.fillText(line, (MARGIN + 6) * k, y * k); y += S.gap; }
     }
+    if (opts.gone && d && d.gone) { ctx.save(); ctx.globalAlpha = 0.28; d.gone.forEach((g) => strokes(g.s)); ctx.restore(); }
     strokes(d && d.s);
     if (opts.fb) { strokes(opts.fb.s); (opts.fb.w || []).forEach((it) => { // the teacher's words and ticks, written on the page
       const hand = (getComputedStyle(document.body).getPropertyValue("--hand") || "").trim() || "'Comic Sans MS', cursive";
@@ -4801,9 +4815,9 @@ const NP = (() => {
     if (d.t) { const lines = d.t.split("\n").reduce((a, para) => a + Math.max(1, Math.ceil((para.length * S.gap * 0.58 * S.text * 0.52) / (W - MARGIN - 24))), 0); y = Math.max(y, TOP + lines * S.gap); }
     return Math.min(d.h || 1000, Math.max(300, y + S.gap * 1.5));
   }
-  function image(key, scale = 0.6, type = "image/jpeg") { // for the hand-in PDF
-    const d = pad(key); if (!d) return null; const cv = document.createElement("canvas"), h = used(d, state.npFb && state.npFb[key]); cv.width = W * scale; cv.height = h * scale;
-    paint(cv.getContext("2d"), d, scale, { paper: true, text: true, set: state.npSet, fb: state.npFb && state.npFb[key] }); return cv.toDataURL(type, 0.8);
+  function image(key, scale = 0.6, type = "image/jpeg", gone = false) { // for the hand-in PDF (the teacher's copy shows rubbed-out work faded)
+    const d = pad(key); if (!d) return null; const cv = document.createElement("canvas"), h = used(gone ? Object.assign({}, d, { s: [...d.s, ...(d.gone || []).flatMap((g) => g.s)] }) : d, state.npFb && state.npFb[key]); cv.width = W * scale; cv.height = h * scale;
+    paint(cv.getContext("2d"), d, scale, { paper: true, text: true, set: state.npSet, fb: state.npFb && state.npFb[key], gone }); return cv.toDataURL(type, 0.8);
   }
 
   // ---- the notepad window ----
@@ -4825,8 +4839,18 @@ const NP = (() => {
     let tool = "pen", u = 1, hist = [], cur = null, erasing = false, saveT = null;
     const snap = () => JSON.stringify({ s: d.s, t: d.t });
     const push = () => { hist.push(snap()); if (hist.length > 40) hist.shift(); };
+    // the teacher keeps a faded record of anything that disappears; the student's page stays clean
+    const sig = (st) => `${st.c}|${st.p.length}|${st.p.slice(0, 6).join(",")}|${st.p.slice(-4).join(",")}`;
+    let prevS = new Map(d.s.map((st) => [sig(st), st])), prevT = d.t || "";
+    function record() {
+      const now = new Set(d.s.map(sig)), lost = [...prevS].filter(([g]) => !now.has(g)).map(([, st]) => st);
+      const t = d.t || "", tLost = prevT.trim() && (prevT.length - t.length >= 15 || (!t.trim() && prevT.trim().length >= 3)) ? prevT : ""; // a big chunk of typing deleted
+      if (lost.length || tLost) { d.gone = d.gone || []; d.gone.push({ at: Date.now(), s: lost, t: tLost.slice(0, 1500) || undefined });
+        while (JSON.stringify(d).length > 88000 && d.gone.length > 1) { d.gone.shift(); d.goneCut = 1; } }
+      prevS = new Map(d.s.map((st) => [sig(st), st])); prevT = t;
+    }
     const saved = (t) => (ov.querySelector("[data-saved]").textContent = t);
-    function persist() { d.v = (d.v || 0) + 1; d.upd = Date.now(); saved("Saving…"); clearTimeout(saveT); saveT = setTimeout(() => { save(); saved("Saved"); sync(key); badges(); }, 600); }
+    function persist() { record(); d.v = (d.v || 0) + 1; d.upd = Date.now(); state.npLast = key; saved("Saving…"); clearTimeout(saveT); saveT = setTimeout(() => { save(); saved("Saved"); sync(key); badges(); }, 600); }
     function layout() {
       const f0 = fbNow(); if (f0) { let y = NP_fbExtent(f0); if (y + 80 > d.h) d.h = Math.ceil((y + 200) / 100) * 100; }
       const S2 = set(); u = page.clientWidth / W; page.style.setProperty("--u", u);
@@ -4914,7 +4938,7 @@ const NP = (() => {
   function sync(key) {
     if (!window.__live || !LIVE.url || !String(state.name || "").trim()) return;
     clearTimeout(syncT[key]);
-    syncT[key] = setTimeout(() => { const d = pad(key); if (!d) return; const body = JSON.stringify({ t: "np", lesson: L.id, name: state.name, cls: state.cls, q: key, label: (QLABEL[key] || QLABEL[key.split("~")[0]] || key), data: JSON.stringify({ s: d.s, t: d.t, h: d.h, tc: d.tc, v: d.v, set: state.npSet || null }).slice(0, 95000) });
+    syncT[key] = setTimeout(() => { const d = pad(key); if (!d) return; const body = JSON.stringify({ t: "np", lesson: L.id, name: state.name, cls: state.cls, q: key, label: (QLABEL[key] || QLABEL[key.split("~")[0]] || key), data: JSON.stringify({ s: d.s, t: d.t, h: d.h, tc: d.tc, v: d.v, gone: d.gone, goneCut: d.goneCut, upd: d.upd, set: state.npSet || null }).slice(0, 95000) });
       try { fetch(LIVE.url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body }).catch(() => {}); } catch (e) { /* offline */ } }, watching[key] > Date.now() ? 600 : 1800);
   }
   function index() { const o = {}; Object.keys(state.np || {}).forEach((k) => { if (has(k)) o[k] = state.np[k].v || 1; }); return o; }
@@ -5061,7 +5085,8 @@ window.__live = (() => {
     const rows = gather(), btn = document.querySelector('#student .tabs button[aria-pressed="true"]');
     const bu = typeof BUILDUP === "object" && BUILDUP ? Object.keys(BUILDUP).map((ci) => `${(state["bu" + ci] && state["bu" + ci].done) || 0}/${BUILDUP[ci].cards.length}`).join(" ") : "";
     let ans; try { const a = JSON.stringify(answersNow()); if (a !== lastAns || ++ansN % 5 === 0) { ans = a.length < 90000 ? JSON.parse(a) : undefined; lastAns = a; } } catch (e) { /* answers are optional */ }
-    return { t, ans, lesson: L.id, name: String(state.name || "").trim(), cls: String(state.cls || "").trim(), vis: document.hidden ? "hidden" : "visible", focus: document.hasFocus(), idle: Math.round((Date.now() - lastInput) / 1000), sec: btn ? btn.textContent.trim() : "", bu, r: rows.map((r) => (r.ok ? "1" : r.tried ? "2" : "0")).join(""), w: rows.map((r) => Math.min(9, r.wrong || 0)).join(""), help: state.help && !state.help.seen ? state.help : null, np: NP.index() };
+    const npl = state.npLast && state.np && state.np[state.npLast] && NP.has(state.npLast) ? { k: state.npLast, at: state.np[state.npLast].upd || 0 } : undefined;
+    return { t, ans, npl, lesson: L.id, name: String(state.name || "").trim(), cls: String(state.cls || "").trim(), vis: document.hidden ? "hidden" : "visible", focus: document.hasFocus(), idle: Math.round((Date.now() - lastInput) / 1000), sec: btn ? btn.textContent.trim() : "", bu, r: rows.map((r) => (r.ok ? "1" : r.tried ? "2" : "0")).join(""), w: rows.map((r) => Math.min(9, r.wrong || 0)).join(""), help: state.help && !state.help.seen ? state.help : null, np: NP.index() };
   }
   function send(t) {
     if (!started) return; const p = payload(t); if (!p.name) return; const body = JSON.stringify(p);
@@ -5107,7 +5132,7 @@ function liveBar() {
   const box = document.getElementById("livebar"); if (!box || !window.__live) return;
   const on = !!(String(state.name || "").trim() && String(state.cls || "").trim());
   if (on && !box.dataset.edit) {
-    box.innerHTML = `<div class="lvb on"><span class="lvdot"></span><span>Live: your teacher can see your progress in this lesson, ${esc(state.name)} · ${esc(state.cls)}.</span><button type="button" data-me>Not you?</button><span style="flex:1"></span><button type="button" class="askhelp" data-help="general" style="float:none;margin:0;text-decoration:none">✋ I need help</button></div>`;
+    box.innerHTML = `<div class="lvb on"><span class="lvdot"></span><span>Live: your teacher can see your progress and your notepads, ${esc(state.name)} · ${esc(state.cls)}.</span><button type="button" data-me>Not you?</button><span style="flex:1"></span><button type="button" class="askhelp" data-help="general" style="float:none;margin:0;text-decoration:none">✋ I need help</button></div>`;
     box.querySelector("[data-me]").onclick = () => { box.dataset.edit = "1"; liveBar(); };
     window.__live.start(); helpPill(); return;
   }
@@ -5117,10 +5142,16 @@ function liveBar() {
 }
 
 // the written working from every notepad, with any teacher feedback, for the hand-in sheet and PDF
+// a line for the teacher's copy: what was rubbed out, undone or cleared, and any typing that was deleted
+function goneNote(d) {
+  const g = (d && d.gone) || []; if (!g.length) return "";
+  const tm = (t) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), typed = g.filter((x) => x.t).slice(-3);
+  return `<p style="margin:2px 0 4px;font-size:9.5pt;color:#8A5A00">🗑 Removed from this page ${g.length} time${g.length === 1 ? "" : "s"} (last at ${tm(g[g.length - 1].at)}). Removed writing is shown faded.${d.goneCut ? " The oldest removals were too big to keep." : ""}</p>${typed.map((x) => `<p style="margin:0 0 4px;font-size:9.5pt;color:#8A5A00">Deleted typing at ${tm(x.at)}: “${esc(x.t.slice(0, 400))}”</p>`).join("")}`;
+}
 function padsHTML(plain) {
   gather(); const keys = Object.keys(state.np || {}).filter((k) => NP.has(k)); if (!keys.length) return "";
   return `<h3 style="margin:18px 0 6px">Written working (${keys.length} notepad${keys.length === 1 ? "" : "s"})</h3>` + keys.map((k) => { const f = state.npFb && state.npFb[k];
-    return `<div style="page-break-inside:avoid;margin:0 0 14px"><p style="margin:4px 0"><b>${esc(QLABEL[k] || QLABEL[k.split("~")[0]] || k)}</b>${f ? ` · <span style="color:#1E8E3E">marked by the teacher (in green on the page)</span>` : ""}</p><img src="${NP.image(k, plain ? 0.5 : 0.6)}" alt="Notepad" style="width:${plain ? "15cm" : "100%"};max-width:640px;border:1px solid #ccc"></div>`; }).join("");
+    return `<div style="page-break-inside:avoid;margin:0 0 14px"><p style="margin:4px 0"><b>${esc(QLABEL[k] || QLABEL[k.split("~")[0]] || k)}</b>${f ? ` · <span style="color:#1E8E3E">marked by the teacher (in green on the page)</span>` : ""}</p>${plain ? goneNote(state.np[k]) : ""}<img src="${NP.image(k, plain ? 0.5 : 0.6, "image/jpeg", !!plain)}" alt="Notepad" style="width:${plain ? "15cm" : "100%"};max-width:640px;border:1px solid #ccc"></div>`; }).join("");
 }
 // a plain page for the PDF in the teacher's Drive (Google's converter ignores scripts and most styling)
 function handinHTML(name, cls, score) {
@@ -5140,10 +5171,11 @@ async function npFetch(id) {
   const key = (() => { try { return localStorage.getItem("jw-live-key") || ""; } catch (e) { return ""; } })();
   const r = await fetch(`${LIVE.url}?t=nps&lesson=${encodeURIComponent(L.id)}&id=${encodeURIComponent(id)}&key=${encodeURIComponent(key)}`); return r.json();
 }
-function npCanvas(d, fb, width, crop) {
-  const set = Object.assign({}, d.set || {}), k = width / NP.W, cv = document.createElement("canvas"), h = crop ? Math.min(d.h || 1000, Math.max(300, (() => { let y = 0; [...(d.s || []), ...((fb && fb.s) || [])].forEach((st) => { for (let i = 1; i < st.p.length; i += 2) y = Math.max(y, st.p[i]); }); y = Math.max(y, NP.fbBottom(fb)); if (d.t) y = Math.max(y, 56 + (d.t.split("\n").length + Math.floor(d.t.length / 60)) * ((set.gap || 40))); return y + 60; })())) : d.h || 1000, dpr = window.devicePixelRatio || 1;
+function npCanvas(d, fb, width, crop, hideGone) {
+  if (!hideGone && d.gone && d.gone.length) d = Object.assign({}, d, { _all: [...(d.s || []), ...d.gone.flatMap((g) => g.s)] });
+  const set = Object.assign({}, d.set || {}), k = width / NP.W, cv = document.createElement("canvas"), h = crop ? Math.min(d.h || 1000, Math.max(300, (() => { let y = 0; [...(d._all || d.s || []), ...((fb && fb.s) || [])].forEach((st) => { for (let i = 1; i < st.p.length; i += 2) y = Math.max(y, st.p[i]); }); y = Math.max(y, NP.fbBottom(fb)); if (d.t) y = Math.max(y, 56 + (d.t.split("\n").length + Math.floor(d.t.length / 60)) * ((set.gap || 40))); return y + 60; })())) : d.h || 1000, dpr = window.devicePixelRatio || 1;
   cv.width = width * dpr; cv.height = h * k * dpr; cv.style.width = width + "px"; cv.style.height = h * k + "px";
-  NP.paint(cv.getContext("2d"), d, k * dpr, { paper: true, text: true, set, fb }); return cv;
+  NP.paint(cv.getContext("2d"), d, k * dpr, { paper: true, text: true, set, fb, gone: !hideGone }); return cv;
 }
 function npTeacherDoc(s, data) { // every notepad, in question order, as one document
   const ov = document.createElement("div"); ov.className = "np-ov";
@@ -5185,10 +5217,17 @@ function npTeacherOne(s, k, o = {}) {
     <div class="np-q">${qHTML}</div>
     <div class="np-tools"><button type="button" data-t="pen" class="on">🖍 Pen</button><button type="button" data-t="type">⌨ Write words</button><button type="button" data-t="ok">✓</button><button type="button" data-t="half">½</button><button type="button" data-t="no">✗</button><button type="button" data-t="rub">🧽 Rubber</button><button type="button" data-t="scroll">✋ Scroll</button><button type="button" data-u>↶ Undo</button>
       ${TPENS.map((c, i) => `<button type="button" class="sw${i === 1 ? " on" : ""}" data-tc="${c}" style="background:${c}" aria-label="Green shade ${i + 1}"></button>`).join("")}</div>
-    <div class="np-scroll"><div class="np-thelp">Everything you write appears on ${esc(s.name)}'s screen as you write it. Press <b>✅ Finished</b> when you're done: it closes the alert for this question. Use <b>✋ Scroll</b> to move up and down with a finger.</div><div data-pg style="position:relative;max-width:860px;margin:0 auto"></div><button type="button" class="np-more" data-more>＋ More paper</button></div></div>`;
+    <div class="np-scroll"><div class="np-gone" data-gone hidden></div><div class="np-thelp">Everything you write appears on ${esc(s.name)}'s screen as you write it. Press <b>✅ Finished</b> when you're done: it closes the alert for this question. Use <b>✋ Scroll</b> to move up and down with a finger.</div><div data-pg style="position:relative;max-width:860px;margin:0 auto"></div><button type="button" class="np-more" data-more>＋ More paper</button></div></div>`;
   document.body.appendChild(ov);
   const host = ov.querySelector("[data-pg]"), st = ov.querySelector("[data-st]"), scroller = ov.querySelector(".np-scroll");
-  let cv, tool = "pen", cur = null, hist = [], tcol = TPENS[1], alive = true, pushT = null, dirty = false, busy = false;
+  let cv, tool = "pen", cur = null, hist = [], tcol = TPENS[1], alive = true, pushT = null, dirty = false, busy = false, hideGone = false;
+  const goneBox = ov.querySelector("[data-gone]");
+  function goneInfo() { // what the student has rubbed out, undone or cleared: shown faded on the page, typing listed here
+    const g = d.gone || []; goneBox.hidden = !g.length; if (!g.length) return;
+    const tm = (t) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), typed = g.filter((x) => x.t).slice(-3).reverse();
+    goneBox.innerHTML = `<span>🗑 ${esc(s.name)} has removed writing from this page ${g.length} time${g.length === 1 ? "" : "s"} (last at ${tm(g[g.length - 1].at)}). ${hideGone ? "It's hidden." : "It's shown faded."}</span><button type="button" data-tg>${hideGone ? "Show removed writing" : "Hide removed writing"}</button>${typed.map((x) => `<div class="tx">Deleted typing at ${tm(x.at)}: “${esc(x.t.slice(0, 300))}”</div>`).join("")}`;
+    goneBox.querySelector("[data-tg]").onclick = () => { hideGone = !hideGone; draw(); };
+  }
   const H = () => Math.max(d.h || 1000, NP.extent(fb) + 200, (d.h || 1000) + extra);
   const status = (t, c) => { st.textContent = t; st.style.color = c || ""; };
   const snap = () => hist.push(JSON.stringify(fb));
@@ -5199,7 +5238,7 @@ function npTeacherOne(s, k, o = {}) {
     finally { busy = false; }
   }
   const changed = () => { dirty = true; status("Sending…", "#B8860B"); clearTimeout(pushT); pushT = setTimeout(() => push(false), 500); };
-  const draw = () => { const w = host.clientWidth; host.querySelectorAll("canvas").forEach((c) => c.remove()); cv = npCanvas(Object.assign({}, d, { h: H() }), fb, w); cv.style.touchAction = tool === "scroll" ? "pan-y" : "none"; cv.style.cursor = tool === "type" ? "text" : tool === "scroll" ? "grab" : "crosshair"; host.prepend(cv); bind(); };
+  const draw = () => { const w = host.clientWidth; host.querySelectorAll("canvas").forEach((c) => c.remove()); cv = npCanvas(Object.assign({}, d, { h: H() }), fb, w, false, hideGone); goneInfo(); cv.style.touchAction = tool === "scroll" ? "pan-y" : "none"; cv.style.cursor = tool === "type" ? "text" : tool === "scroll" ? "grab" : "crosshair"; host.prepend(cv); bind(); };
   const pos = (e) => { const r = cv.getBoundingClientRect(); return [Math.round(((e.clientX - r.left) / r.width) * NP.W), Math.round(((e.clientY - r.top) / r.height) * H())]; };
   const STAMP = { ok: "✓", half: "½", no: "✗" };
   function words(x, y) { // a box on the page to write a comment in; Enter or tapping away puts it on the page
@@ -5265,7 +5304,7 @@ function liveStatus(s, now) {
 function openLive() {
   if (!studentBuilt) { studentBuilt = true; buildStudent(); } // so every question's text is known here too
   const ov = document.createElement("div"); ov.className = "lv-ov";
-  ov.innerHTML = `<div class="lv-p" role="dialog" aria-label="Live class"><div class="lv-h"><b class="t">📡 Live class · ${esc(L.id)}</b><label class="small">Class <select data-cls><option value="">All</option></select></label><label class="snd"><input type="checkbox" data-snd checked> 🔔 Sound</label><button type="button" data-key>🔑 Key</button><button type="button" data-x>✕ Close</button></div><div class="lv-counts"></div><div class="lv-alerts" aria-live="polite"></div><div class="lv-grid"><div class="lv-empty">Connecting…</div></div><div class="lv-det" hidden></div><div class="lv-note">✋ = a student asked for help. ⚠️ = 3 wrong answers in a row on the same question. Click a name in an alert to open their work for that question; ✕ hides an alert. Click a student, then any question, to see their answer and write on their notepad. Updates every 5 seconds.</div></div>`;
+  ov.innerHTML = `<div class="lv-p" role="dialog" aria-label="Live class"><div class="lv-h"><b class="t">📡 Live class · ${esc(L.id)}</b><label class="small">Class <select data-cls><option value="">All</option></select></label><label class="snd"><input type="checkbox" data-snd checked> 🔔 Sound</label><button type="button" data-wall>📝 Notepads wall</button><button type="button" data-key>🔑 Key</button><button type="button" data-x>✕ Close</button></div><div class="lv-counts"></div><div class="lv-alerts" aria-live="polite"></div><div class="lv-grid"><div class="lv-empty">Connecting…</div></div><div class="lv-det" hidden></div><div class="lv-note">✋ = a student asked for help. ⚠️ = 3 wrong answers in a row on the same question. Click a name in an alert to open their work for that question; ✕ hides an alert. Click a student, then any question, to see their answer and write on their notepad. Updates every 5 seconds.</div></div>`;
   document.body.appendChild(ov);
   const grid = ov.querySelector(".lv-grid"), counts = ov.querySelector(".lv-counts"), det = ov.querySelector(".lv-det"), sel = ov.querySelector("[data-cls]"), alerts = ov.querySelector(".lv-alerts");
   const seenAlerts = new Set(); let firstPoll = true, ac = null, title0 = document.title;
@@ -5302,15 +5341,16 @@ function openLive() {
   }
   async function loadAnswers(id) { try { const j = await liveGet({ t: "ans", id }); if (j && j.ok) answers[id] = j.ans || {}; } catch (e) { /* keep the last copy */ } }
   // open a student's notepad for question row i (from an alert or their answers)
-  async function openPad(s, i) {
-    const id = sid(s), base = keysByLabel[i]; if (!base) return;
+  async function openPad(s, i, k0) {
+    const id = sid(s), base = k0 ? k0.split("~")[0] : keysByLabel[i]; if (!base) return;
+    if (i === undefined || i < 0) i = keysByLabel.indexOf(base);
     if (!answers[id]) await loadAnswers(id);
-    const an = (answers[id] || {})[base], k = (an && an.k) || npKey(s, base) || base, lk = `${id}|${i}`;
+    const an = (answers[id] || {})[base], k = k0 || (an && an.k) || npKey(s, base) || base, lk = `${id}|${i}`;
     let pad = null, fb = null; try { const j = await liveGet({ t: "pad", id, q: k }); if (j && j.ok) { pad = j.pad; fb = j.fb; } } catch (e) { /* open a fresh page */ }
-    npTeacherOne(s, k, { label: labelText(i), q: (an && an.q) || (QTEXT[k] || QTEXT[base] || {}).q || "", pad, fb,
+    npTeacherOne(s, k, { label: i > -1 ? labelText(i) : QLABEL[k] || QLABEL[base] || k, q: (an && an.q) || (QTEXT[k] || QTEXT[base] || {}).q || "", pad, fb,
       onOpen: () => { looking.add(lk); draw(); },
       onClose: () => { looking.delete(lk); draw(); },
-      onFinish: () => { handled[lk] = Math.max(1, +((s.w || "")[i] || 0)); saveHandled(); if (s.help && s.help.q === labelText(i)) ack(id); else poll(); } });
+      onFinish: () => { if (i > -1) { handled[lk] = Math.max(1, +((s.w || "")[i] || 0)); saveHandled(); } if (s.help && i > -1 && s.help.q === labelText(i)) ack(id); else poll(); } });
   }
   function draw() {
     const now = data.now || Date.now(), all = Object.values(data.students || {});
@@ -5362,6 +5402,42 @@ function openLive() {
       ${a ? `<div class="lv-qa"><b>Their answer:</b> ${a.a ? esc(a.a) : `<span class="muted">nothing typed</span>`}${a.t ? ` <span class="small muted">· ${a.t} ${a.t === 1 ? "check" : "checks"}${a.sh ? " · looked at the answer" : ""}</span>` : ""}</div>` : ""}${dr}
       <div class="lv-qb"><button type="button" data-pad="${i}">📝 ${hasPad ? "Open their notepad" : "Write a note on their notepad"}</button></div></div>`;
   }
+  // every student's latest notepad at a glance, refreshing every few seconds; click one to open it
+  function openWall() {
+    const w = document.createElement("div"); w.className = "lv-ov";
+    w.innerHTML = `<div class="lv-p" role="dialog" aria-label="Notepads wall"><div class="lv-h"><b class="t">📝 Notepads wall · ${esc(L.id)}${sel.value ? " · " + esc(sel.value) : ""}</b><span class="muted small" data-ws>Loading…</span><button type="button" data-x>✕ Close</button></div><div class="lv-note" style="border:0">Each student's most recent notepad, updating every 5 seconds. Faded writing was rubbed out, undone or cleared. Click a notepad to open it and write on it.</div><div class="lv-wall"><div class="lv-empty">Loading…</div></div></div>`;
+    document.body.appendChild(w);
+    const wall = w.querySelector(".lv-wall"), ws = w.querySelector("[data-ws]"), seen = {}; let on = true, t2 = null;
+    async function tick() {
+      clearTimeout(t2); if (!on) return;
+      try {
+        const j = await liveGet({ t: "wall", cls: sel.value || "" }); if (!j.ok) throw new Error(j.error);
+        const pads = (j.pads || []).filter((x) => x.pad && x.pad.data).sort((a, b) => a.name.localeCompare(b.name)), now = j.now || Date.now();
+        ws.textContent = `${pads.length} notepad${pads.length === 1 ? "" : "s"} · updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
+        if (!pads.length) { wall.innerHTML = `<div class="lv-empty">No one has written in a notepad yet.</div>`; }
+        else {
+          if (wall.querySelector(".lv-empty")) wall.innerHTML = "";
+          const ids = new Set(pads.map((x) => x.id + "|" + x.q));
+          wall.querySelectorAll(".lv-tile").forEach((t) => { if (!ids.has(t.dataset.k)) t.remove(); });
+          pads.forEach((x, n) => {
+            const key = x.id + "|" + x.q; let t = wall.querySelector(`.lv-tile[data-k="${CSS.escape(key)}"]`);
+            if (!t) { t = document.createElement("div"); t.className = "lv-tile"; t.dataset.k = key; t.innerHTML = `<div class="th">${esc(x.name)} <span>${esc(x.cls)}</span><span class="sp"></span><span data-ago></span></div><div class="tq">${esc(x.pad.label || QLABEL[x.q] || x.q)}</div><div class="pv"></div><div class="gn" hidden></div>`;
+              t.onclick = () => { const s = Object.values(data.students || {}).find((y) => sid(y) === x.id); if (s) openPad(s, -1, x.q); }; }
+            if (wall.children[n] !== t) wall.insertBefore(t, wall.children[n] || null);
+            t.querySelector("[data-ago]").textContent = x.at ? ago(now - x.at) : "";
+            t.classList.toggle("fresh", x.at && now - x.at < 20000);
+            if (seen[key] !== x.pad.data) { seen[key] = x.pad.data; const d = JSON.parse(x.pad.data || "{}"), pv = t.querySelector(".pv"); pv.innerHTML = ""; pv.appendChild(npCanvas(d, null, pv.clientWidth || 320, true));
+              const gn = t.querySelector(".gn"), g = d.gone || []; gn.hidden = !g.length; gn.textContent = g.length ? `🗑 Removed writing ${g.length} time${g.length === 1 ? "" : "s"}${g.some((y) => y.t) ? " (incl. typing)" : ""}` : ""; }
+          });
+        }
+      } catch (e) { ws.textContent = "Can't reach the live server. Trying again…"; }
+      t2 = setTimeout(tick, 5000);
+    }
+    const shut = () => { on = false; clearTimeout(t2); w.remove(); };
+    w.querySelector("[data-x]").onclick = shut; w.addEventListener("click", (e) => { if (e.target === w) shut(); });
+    tick();
+  }
+  ov.querySelector("[data-wall]").onclick = () => { if (!liveKey()) return askKey(); openWall(); };
   sel.onchange = draw;
   ov.querySelector("[data-key]").onclick = () => askKey();
   const close = () => { alive = false; clearTimeout(tm); ov.remove(); document.title = title0; };
