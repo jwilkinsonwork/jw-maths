@@ -291,13 +291,22 @@ button.primary { background: var(--ink); color: #fff; border-color: var(--ink); 
 .pq-arrow small { font: 700 .45em var(--body); }
 .ty-panel, .np-panel { background: #fff; border: 2px solid var(--ink); border-radius: 8px; box-shadow: 6px 6px 0 var(--ink); width: 1000px; max-height: 640px; padding: 16px 24px 18px; display: flex; flex-direction: column; gap: 12px; animation: kwpop .25s ease-out; overflow: auto; }
 .ty-rows { display: flex; flex-direction: column; gap: 10px; }
-.ty-row { display: flex; gap: 8px; align-items: stretch; }
+.ty-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; } .ty-row > .ty-add { flex: 1; }
 .ty-add { flex: 1; display: grid; grid-template-columns: 56px minmax(0, 1.3fr) minmax(0, 1fr) 60px; align-items: center; gap: 14px; padding: 8px 14px; text-align: left; font: 600 22px var(--body); border-radius: 8px; box-shadow: -3px 3px 0 var(--ink); }
 .ty-add:hover { background: #FFF8D6; }
 .ty-bar { height: 26px; background: #EEF1F7; border-radius: 4px; overflow: hidden; } .ty-bar i { display: block; height: 100%; width: 0; background: var(--blue, #2F5BD3); transition: width .2s; }
 .ty-n { font: 700 32px var(--display); text-align: right; }
 .ty-sub { width: 52px; font-size: 26px; border-radius: 8px; }
 .ty-row.right .ty-add { border-color: #1E8E4E; background: #DDF5E5; } .ty-row.right .ty-bar i { background: #1E8E4E; }
+.ty-live { font: 800 14px var(--body); padding: 5px 12px; border: 2px solid var(--blue); border-radius: 8px; background: #EEF3FF; color: var(--blue); cursor: pointer; }
+.ty-live.on { background: #fff; color: var(--ink); border-color: var(--ink); }
+.ty-lbar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 8px 12px; margin: 0 0 8px; background: #EEF3FF; border-radius: 10px; font: 700 15px var(--body); }
+.ty-lbar[hidden] { display: none; } .ty-lbar select { font: 700 15px var(--body); }
+.ty-lbar button { font: 800 14px var(--body); padding: 4px 10px; border: 2px solid var(--ink); border-radius: 8px; background: #fff; cursor: pointer; }
+.ty-lst { flex-basis: 100%; }
+.ty-panel.live .ty-sub { visibility: hidden; }
+.ty-who { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 4px 6px; padding: 4px 8px 8px 52px; font: 700 14px var(--body); }
+.ty-who[hidden] { display: none; } .ty-who span { background: #F1F3F8; border-radius: 10px; padding: 1px 8px; }
 .ty-foot { display: flex; align-items: center; gap: 12px; } .ty-total { flex: 1; font-size: 18px; color: var(--ink2); }
 .ty-foot .primary { background: var(--hl, #FFE66D); color: var(--ink); }
 .ty-panel.v .ty-add { padding: 4px 14px; font-size: 18px; } .ty-panel.v .ty-n { font-size: 26px; } .ty-panel.v .smc-l { width: 40px; height: 40px; font-size: 24px; } .ty-panel.v .ty-rows { gap: 6px; }
@@ -1101,8 +1110,36 @@ function venn(v, px = 300) {
   out.forEach((s, i) => { g += t(i % 2 ? W - fs * 0.6 : fs * 0.6, H - fs * 0.7 - Math.floor(i / 2) * fs * 1.3, s, { anchor: i % 2 ? "end" : "start" }); });
   return g + `</svg>`;
 }
+// a number line for rounding: ticks, labels, marked values, the halfway point, a bracket for a range, and arrows to the rounded value
+function nline(o, px = 300) {
+  const W = px * 1.6, H = px * 0.62, pad = W * 0.07, base = H * 0.6, fs = Math.max(12, W / 19), span = o.to - o.from;
+  const X = (v) => pad + ((v - o.from) / span) * (W - 2 * pad), near = (a, b) => Math.abs(a - b) < span * 1e-6;
+  const fmt = (v) => { const dp = o.dp !== undefined ? o.dp : (String(o.major || 1).split(".")[1] || "").length; let t = Math.abs(v).toFixed(dp); const [a, b] = t.split("."); t = a.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (b ? "." + b : ""); return (v < 0 ? "−" : "") + (o.money ? "£" : "") + t + (o.unit || ""); };
+  const fmtX = (v) => { const d = (String(+(+v).toFixed(10)).split(".")[1] || "").length, dp0 = o.dp !== undefined ? o.dp : 0, dp = o.money && d ? 2 : Math.max(dp0, d); let t = Math.abs(v).toFixed(dp); const [a, b] = t.split("."); return (v < 0 ? "−" : "") + (o.money ? "£" : "") + a.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (b ? "." + b : ""); }; // a value that may need more decimals than the labels
+  let g = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Number line from ${fmt(o.from)} to ${fmt(o.to)}"><rect x="1" y="1" width="${W - 2}" height="${H - 2}" rx="${fs * 0.6}" fill="#fff"/>`;
+  if (o.hl) g += `<rect x="${X(o.hl.from)}" y="${base - fs * 0.55}" width="${X(o.hl.to) - X(o.hl.from)}" height="${fs * 1.1}" rx="${fs * 0.3}" fill="${col(o.hl.color, "var(--amber)")}" fill-opacity=".28"/>`;
+  g += `<line x1="${pad * 0.4}" y1="${base}" x2="${W - pad * 0.4}" y2="${base}" stroke="#23264A" stroke-width="${W / 260}" stroke-linecap="round"/>`;
+  const minor = o.minor || (o.major || 1) / 10, major = o.major || minor * 10, n = Math.round(span / minor);
+  for (let i = 0; i <= n; i++) { const v = o.from + i * minor, big = near(Math.round((v - o.from) / major) * major + o.from, v), x = X(v), h = big ? fs * 0.85 : fs * 0.42;
+    g += `<line x1="${x}" y1="${base - h}" x2="${x}" y2="${base + h}" stroke="#23264A" stroke-width="${big ? W / 330 : W / 600}"/>`;
+    if (big && o.labels !== false && !(o.hide || []).some((h2) => near(h2, v))) g += `<text x="${x}" y="${base + fs * 2.1}" font-size="${fs}" text-anchor="middle" font-weight="700" fill="#23264A" font-family="Nunito,sans-serif">${fmt(v)}</text>`; }
+  (o.extra || []).forEach((v) => (g += `<text x="${X(v)}" y="${base + fs * 2.1}" font-size="${fs * 0.85}" text-anchor="middle" font-weight="700" fill="#4A4F75" font-family="Nunito,sans-serif">${fmt(v)}</text>`));
+  if (o.half !== undefined) g += `<line x1="${X(o.half)}" y1="${base - fs * 2.2}" x2="${X(o.half)}" y2="${base + fs * 0.9}" stroke="var(--purple)" stroke-width="${W / 300}" stroke-dasharray="${fs * 0.35} ${fs * 0.25}"/><text x="${X(o.half)}" y="${base - fs * 2.5}" font-size="${fs * 0.8}" text-anchor="middle" font-weight="800" fill="var(--purple)" font-family="Nunito,sans-serif">halfway ${o.halfLabel === false ? "" : fmtX(o.half)}</text>`;
+  if (o.bracket) { const b = o.bracket, y = base - fs * 1.6, c = col(b.color, "var(--teal)");
+    g += `<line x1="${X(b.from)}" y1="${y}" x2="${X(b.to)}" y2="${y}" stroke="${c}" stroke-width="${W / 160}"/>`;
+    [["from", b.loOpen], ["to", b.hiOpen]].forEach(([k, open]) => (g += `<circle cx="${X(b[k])}" cy="${y}" r="${fs * 0.32}" fill="${open ? "#fff" : c}" stroke="${c}" stroke-width="${W / 300}"/>`));
+    if (b.label) g += `<text x="${(X(b.from) + X(b.to)) / 2}" y="${y - fs * 0.6}" font-size="${fs * 0.9}" text-anchor="middle" font-weight="800" fill="${c}" font-family="Nunito,sans-serif">${esc(b.label)}</text>`; }
+  (o.arrows || []).forEach((a) => { const x1 = X(a.from), x2 = X(a.to), c = col(a.color, "var(--teal)"), up = base - fs * (a.high || 1.4), mx = (x1 + x2) / 2;
+    g += `<path d="M ${x1} ${base - fs * 0.5} Q ${mx} ${up - fs * 1.2} ${x2} ${base - fs * 0.6}" fill="none" stroke="${c}" stroke-width="${W / 280}" marker-end="url(#nlar)"/>`; });
+  (o.marks || []).forEach((m) => { const x = X(m.v), c = col(m.color, "var(--coral)"), y = base - fs * (m.lift || 1.1);
+    g += `<path d="M ${x} ${base - fs * 0.15} l ${-fs * 0.42} ${-fs * 0.75} h ${fs * 0.84} z" fill="${c}"/>`;
+    if (m.label !== "") g += `<text x="${x}" y="${y - fs * 0.15}" font-size="${fs * (m.size || 1.05)}" text-anchor="${m.anchor || "middle"}" font-weight="800" fill="${c}" font-family="Nunito,sans-serif">${esc(m.label !== undefined ? m.label : fmtX(m.v))}</text>`; });
+  if (o.arrows && o.arrows.length) g = g.replace(`role="img"`, `role="img"`) + `<defs><marker id="nlar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="${fs * 0.5}" markerHeight="${fs * 0.5}" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--teal)"/></marker></defs>`;
+  return g + `</svg>`;
+}
 function graph(spec = {}, px = 300) {
   if (spec.venn) return venn(spec.venn, px);
+  if (spec.nl) return nline(spec.nl, px);
   const [x0, x1, xs] = spec.xr || [-5, 5, 1], [y0, y1, ys] = spec.yr || [-5, 5, 1];
   const pad = 26, W = px, H = px, iw = W - 2 * pad, ih = H - 2 * pad;
   const X = (x) => pad + ((x - x0) / (x1 - x0)) * iw, Y = (y) => H - pad - ((y - y0) / (y1 - y0)) * ih;
@@ -1627,7 +1664,8 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
   function build(i) {
     const c = cards[i], Q = c.spec.make(); c.built = true;
     c.el.innerHTML = `<div class="bu-head"><span class="bu-num">Card ${i + 1} of ${N}</span><b>${tex(c.spec.title)}</b>${c.spec.sub ? `<span class="bu-new">${tex(c.spec.sub)}</span>` : ""}${!big ? `<button type="button" class="askhelp" style="margin-left:auto;float:none" data-buladder>💡 Help</button>` : ""}</div><div class="bu-body"><div class="bu-g"></div><div class="bu-side"><div class="bu-q">${tex(Q.q)}</div>${c.spec.remind || Q.remind ? `<div class="bu-remind"><span class="bu-rtag">Reminder</span> ${c.spec.remind || Q.remind}</div>` : ""}<div class="bu-steps"></div><div class="bu-endslot"></div></div></div>`;
-    const G = buGrid(c.el.querySelector(".bu-g"), Q.line, big ? 440 : 390, { lines: Q.lines, points: Q.points }), ctx = { Q, G }; c.el.__bu = ctx;
+    const noop = () => {}, G = Q.spec ? (() => { const gh = c.el.querySelector(".bu-g"); gh.classList.add("bu-nl"); gh.innerHTML = graph(Q.spec, big ? 440 : 390); return { flash: noop, drawTri: noop, useLine: noop, clear: noop, setPicking: noop, lattice: noop, show: (sp) => (gh.innerHTML = graph(sp, big ? 440 : 390)) }; })()
+      : buGrid(c.el.querySelector(".bu-g"), Q.line, big ? 440 : 390, { lines: Q.lines, points: Q.points }), ctx = { Q, G }; c.el.__bu = ctx;
     if (Q.tri) G.drawTri(Q.tri[0], Q.tri[1]);
     const hl = c.el.querySelector("[data-buladder]"); let hlv = 0;
     if (hl) hl.onclick = () => {
@@ -1831,6 +1869,7 @@ function buildSlides() {
   slide("plen", "Plenary", head("plen", "Plenary") + `<div class="sbody"><div class="col"><div class="big" style="font-weight:800">${tex(L.plenary.q)}</div><div class="mid muted">${tex(L.plenary.follow || "")}</div></div><div class="svgwrap" style="width:400px">${graph(L.plenary.graph || {}, 400)}</div></div>`);
 }
 const TALLY = []; // the multiple-choice and hinge questions, so the tally knows the answer and the misconceptions
+(L.cycles || []).forEach((cy, ci) => { (cy.mcqs || []).forEach((m, mi) => (m.__id = `${ci}m${mi}`)); if (cy.hinge) cy.hinge.__id = `${ci}h`; });
 function mcqHTML(kind, title, m) {
   const ti = TALLY.push(m) - 1;
   const ai = letters.indexOf(m.ans);
@@ -2081,13 +2120,13 @@ function studentMCQ(m, key, num) {
   const opts = m.graphs
     ? m.graphs.map((g, i) => `<button type="button" class="smc-opt smc-g" data-i="${i}" aria-pressed="false"><span class="smc-l">${letters[i]}</span><span class="svgwrap">${graph(g, 260)}</span></button>`).join("")
     : m.opts.map((o, i) => `<button type="button" class="smc-opt" data-i="${i}" aria-pressed="false"><span class="smc-l">${letters[i]}</span><span class="smc-t">${tex(o)}</span></button>`).join("");
-  el.innerHTML = `<div class="qt"><span class="qn" style="background:var(--blue)">Multiple choice ${num}</span><span class="smc-q">${tex(m.q)}</span></div><div class="smc-body"><div class="smc-grid${m.graphs ? " smc-grid4" : ""}">${opts}</div><div class="smc-show" aria-live="polite"><span class="smc-show-h">My answer</span><span class="smc-big">?</span></div></div>`;
+  el.innerHTML = `<div class="qt"><span class="qn" style="background:${num === "Hinge" ? "var(--coral)" : "var(--blue)"}">${num === "Hinge" ? "Hinge question" : `Multiple choice ${num}`}</span><span class="smc-q">${tex(m.q)}</span></div><div class="smc-body"><div class="smc-grid${m.graphs ? " smc-grid4" : ""}">${opts}</div><div class="smc-show" aria-live="polite"><span class="smc-show-h">My answer</span><span class="smc-big">?</span></div></div>`;
   const pick = (i) => {
     el.querySelectorAll(".smc-opt").forEach((b) => { const on = +b.dataset.i === i; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
     el.querySelector(".smc-big").textContent = i === undefined ? "?" : letters[i];
     el.querySelector(".smc-show").classList.toggle("set", i !== undefined);
   };
-  el.querySelectorAll(".smc-opt").forEach((b) => (b.onclick = () => { const i = +b.dataset.i; state[key] = { pick: i }; save(); pick(i); }));
+  el.querySelectorAll(".smc-opt").forEach((b) => (b.onclick = () => { const i = +b.dataset.i; state[key] = { pick: i }; if (m.__id) { state.mcp = state.mcp || {}; state.mcp[m.__id] = [i, Date.now()]; } save(); pick(i); if (window.__live) window.__live.beatSoon(400); }));
   pick(st.pick);
   return el;
 }
@@ -2167,38 +2206,74 @@ function openPrereq(slideEl) {
 // ---------- multiple choice and hinge: tally the class's answers ----------
 const TALLY_COUNTS = {};
 function openTally(slideEl, ti) {
-  const m = TALLY[ti], ai = letters.indexOf(m.ans), n = (m.graphs || m.opts).length, c = TALLY_COUNTS[ti] || (TALLY_COUNTS[ti] = Array(n).fill(0));
+  const m = TALLY[ti], ai = letters.indexOf(m.ans), n = (m.graphs || m.opts).length, manual = TALLY_COUNTS[ti] || (TALLY_COUNTS[ti] = Array(n).fill(0));
+  let c = manual, live = false, hide = false, since = 0, who = Array(n).fill(null).map(() => []), pollT = null, cls = "", openWho = new Set();
   const md = document.createElement("div"); md.className = "kw-modal";
-  md.innerHTML = `<div class="ty-panel" role="dialog" aria-label="Tally the answers"><div class="mt-head"><b>Tally the Answers</b><span class="muted">Click a row (or press A, B, C, D) for each student. − takes one off.</span><button class="kw-close" aria-label="Close">✕</button></div><div class="ty-rows">${[...Array(n)].map((_, i) => `<div class="ty-row" data-i="${i}"><button type="button" class="ty-add" data-i="${i}"><span class="smc-l">${letters[i]}</span><span class="ty-opt">${m.graphs ? `Graph ${letters[i]}` : tex(m.opts[i])}</span><span class="ty-bar"><i></i></span><b class="ty-n">0</b></button><button type="button" class="ty-sub" data-i="${i}" aria-label="One fewer for ${letters[i]}">−</button></div>`).join("")}</div><div class="ty-foot"><span class="ty-total"></span><button type="button" class="ty-reset">Reset</button><button type="button" class="ty-show primary">Show the Verdict</button></div><div class="ty-verdict" hidden></div></div>`;
+  md.innerHTML = `<div class="ty-panel" role="dialog" aria-label="Tally the answers"><div class="mt-head"><b>Tally the Answers</b><span class="muted ty-help">Click a row (or press A, B, C, D) for each student. − takes one off.</span>${LIVE.url ? `<button type="button" class="ty-live">📡 Live from class</button>` : ""}<button class="kw-close" aria-label="Close">✕</button></div>
+    <div class="ty-lbar" hidden><label>Class <select class="ty-cls"><option value="">All</option></select></label><label class="ty-hide"><input type="checkbox" class="ty-hidecb"> 🙈 Hide the counts</label><button type="button" class="ty-fresh" title="Only count answers chosen from now on">↺ Start fresh</button><span class="ty-lst muted small"></span></div>
+    <div class="ty-rows">${[...Array(n)].map((_, i) => `<div class="ty-row" data-i="${i}"><button type="button" class="ty-add" data-i="${i}"><span class="smc-l">${letters[i]}</span><span class="ty-opt">${m.graphs ? `Graph ${letters[i]}` : tex(m.opts[i])}</span><span class="ty-bar"><i></i></span><b class="ty-n">0</b></button><button type="button" class="ty-sub" data-i="${i}" aria-label="One fewer for ${letters[i]}">−</button><div class="ty-who" hidden></div></div>`).join("")}</div><div class="ty-foot"><span class="ty-total"></span><button type="button" class="ty-reset">Reset</button><button type="button" class="ty-show primary">Show the Verdict</button></div><div class="ty-verdict" hidden></div></div>`;
   slideEl.appendChild(md); titleCase(md);
-  const verdict = md.querySelector(".ty-verdict");
+  const verdict = md.querySelector(".ty-verdict"), q = (x) => md.querySelector(x);
   const draw = () => {
     const tot = c.reduce((a, b) => a + b, 0), mx = Math.max(1, ...c);
-    md.querySelectorAll(".ty-row").forEach((r, i) => { r.querySelector(".ty-n").textContent = c[i]; r.querySelector(".ty-bar i").style.width = (c[i] / mx) * 100 + "%"; });
-    md.querySelector(".ty-total").textContent = `${tot} answer${tot === 1 ? "" : "s"}`;
-    if (!verdict.hidden) show();
+    md.querySelectorAll(".ty-row").forEach((r, i) => { r.querySelector(".ty-n").textContent = hide ? "?" : c[i]; r.querySelector(".ty-bar i").style.width = hide ? "0%" : (c[i] / mx) * 100 + "%";
+      const w = r.querySelector(".ty-who"); w.hidden = !(live && !hide && openWho.has(i)); if (!w.hidden) w.innerHTML = who[i].length ? who[i].map((x) => `<span>${esc(x)}</span>`).join("") : `<i class="muted">Nobody yet</i>`; });
+    q(".ty-total").textContent = `${tot} answer${tot === 1 ? "" : "s"}${live ? " in so far" : ""}`;
+    if (!verdict.hidden && !hide) show(true);
   };
-  const show = () => {
-    const tot = c.reduce((a, b) => a + b, 0); verdict.hidden = false; md.querySelector(".ty-panel").classList.add("v");
+  const show = (fromDraw) => {
+    if (hide) { hide = false; q(".ty-hidecb").checked = false; }
+    const tot = c.reduce((a, b) => a + b, 0); verdict.hidden = false; q(".ty-panel").classList.add("v");
     md.querySelectorAll(".ty-row").forEach((r, i) => r.classList.toggle("right", i === ai));
     if (!tot) { verdict.innerHTML = "Add the class's answers first."; return; }
     const pct = Math.round((c[ai] / tot) * 100), wrong = c.map((v, i) => [v, i]).filter(([v, i]) => i !== ai && v > 0).sort((a, b) => b[0] - a[0]);
     const go = pct >= 75;
     verdict.innerHTML = `<div class="ty-call ${go ? "go" : "stop"}">${go ? "Move on" : "Reteach"}: <b>${pct}%</b> chose the right answer, <b>${letters[ai]}</b>.</div>` +
-      (wrong.length ? `<div class="ty-why">${wrong.slice(0, 2).map(([v, i]) => `<div><b>${letters[i]}</b> (${v} student${v === 1 ? "" : "s"}): ${tex((m.why || [])[i] || "")}</div>`).join("")}</div>` : "") +
+      (wrong.length ? `<div class="ty-why">${wrong.slice(0, 2).map(([v, i]) => `<div><b>${letters[i]}</b> (${v} student${v === 1 ? "" : "s"}${live && who[i].length ? `: ${who[i].slice(0, 8).map(esc).join(", ")}${who[i].length > 8 ? "…" : ""}` : ""}): ${tex((m.why || [])[i] || "")}</div>`).join("")}</div>` : "") +
       (m.notes ? `<div class="ty-note"><b>Teacher note:</b> ${tex(m.notes)}</div>` : "");
+    if (!fromDraw) draw();
   };
-  const add = (i, d) => { c[i] = Math.max(0, c[i] + d); draw(); };
+  // live: everyone's choice on the student page, refreshed every 4 seconds
+  async function poll() {
+    clearTimeout(pollT); if (!live || !md.isConnected) return;
+    const key = (() => { try { return localStorage.getItem("jw-live-key") || ""; } catch (e) { return ""; } })();
+    if (!key) { q(".ty-lst").textContent = "Open ⚙ → 📡 Live class once and type your key first."; return; }
+    try {
+      const j = await (await fetch(`${LIVE.url}?t=live&lesson=${encodeURIComponent(L.id)}&key=${encodeURIComponent(key)}`)).json();
+      if (!j.ok) throw new Error(j.error);
+      const all = Object.values(j.students || {}), sel = q(".ty-cls"), classes = [...new Set(all.map((x) => x.cls))].sort();
+      sel.innerHTML = `<option value="">All</option>` + classes.map((k) => `<option${k === cls ? " selected" : ""}>${esc(k)}</option>`).join("");
+      const lc = Array(n).fill(0); who = Array(n).fill(null).map(() => []);
+      all.filter((x) => !cls || x.cls === cls).forEach((x) => { const v = x.mc && x.mc[m.__id]; if (v && v[0] < n && v[1] >= since) { lc[v[0]]++; who[v[0]].push(x.name); } });
+      who.forEach((w) => w.sort((a, b) => a.localeCompare(b)));
+      c = lc; const joined = all.filter((x) => !cls || x.cls === cls).length;
+      q(".ty-lst").textContent = `${c.reduce((a, b) => a + b, 0)} of ${joined} student${joined === 1 ? "" : "s"} have answered · updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
+      draw();
+    } catch (e) { q(".ty-lst").textContent = e.message === "key" ? "Your Live class key wasn't accepted. Re-enter it in ⚙ → 📡 Live class." : "Can't reach the live server. Trying again…"; }
+    pollT = setTimeout(poll, 4000);
+  }
+  const setLive = (on) => {
+    live = on; c = on ? Array(n).fill(0) : manual; q(".ty-lbar").hidden = !on; q(".ty-panel").classList.toggle("live", on);
+    const lb = q(".ty-live"); if (lb) { lb.classList.toggle("on", on); lb.textContent = on ? "✋ Count by hand instead" : "📡 Live from class"; }
+    q(".ty-help").textContent = on ? "Live: students' answers on their page. Click a row to see who chose it." : "Click a row (or press A, B, C, D) for each student. − takes one off.";
+    verdict.hidden = true; q(".ty-panel").classList.remove("v"); md.querySelectorAll(".ty-row").forEach((r) => r.classList.remove("right"));
+    draw(); if (on) poll(); else clearTimeout(pollT);
+  };
+  const add = (i, d) => { if (live) return; manual[i] = Math.max(0, manual[i] + d); draw(); };
   const keys = (e) => { if (!md.isConnected) return document.removeEventListener("keydown", keys); const k = e.key.toUpperCase(), i = "ABCD".indexOf(k) >= 0 ? "ABCD".indexOf(k) : "1234".indexOf(k); if (i >= 0 && i < n) { e.preventDefault(); add(i, e.shiftKey ? -1 : 1); } };
   document.addEventListener("keydown", keys);
+  q(".ty-cls").onchange = (e) => { cls = e.target.value; poll(); };
+  q(".ty-hidecb").onchange = (e) => { hide = e.target.checked; if (hide) { verdict.hidden = true; q(".ty-panel").classList.remove("v"); md.querySelectorAll(".ty-row").forEach((r) => r.classList.remove("right")); } draw(); };
   md.addEventListener("click", (e) => {
     e.stopPropagation();
-    if (e.target === md || e.target.closest(".kw-close")) { md.remove(); document.removeEventListener("keydown", keys); return; }
+    if (e.target === md || e.target.closest(".kw-close")) { md.remove(); clearTimeout(pollT); document.removeEventListener("keydown", keys); return; }
     const b = e.target.closest("button"); if (!b) return;
-    if (b.classList.contains("ty-add")) add(+b.dataset.i, 1);
+    if (b.classList.contains("ty-live")) return setLive(!live);
+    if (b.classList.contains("ty-fresh")) { since = Date.now(); poll(); return; }
+    if (b.classList.contains("ty-add")) { if (live) { const i = +b.dataset.i; openWho.has(i) ? openWho.delete(i) : openWho.add(i); draw(); } else add(+b.dataset.i, 1); }
     if (b.classList.contains("ty-sub")) add(+b.dataset.i, -1);
-    if (b.classList.contains("ty-reset")) { c.fill(0); verdict.hidden = true; md.querySelector(".ty-panel").classList.remove("v"); md.querySelectorAll(".ty-row").forEach((r) => r.classList.remove("right")); draw(); }
-    if (b.classList.contains("ty-show")) show();
+    if (b.classList.contains("ty-reset")) { if (live) { since = Date.now(); poll(); } else manual.fill(0); verdict.hidden = true; q(".ty-panel").classList.remove("v"); md.querySelectorAll(".ty-row").forEach((r) => r.classList.remove("right")); draw(); }
+    if (b.classList.contains("ty-show")) show(false);
   });
   draw();
 }
@@ -2730,7 +2805,7 @@ const STUDENT_ONLY = /*STUDENT_ONLY*/false;
 const save = () => { try { localStorage.setItem(SAVE, JSON.stringify(state)); } catch (e) { /* storage not available */ } if (window.__live) window.__live.beatSoon(); };
 
 function parseNum(s) {
-  let t = String(s).trim().replace(/[−–]/g, "-").replace(/\s+/g, "");
+  let t = String(s).trim().replace(/[−–]/g, "-").replace(/\s+/g, "").replace(/^(-?)£/, "$1").replace(/(\d),(?=\d{3}(\D|$))/g, "$1").replace(/(\d)(p|cm|mm|km|kg|g|m|ml|l|s|m²|cm²|people)$/i, "$1");
   t = t.replace(/[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛]/g, (c) => `${FR[c][0]}/${FR[c][1]}`);
   t = t.replace(/°$/, "");
   const m = t.match(/^(-?)(\d*\.?\d+)(?:\/(\d*\.?\d+))?$/);
@@ -2743,7 +2818,9 @@ function checkPart(spec, val) {
   if (val === undefined || val === null || val === "") return null;
   switch (spec.t) {
     case "yn": case "choice": return val === spec.v;
-    case "num": { const v = parseNum(val); return isFinite(v) && Math.abs(v - spec.v) < 1e-6; }
+    case "num": { const v = parseNum(val); if (!(isFinite(v) && Math.abs(v - spec.v) < 1e-6)) return false;
+      if (spec.keep) { const t = String(val).trim().replace(/[−–]/g, "-").replace(/\s+/g, "").replace(/^(-?)£/, "$1").replace(/,/g, ""); return t.replace(/^(-?)0+(?=\d)/, "$1") === String(spec.keep).replace(/,/g, ""); } // e.g. 3.40 to 2 d.p.: the zero must be written
+      return true; }
     case "eq": { const r = parseLine(val), e = parseLine(spec.v); return !r.error && sameLine(r, e); }
     case "text": { const t = String(val).toLowerCase().replace(/\s+/g, "").replace(/[−–]/g, "-"); return spec.v.includes(t); }
     case "coords": {
@@ -2815,7 +2892,7 @@ function qCard(key, num, numCol, qText, model, parts, extra = "", retry = null) 
     const lab = p.label ? `<label>${esc(p.label)}</label>` : "";
     if (p.t === "yn") return `<div class="part" data-p="${i}">${lab}<button data-val="true">Yes</button><button data-val="false">No</button><span class="res"></span></div>`;
     if (p.t === "choice") return `<div class="part" data-p="${i}">${lab}${p.opts.map((o, k) => `<button data-val="${k}">${tex(o)}</button>`).join("")}<span class="res"></span></div>`;
-    const ph = { num: "e.g. −1/2", eq: "e.g. y = 2x + 1", lines2: "e.g. y = 2x + 1", coords: "e.g. (1, 4), (2, 5)", text: "" }[p.t] || "";
+    const ph = { num: p.ph || (typeof NUM_PH !== "undefined" ? NUM_PH : "e.g. −1/2"), eq: "e.g. y = 2x + 1", lines2: "e.g. y = 2x + 1", coords: "e.g. (1, 4), (2, 5)", text: "" }[p.t] || "";
     return `<div class="part" data-p="${i}">${lab}<input type="text" placeholder="${ph}" aria-label="${esc(p.label || "Answer")}"><span class="res"></span></div>`;
   }).join("");
   const ladder = !/^ex[AB]/.test(key) && (LIVE.url || (retry && (retry.hint || retry.how)));
@@ -3060,6 +3137,7 @@ function buildStudent() {
       pb.appendChild(qCard(`prob${ci}`, "?", "var(--purple)", `${P.context} ${P.question}`, P.answer.join(" "), CHECKS.problem[0], `<div class="small muted">Think about: ${P.think.map(tex).join(" ")}</div>`));
       d.appendChild(pb);
     }
+    if (cy.hinge) { const hh = document.createElement("div"); hh.innerHTML = `<h2 style="font-size:22px">Hinge question</h2><p class="intro">Choose your answer when your teacher asks.</p>`; hh.appendChild(studentMCQ(cy.hinge, `hinge${ci}`, "Hinge")); d.appendChild(hh); }
     return d;
   }
   const open = (k) => {
@@ -5086,7 +5164,7 @@ window.__live = (() => {
     const bu = typeof BUILDUP === "object" && BUILDUP ? Object.keys(BUILDUP).map((ci) => `${(state["bu" + ci] && state["bu" + ci].done) || 0}/${BUILDUP[ci].cards.length}`).join(" ") : "";
     let ans; try { const a = JSON.stringify(answersNow()); if (a !== lastAns || ++ansN % 5 === 0) { ans = a.length < 90000 ? JSON.parse(a) : undefined; lastAns = a; } } catch (e) { /* answers are optional */ }
     const npl = state.npLast && state.np && state.np[state.npLast] && NP.has(state.npLast) ? { k: state.npLast, at: state.np[state.npLast].upd || 0 } : undefined;
-    return { t, ans, npl, lesson: L.id, name: String(state.name || "").trim(), cls: String(state.cls || "").trim(), vis: document.hidden ? "hidden" : "visible", focus: document.hasFocus(), idle: Math.round((Date.now() - lastInput) / 1000), sec: btn ? btn.textContent.trim() : "", bu, r: rows.map((r) => (r.ok ? "1" : r.tried ? "2" : "0")).join(""), w: rows.map((r) => Math.min(9, r.wrong || 0)).join(""), help: state.help && !state.help.seen ? state.help : null, np: NP.index() };
+    return { t, ans, npl, mc: state.mcp || {}, lesson: L.id, name: String(state.name || "").trim(), cls: String(state.cls || "").trim(), vis: document.hidden ? "hidden" : "visible", focus: document.hasFocus(), idle: Math.round((Date.now() - lastInput) / 1000), sec: btn ? btn.textContent.trim() : "", bu, r: rows.map((r) => (r.ok ? "1" : r.tried ? "2" : "0")).join(""), w: rows.map((r) => Math.min(9, r.wrong || 0)).join(""), help: state.help && !state.help.seen ? state.help : null, np: NP.index() };
   }
   function send(t) {
     if (!started) return; const p = payload(t); if (!p.name) return; const body = JSON.stringify(p);

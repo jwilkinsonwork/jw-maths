@@ -291,13 +291,22 @@ button.primary { background: var(--ink); color: #fff; border-color: var(--ink); 
 .pq-arrow small { font: 700 .45em var(--body); }
 .ty-panel, .np-panel { background: #fff; border: 2px solid var(--ink); border-radius: 8px; box-shadow: 6px 6px 0 var(--ink); width: 1000px; max-height: 640px; padding: 16px 24px 18px; display: flex; flex-direction: column; gap: 12px; animation: kwpop .25s ease-out; overflow: auto; }
 .ty-rows { display: flex; flex-direction: column; gap: 10px; }
-.ty-row { display: flex; gap: 8px; align-items: stretch; }
+.ty-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; } .ty-row > .ty-add { flex: 1; }
 .ty-add { flex: 1; display: grid; grid-template-columns: 56px minmax(0, 1.3fr) minmax(0, 1fr) 60px; align-items: center; gap: 14px; padding: 8px 14px; text-align: left; font: 600 22px var(--body); border-radius: 8px; box-shadow: -3px 3px 0 var(--ink); }
 .ty-add:hover { background: #FFF8D6; }
 .ty-bar { height: 26px; background: #EEF1F7; border-radius: 4px; overflow: hidden; } .ty-bar i { display: block; height: 100%; width: 0; background: var(--blue, #2F5BD3); transition: width .2s; }
 .ty-n { font: 700 32px var(--display); text-align: right; }
 .ty-sub { width: 52px; font-size: 26px; border-radius: 8px; }
 .ty-row.right .ty-add { border-color: #1E8E4E; background: #DDF5E5; } .ty-row.right .ty-bar i { background: #1E8E4E; }
+.ty-live { font: 800 14px var(--body); padding: 5px 12px; border: 2px solid var(--blue); border-radius: 8px; background: #EEF3FF; color: var(--blue); cursor: pointer; }
+.ty-live.on { background: #fff; color: var(--ink); border-color: var(--ink); }
+.ty-lbar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 8px 12px; margin: 0 0 8px; background: #EEF3FF; border-radius: 10px; font: 700 15px var(--body); }
+.ty-lbar[hidden] { display: none; } .ty-lbar select { font: 700 15px var(--body); }
+.ty-lbar button { font: 800 14px var(--body); padding: 4px 10px; border: 2px solid var(--ink); border-radius: 8px; background: #fff; cursor: pointer; }
+.ty-lst { flex-basis: 100%; }
+.ty-panel.live .ty-sub { visibility: hidden; }
+.ty-who { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 4px 6px; padding: 4px 8px 8px 52px; font: 700 14px var(--body); }
+.ty-who[hidden] { display: none; } .ty-who span { background: #F1F3F8; border-radius: 10px; padding: 1px 8px; }
 .ty-foot { display: flex; align-items: center; gap: 12px; } .ty-total { flex: 1; font-size: 18px; color: var(--ink2); }
 .ty-foot .primary { background: var(--hl, #FFE66D); color: var(--ink); }
 .ty-panel.v .ty-add { padding: 4px 14px; font-size: 18px; } .ty-panel.v .ty-n { font-size: 26px; } .ty-panel.v .smc-l { width: 40px; height: 40px; font-size: 24px; } .ty-panel.v .ty-rows { gap: 6px; }
@@ -2996,6 +3005,7 @@ function buildSlides() {
   slide("plen", "Plenary", head("plen", "Plenary") + `<div class="sbody"><div class="col"><div class="big" style="font-weight:800">${tex(L.plenary.q)}</div><div class="mid muted">${tex(L.plenary.follow || "")}</div></div><div class="svgwrap" style="width:400px">${graph(L.plenary.graph || {}, 400)}</div></div>`);
 }
 const TALLY = []; // the multiple-choice and hinge questions, so the tally knows the answer and the misconceptions
+(L.cycles || []).forEach((cy, ci) => { (cy.mcqs || []).forEach((m, mi) => (m.__id = `${ci}m${mi}`)); if (cy.hinge) cy.hinge.__id = `${ci}h`; });
 function mcqHTML(kind, title, m) {
   const ti = TALLY.push(m) - 1;
   const ai = letters.indexOf(m.ans);
@@ -3246,13 +3256,13 @@ function studentMCQ(m, key, num) {
   const opts = m.graphs
     ? m.graphs.map((g, i) => `<button type="button" class="smc-opt smc-g" data-i="${i}" aria-pressed="false"><span class="smc-l">${letters[i]}</span><span class="svgwrap">${graph(g, 260)}</span></button>`).join("")
     : m.opts.map((o, i) => `<button type="button" class="smc-opt" data-i="${i}" aria-pressed="false"><span class="smc-l">${letters[i]}</span><span class="smc-t">${tex(o)}</span></button>`).join("");
-  el.innerHTML = `<div class="qt"><span class="qn" style="background:var(--blue)">Multiple choice ${num}</span><span class="smc-q">${tex(m.q)}</span></div><div class="smc-body"><div class="smc-grid${m.graphs ? " smc-grid4" : ""}">${opts}</div><div class="smc-show" aria-live="polite"><span class="smc-show-h">My answer</span><span class="smc-big">?</span></div></div>`;
+  el.innerHTML = `<div class="qt"><span class="qn" style="background:${num === "Hinge" ? "var(--coral)" : "var(--blue)"}">${num === "Hinge" ? "Hinge question" : `Multiple choice ${num}`}</span><span class="smc-q">${tex(m.q)}</span></div><div class="smc-body"><div class="smc-grid${m.graphs ? " smc-grid4" : ""}">${opts}</div><div class="smc-show" aria-live="polite"><span class="smc-show-h">My answer</span><span class="smc-big">?</span></div></div>`;
   const pick = (i) => {
     el.querySelectorAll(".smc-opt").forEach((b) => { const on = +b.dataset.i === i; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
     el.querySelector(".smc-big").textContent = i === undefined ? "?" : letters[i];
     el.querySelector(".smc-show").classList.toggle("set", i !== undefined);
   };
-  el.querySelectorAll(".smc-opt").forEach((b) => (b.onclick = () => { const i = +b.dataset.i; state[key] = { pick: i }; save(); pick(i); }));
+  el.querySelectorAll(".smc-opt").forEach((b) => (b.onclick = () => { const i = +b.dataset.i; state[key] = { pick: i }; if (m.__id) { state.mcp = state.mcp || {}; state.mcp[m.__id] = [i, Date.now()]; } save(); pick(i); if (window.__live) window.__live.beatSoon(400); }));
   pick(st.pick);
   return el;
 }
@@ -3332,38 +3342,74 @@ function openPrereq(slideEl) {
 // ---------- multiple choice and hinge: tally the class's answers ----------
 const TALLY_COUNTS = {};
 function openTally(slideEl, ti) {
-  const m = TALLY[ti], ai = letters.indexOf(m.ans), n = (m.graphs || m.opts).length, c = TALLY_COUNTS[ti] || (TALLY_COUNTS[ti] = Array(n).fill(0));
+  const m = TALLY[ti], ai = letters.indexOf(m.ans), n = (m.graphs || m.opts).length, manual = TALLY_COUNTS[ti] || (TALLY_COUNTS[ti] = Array(n).fill(0));
+  let c = manual, live = false, hide = false, since = 0, who = Array(n).fill(null).map(() => []), pollT = null, cls = "", openWho = new Set();
   const md = document.createElement("div"); md.className = "kw-modal";
-  md.innerHTML = `<div class="ty-panel" role="dialog" aria-label="Tally the answers"><div class="mt-head"><b>Tally the Answers</b><span class="muted">Click a row (or press A, B, C, D) for each student. − takes one off.</span><button class="kw-close" aria-label="Close">✕</button></div><div class="ty-rows">${[...Array(n)].map((_, i) => `<div class="ty-row" data-i="${i}"><button type="button" class="ty-add" data-i="${i}"><span class="smc-l">${letters[i]}</span><span class="ty-opt">${m.graphs ? `Graph ${letters[i]}` : tex(m.opts[i])}</span><span class="ty-bar"><i></i></span><b class="ty-n">0</b></button><button type="button" class="ty-sub" data-i="${i}" aria-label="One fewer for ${letters[i]}">−</button></div>`).join("")}</div><div class="ty-foot"><span class="ty-total"></span><button type="button" class="ty-reset">Reset</button><button type="button" class="ty-show primary">Show the Verdict</button></div><div class="ty-verdict" hidden></div></div>`;
+  md.innerHTML = `<div class="ty-panel" role="dialog" aria-label="Tally the answers"><div class="mt-head"><b>Tally the Answers</b><span class="muted ty-help">Click a row (or press A, B, C, D) for each student. − takes one off.</span>${LIVE.url ? `<button type="button" class="ty-live">📡 Live from class</button>` : ""}<button class="kw-close" aria-label="Close">✕</button></div>
+    <div class="ty-lbar" hidden><label>Class <select class="ty-cls"><option value="">All</option></select></label><label class="ty-hide"><input type="checkbox" class="ty-hidecb"> 🙈 Hide the counts</label><button type="button" class="ty-fresh" title="Only count answers chosen from now on">↺ Start fresh</button><span class="ty-lst muted small"></span></div>
+    <div class="ty-rows">${[...Array(n)].map((_, i) => `<div class="ty-row" data-i="${i}"><button type="button" class="ty-add" data-i="${i}"><span class="smc-l">${letters[i]}</span><span class="ty-opt">${m.graphs ? `Graph ${letters[i]}` : tex(m.opts[i])}</span><span class="ty-bar"><i></i></span><b class="ty-n">0</b></button><button type="button" class="ty-sub" data-i="${i}" aria-label="One fewer for ${letters[i]}">−</button><div class="ty-who" hidden></div></div>`).join("")}</div><div class="ty-foot"><span class="ty-total"></span><button type="button" class="ty-reset">Reset</button><button type="button" class="ty-show primary">Show the Verdict</button></div><div class="ty-verdict" hidden></div></div>`;
   slideEl.appendChild(md); titleCase(md);
-  const verdict = md.querySelector(".ty-verdict");
+  const verdict = md.querySelector(".ty-verdict"), q = (x) => md.querySelector(x);
   const draw = () => {
     const tot = c.reduce((a, b) => a + b, 0), mx = Math.max(1, ...c);
-    md.querySelectorAll(".ty-row").forEach((r, i) => { r.querySelector(".ty-n").textContent = c[i]; r.querySelector(".ty-bar i").style.width = (c[i] / mx) * 100 + "%"; });
-    md.querySelector(".ty-total").textContent = `${tot} answer${tot === 1 ? "" : "s"}`;
-    if (!verdict.hidden) show();
+    md.querySelectorAll(".ty-row").forEach((r, i) => { r.querySelector(".ty-n").textContent = hide ? "?" : c[i]; r.querySelector(".ty-bar i").style.width = hide ? "0%" : (c[i] / mx) * 100 + "%";
+      const w = r.querySelector(".ty-who"); w.hidden = !(live && !hide && openWho.has(i)); if (!w.hidden) w.innerHTML = who[i].length ? who[i].map((x) => `<span>${esc(x)}</span>`).join("") : `<i class="muted">Nobody yet</i>`; });
+    q(".ty-total").textContent = `${tot} answer${tot === 1 ? "" : "s"}${live ? " in so far" : ""}`;
+    if (!verdict.hidden && !hide) show(true);
   };
-  const show = () => {
-    const tot = c.reduce((a, b) => a + b, 0); verdict.hidden = false; md.querySelector(".ty-panel").classList.add("v");
+  const show = (fromDraw) => {
+    if (hide) { hide = false; q(".ty-hidecb").checked = false; }
+    const tot = c.reduce((a, b) => a + b, 0); verdict.hidden = false; q(".ty-panel").classList.add("v");
     md.querySelectorAll(".ty-row").forEach((r, i) => r.classList.toggle("right", i === ai));
     if (!tot) { verdict.innerHTML = "Add the class's answers first."; return; }
     const pct = Math.round((c[ai] / tot) * 100), wrong = c.map((v, i) => [v, i]).filter(([v, i]) => i !== ai && v > 0).sort((a, b) => b[0] - a[0]);
     const go = pct >= 75;
     verdict.innerHTML = `<div class="ty-call ${go ? "go" : "stop"}">${go ? "Move on" : "Reteach"}: <b>${pct}%</b> chose the right answer, <b>${letters[ai]}</b>.</div>` +
-      (wrong.length ? `<div class="ty-why">${wrong.slice(0, 2).map(([v, i]) => `<div><b>${letters[i]}</b> (${v} student${v === 1 ? "" : "s"}): ${tex((m.why || [])[i] || "")}</div>`).join("")}</div>` : "") +
+      (wrong.length ? `<div class="ty-why">${wrong.slice(0, 2).map(([v, i]) => `<div><b>${letters[i]}</b> (${v} student${v === 1 ? "" : "s"}${live && who[i].length ? `: ${who[i].slice(0, 8).map(esc).join(", ")}${who[i].length > 8 ? "…" : ""}` : ""}): ${tex((m.why || [])[i] || "")}</div>`).join("")}</div>` : "") +
       (m.notes ? `<div class="ty-note"><b>Teacher note:</b> ${tex(m.notes)}</div>` : "");
+    if (!fromDraw) draw();
   };
-  const add = (i, d) => { c[i] = Math.max(0, c[i] + d); draw(); };
+  // live: everyone's choice on the student page, refreshed every 4 seconds
+  async function poll() {
+    clearTimeout(pollT); if (!live || !md.isConnected) return;
+    const key = (() => { try { return localStorage.getItem("jw-live-key") || ""; } catch (e) { return ""; } })();
+    if (!key) { q(".ty-lst").textContent = "Open ⚙ → 📡 Live class once and type your key first."; return; }
+    try {
+      const j = await (await fetch(`${LIVE.url}?t=live&lesson=${encodeURIComponent(L.id)}&key=${encodeURIComponent(key)}`)).json();
+      if (!j.ok) throw new Error(j.error);
+      const all = Object.values(j.students || {}), sel = q(".ty-cls"), classes = [...new Set(all.map((x) => x.cls))].sort();
+      sel.innerHTML = `<option value="">All</option>` + classes.map((k) => `<option${k === cls ? " selected" : ""}>${esc(k)}</option>`).join("");
+      const lc = Array(n).fill(0); who = Array(n).fill(null).map(() => []);
+      all.filter((x) => !cls || x.cls === cls).forEach((x) => { const v = x.mc && x.mc[m.__id]; if (v && v[0] < n && v[1] >= since) { lc[v[0]]++; who[v[0]].push(x.name); } });
+      who.forEach((w) => w.sort((a, b) => a.localeCompare(b)));
+      c = lc; const joined = all.filter((x) => !cls || x.cls === cls).length;
+      q(".ty-lst").textContent = `${c.reduce((a, b) => a + b, 0)} of ${joined} student${joined === 1 ? "" : "s"} have answered · updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
+      draw();
+    } catch (e) { q(".ty-lst").textContent = e.message === "key" ? "Your Live class key wasn't accepted. Re-enter it in ⚙ → 📡 Live class." : "Can't reach the live server. Trying again…"; }
+    pollT = setTimeout(poll, 4000);
+  }
+  const setLive = (on) => {
+    live = on; c = on ? Array(n).fill(0) : manual; q(".ty-lbar").hidden = !on; q(".ty-panel").classList.toggle("live", on);
+    const lb = q(".ty-live"); if (lb) { lb.classList.toggle("on", on); lb.textContent = on ? "✋ Count by hand instead" : "📡 Live from class"; }
+    q(".ty-help").textContent = on ? "Live: students' answers on their page. Click a row to see who chose it." : "Click a row (or press A, B, C, D) for each student. − takes one off.";
+    verdict.hidden = true; q(".ty-panel").classList.remove("v"); md.querySelectorAll(".ty-row").forEach((r) => r.classList.remove("right"));
+    draw(); if (on) poll(); else clearTimeout(pollT);
+  };
+  const add = (i, d) => { if (live) return; manual[i] = Math.max(0, manual[i] + d); draw(); };
   const keys = (e) => { if (!md.isConnected) return document.removeEventListener("keydown", keys); const k = e.key.toUpperCase(), i = "ABCD".indexOf(k) >= 0 ? "ABCD".indexOf(k) : "1234".indexOf(k); if (i >= 0 && i < n) { e.preventDefault(); add(i, e.shiftKey ? -1 : 1); } };
   document.addEventListener("keydown", keys);
+  q(".ty-cls").onchange = (e) => { cls = e.target.value; poll(); };
+  q(".ty-hidecb").onchange = (e) => { hide = e.target.checked; if (hide) { verdict.hidden = true; q(".ty-panel").classList.remove("v"); md.querySelectorAll(".ty-row").forEach((r) => r.classList.remove("right")); } draw(); };
   md.addEventListener("click", (e) => {
     e.stopPropagation();
-    if (e.target === md || e.target.closest(".kw-close")) { md.remove(); document.removeEventListener("keydown", keys); return; }
+    if (e.target === md || e.target.closest(".kw-close")) { md.remove(); clearTimeout(pollT); document.removeEventListener("keydown", keys); return; }
     const b = e.target.closest("button"); if (!b) return;
-    if (b.classList.contains("ty-add")) add(+b.dataset.i, 1);
+    if (b.classList.contains("ty-live")) return setLive(!live);
+    if (b.classList.contains("ty-fresh")) { since = Date.now(); poll(); return; }
+    if (b.classList.contains("ty-add")) { if (live) { const i = +b.dataset.i; openWho.has(i) ? openWho.delete(i) : openWho.add(i); draw(); } else add(+b.dataset.i, 1); }
     if (b.classList.contains("ty-sub")) add(+b.dataset.i, -1);
-    if (b.classList.contains("ty-reset")) { c.fill(0); verdict.hidden = true; md.querySelector(".ty-panel").classList.remove("v"); md.querySelectorAll(".ty-row").forEach((r) => r.classList.remove("right")); draw(); }
-    if (b.classList.contains("ty-show")) show();
+    if (b.classList.contains("ty-reset")) { if (live) { since = Date.now(); poll(); } else manual.fill(0); verdict.hidden = true; q(".ty-panel").classList.remove("v"); md.querySelectorAll(".ty-row").forEach((r) => r.classList.remove("right")); draw(); }
+    if (b.classList.contains("ty-show")) show(false);
   });
   draw();
 }
@@ -4227,6 +4273,7 @@ function buildStudent() {
       pb.appendChild(qCard(`prob${ci}`, "?", "var(--purple)", `${P.context} ${P.question}`, P.answer.join(" "), CHECKS.problem[0], `<div class="small muted">Think about: ${P.think.map(tex).join(" ")}</div>`));
       d.appendChild(pb);
     }
+    if (cy.hinge) { const hh = document.createElement("div"); hh.innerHTML = `<h2 style="font-size:22px">Hinge question</h2><p class="intro">Choose your answer when your teacher asks.</p>`; hh.appendChild(studentMCQ(cy.hinge, `hinge${ci}`, "Hinge")); d.appendChild(hh); }
     return d;
   }
   const open = (k) => {
@@ -5763,7 +5810,7 @@ window.__live = (() => {
     const bu = typeof BUILDUP === "object" && BUILDUP ? Object.keys(BUILDUP).map((ci) => `${(state["bu" + ci] && state["bu" + ci].done) || 0}/${BUILDUP[ci].cards.length}`).join(" ") : "";
     let ans; try { const a = JSON.stringify(answersNow()); if (a !== lastAns || ++ansN % 5 === 0) { ans = a.length < 90000 ? JSON.parse(a) : undefined; lastAns = a; } } catch (e) { /* answers are optional */ }
     const npl = state.npLast && state.np && state.np[state.npLast] && NP.has(state.npLast) ? { k: state.npLast, at: state.np[state.npLast].upd || 0 } : undefined;
-    return { t, ans, npl, lesson: L.id, name: String(state.name || "").trim(), cls: String(state.cls || "").trim(), vis: document.hidden ? "hidden" : "visible", focus: document.hasFocus(), idle: Math.round((Date.now() - lastInput) / 1000), sec: btn ? btn.textContent.trim() : "", bu, r: rows.map((r) => (r.ok ? "1" : r.tried ? "2" : "0")).join(""), w: rows.map((r) => Math.min(9, r.wrong || 0)).join(""), help: state.help && !state.help.seen ? state.help : null, np: NP.index() };
+    return { t, ans, npl, mc: state.mcp || {}, lesson: L.id, name: String(state.name || "").trim(), cls: String(state.cls || "").trim(), vis: document.hidden ? "hidden" : "visible", focus: document.hasFocus(), idle: Math.round((Date.now() - lastInput) / 1000), sec: btn ? btn.textContent.trim() : "", bu, r: rows.map((r) => (r.ok ? "1" : r.tried ? "2" : "0")).join(""), w: rows.map((r) => Math.min(9, r.wrong || 0)).join(""), help: state.help && !state.help.seen ? state.help : null, np: NP.index() };
   }
   function send(t) {
     if (!started) return; const p = payload(t); if (!p.name) return; const body = JSON.stringify(p);

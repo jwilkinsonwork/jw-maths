@@ -291,13 +291,22 @@ button.primary { background: var(--ink); color: #fff; border-color: var(--ink); 
 .pq-arrow small { font: 700 .45em var(--body); }
 .ty-panel, .np-panel { background: #fff; border: 2px solid var(--ink); border-radius: 8px; box-shadow: 6px 6px 0 var(--ink); width: 1000px; max-height: 640px; padding: 16px 24px 18px; display: flex; flex-direction: column; gap: 12px; animation: kwpop .25s ease-out; overflow: auto; }
 .ty-rows { display: flex; flex-direction: column; gap: 10px; }
-.ty-row { display: flex; gap: 8px; align-items: stretch; }
+.ty-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; } .ty-row > .ty-add { flex: 1; }
 .ty-add { flex: 1; display: grid; grid-template-columns: 56px minmax(0, 1.3fr) minmax(0, 1fr) 60px; align-items: center; gap: 14px; padding: 8px 14px; text-align: left; font: 600 22px var(--body); border-radius: 8px; box-shadow: -3px 3px 0 var(--ink); }
 .ty-add:hover { background: #FFF8D6; }
 .ty-bar { height: 26px; background: #EEF1F7; border-radius: 4px; overflow: hidden; } .ty-bar i { display: block; height: 100%; width: 0; background: var(--blue, #2F5BD3); transition: width .2s; }
 .ty-n { font: 700 32px var(--display); text-align: right; }
 .ty-sub { width: 52px; font-size: 26px; border-radius: 8px; }
 .ty-row.right .ty-add { border-color: #1E8E4E; background: #DDF5E5; } .ty-row.right .ty-bar i { background: #1E8E4E; }
+.ty-live { font: 800 14px var(--body); padding: 5px 12px; border: 2px solid var(--blue); border-radius: 8px; background: #EEF3FF; color: var(--blue); cursor: pointer; }
+.ty-live.on { background: #fff; color: var(--ink); border-color: var(--ink); }
+.ty-lbar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 8px 12px; margin: 0 0 8px; background: #EEF3FF; border-radius: 10px; font: 700 15px var(--body); }
+.ty-lbar[hidden] { display: none; } .ty-lbar select { font: 700 15px var(--body); }
+.ty-lbar button { font: 800 14px var(--body); padding: 4px 10px; border: 2px solid var(--ink); border-radius: 8px; background: #fff; cursor: pointer; }
+.ty-lst { flex-basis: 100%; }
+.ty-panel.live .ty-sub { visibility: hidden; }
+.ty-who { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 4px 6px; padding: 4px 8px 8px 52px; font: 700 14px var(--body); }
+.ty-who[hidden] { display: none; } .ty-who span { background: #F1F3F8; border-radius: 10px; padding: 1px 8px; }
 .ty-foot { display: flex; align-items: center; gap: 12px; } .ty-total { flex: 1; font-size: 18px; color: var(--ink2); }
 .ty-foot .primary { background: var(--hl, #FFE66D); color: var(--ink); }
 .ty-panel.v .ty-add { padding: 4px 14px; font-size: 18px; } .ty-panel.v .ty-n { font-size: 26px; } .ty-panel.v .smc-l { width: 40px; height: 40px; font-size: 24px; } .ty-panel.v .ty-rows { gap: 6px; }
@@ -1103,8 +1112,36 @@ function venn(v, px = 300) {
   out.forEach((s, i) => { g += t(i % 2 ? W - fs * 0.6 : fs * 0.6, H - fs * 0.7 - Math.floor(i / 2) * fs * 1.3, s, { anchor: i % 2 ? "end" : "start" }); });
   return g + `</svg>`;
 }
+// a number line for rounding: ticks, labels, marked values, the halfway point, a bracket for a range, and arrows to the rounded value
+function nline(o, px = 300) {
+  const W = px * 1.6, H = px * 0.62, pad = W * 0.07, base = H * 0.6, fs = Math.max(12, W / 19), span = o.to - o.from;
+  const X = (v) => pad + ((v - o.from) / span) * (W - 2 * pad), near = (a, b) => Math.abs(a - b) < span * 1e-6;
+  const fmt = (v) => { const dp = o.dp !== undefined ? o.dp : (String(o.major || 1).split(".")[1] || "").length; let t = Math.abs(v).toFixed(dp); const [a, b] = t.split("."); t = a.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (b ? "." + b : ""); return (v < 0 ? "−" : "") + (o.money ? "£" : "") + t + (o.unit || ""); };
+  const fmtX = (v) => { const d = (String(+(+v).toFixed(10)).split(".")[1] || "").length, dp0 = o.dp !== undefined ? o.dp : 0, dp = o.money && d ? 2 : Math.max(dp0, d); let t = Math.abs(v).toFixed(dp); const [a, b] = t.split("."); return (v < 0 ? "−" : "") + (o.money ? "£" : "") + a.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (b ? "." + b : ""); }; // a value that may need more decimals than the labels
+  let g = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Number line from ${fmt(o.from)} to ${fmt(o.to)}"><rect x="1" y="1" width="${W - 2}" height="${H - 2}" rx="${fs * 0.6}" fill="#fff"/>`;
+  if (o.hl) g += `<rect x="${X(o.hl.from)}" y="${base - fs * 0.55}" width="${X(o.hl.to) - X(o.hl.from)}" height="${fs * 1.1}" rx="${fs * 0.3}" fill="${col(o.hl.color, "var(--amber)")}" fill-opacity=".28"/>`;
+  g += `<line x1="${pad * 0.4}" y1="${base}" x2="${W - pad * 0.4}" y2="${base}" stroke="#23264A" stroke-width="${W / 260}" stroke-linecap="round"/>`;
+  const minor = o.minor || (o.major || 1) / 10, major = o.major || minor * 10, n = Math.round(span / minor);
+  for (let i = 0; i <= n; i++) { const v = o.from + i * minor, big = near(Math.round((v - o.from) / major) * major + o.from, v), x = X(v), h = big ? fs * 0.85 : fs * 0.42;
+    g += `<line x1="${x}" y1="${base - h}" x2="${x}" y2="${base + h}" stroke="#23264A" stroke-width="${big ? W / 330 : W / 600}"/>`;
+    if (big && o.labels !== false && !(o.hide || []).some((h2) => near(h2, v))) g += `<text x="${x}" y="${base + fs * 2.1}" font-size="${fs}" text-anchor="middle" font-weight="700" fill="#23264A" font-family="Nunito,sans-serif">${fmt(v)}</text>`; }
+  (o.extra || []).forEach((v) => (g += `<text x="${X(v)}" y="${base + fs * 2.1}" font-size="${fs * 0.85}" text-anchor="middle" font-weight="700" fill="#4A4F75" font-family="Nunito,sans-serif">${fmt(v)}</text>`));
+  if (o.half !== undefined) g += `<line x1="${X(o.half)}" y1="${base - fs * 2.2}" x2="${X(o.half)}" y2="${base + fs * 0.9}" stroke="var(--purple)" stroke-width="${W / 300}" stroke-dasharray="${fs * 0.35} ${fs * 0.25}"/><text x="${X(o.half)}" y="${base - fs * 2.5}" font-size="${fs * 0.8}" text-anchor="middle" font-weight="800" fill="var(--purple)" font-family="Nunito,sans-serif">halfway ${o.halfLabel === false ? "" : fmtX(o.half)}</text>`;
+  if (o.bracket) { const b = o.bracket, y = base - fs * 1.6, c = col(b.color, "var(--teal)");
+    g += `<line x1="${X(b.from)}" y1="${y}" x2="${X(b.to)}" y2="${y}" stroke="${c}" stroke-width="${W / 160}"/>`;
+    [["from", b.loOpen], ["to", b.hiOpen]].forEach(([k, open]) => (g += `<circle cx="${X(b[k])}" cy="${y}" r="${fs * 0.32}" fill="${open ? "#fff" : c}" stroke="${c}" stroke-width="${W / 300}"/>`));
+    if (b.label) g += `<text x="${(X(b.from) + X(b.to)) / 2}" y="${y - fs * 0.6}" font-size="${fs * 0.9}" text-anchor="middle" font-weight="800" fill="${c}" font-family="Nunito,sans-serif">${esc(b.label)}</text>`; }
+  (o.arrows || []).forEach((a) => { const x1 = X(a.from), x2 = X(a.to), c = col(a.color, "var(--teal)"), up = base - fs * (a.high || 1.4), mx = (x1 + x2) / 2;
+    g += `<path d="M ${x1} ${base - fs * 0.5} Q ${mx} ${up - fs * 1.2} ${x2} ${base - fs * 0.6}" fill="none" stroke="${c}" stroke-width="${W / 280}" marker-end="url(#nlar)"/>`; });
+  (o.marks || []).forEach((m) => { const x = X(m.v), c = col(m.color, "var(--coral)"), y = base - fs * (m.lift || 1.1);
+    g += `<path d="M ${x} ${base - fs * 0.15} l ${-fs * 0.42} ${-fs * 0.75} h ${fs * 0.84} z" fill="${c}"/>`;
+    if (m.label !== "") g += `<text x="${x}" y="${y - fs * 0.15}" font-size="${fs * (m.size || 1.05)}" text-anchor="${m.anchor || "middle"}" font-weight="800" fill="${c}" font-family="Nunito,sans-serif">${esc(m.label !== undefined ? m.label : fmtX(m.v))}</text>`; });
+  if (o.arrows && o.arrows.length) g = g.replace(`role="img"`, `role="img"`) + `<defs><marker id="nlar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="${fs * 0.5}" markerHeight="${fs * 0.5}" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--teal)"/></marker></defs>`;
+  return g + `</svg>`;
+}
 function graph(spec = {}, px = 300) {
   if (spec.venn) return venn(spec.venn, px);
+  if (spec.nl) return nline(spec.nl, px);
   const [x0, x1, xs] = spec.xr || [-5, 5, 1], [y0, y1, ys] = spec.yr || [-5, 5, 1];
   const pad = 26, W = px, H = px, iw = W - 2 * pad, ih = H - 2 * pad;
   const X = (x) => pad + ((x - x0) / (x1 - x0)) * iw, Y = (y) => H - pad - ((y - y0) / (y1 - y0)) * ih;
@@ -1629,7 +1666,8 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
   function build(i) {
     const c = cards[i], Q = c.spec.make(); c.built = true;
     c.el.innerHTML = `<div class="bu-head"><span class="bu-num">Card ${i + 1} of ${N}</span><b>${tex(c.spec.title)}</b>${c.spec.sub ? `<span class="bu-new">${tex(c.spec.sub)}</span>` : ""}${!big ? `<button type="button" class="askhelp" style="margin-left:auto;float:none" data-buladder>💡 Help</button>` : ""}</div><div class="bu-body"><div class="bu-g"></div><div class="bu-side"><div class="bu-q">${tex(Q.q)}</div>${c.spec.remind || Q.remind ? `<div class="bu-remind"><span class="bu-rtag">Reminder</span> ${c.spec.remind || Q.remind}</div>` : ""}<div class="bu-steps"></div><div class="bu-endslot"></div></div></div>`;
-    const G = buGrid(c.el.querySelector(".bu-g"), Q.line, big ? 440 : 390, { lines: Q.lines, points: Q.points }), ctx = { Q, G }; c.el.__bu = ctx;
+    const noop = () => {}, G = Q.spec ? (() => { const gh = c.el.querySelector(".bu-g"); gh.classList.add("bu-nl"); gh.innerHTML = graph(Q.spec, big ? 440 : 390); return { flash: noop, drawTri: noop, useLine: noop, clear: noop, setPicking: noop, lattice: noop, show: (sp) => (gh.innerHTML = graph(sp, big ? 440 : 390)) }; })()
+      : buGrid(c.el.querySelector(".bu-g"), Q.line, big ? 440 : 390, { lines: Q.lines, points: Q.points }), ctx = { Q, G }; c.el.__bu = ctx;
     if (Q.tri) G.drawTri(Q.tri[0], Q.tri[1]);
     const hl = c.el.querySelector("[data-buladder]"); let hlv = 0;
     if (hl) hl.onclick = () => {
@@ -1833,6 +1871,7 @@ function buildSlides() {
   slide("plen", "Plenary", head("plen", "Plenary") + `<div class="sbody"><div class="col"><div class="big" style="font-weight:800">${tex(L.plenary.q)}</div><div class="mid muted">${tex(L.plenary.follow || "")}</div></div><div class="svgwrap" style="width:400px">${graph(L.plenary.graph || {}, 400)}</div></div>`);
 }
 const TALLY = []; // the multiple-choice and hinge questions, so the tally knows the answer and the misconceptions
+(L.cycles || []).forEach((cy, ci) => { (cy.mcqs || []).forEach((m, mi) => (m.__id = `${ci}m${mi}`)); if (cy.hinge) cy.hinge.__id = `${ci}h`; });
 function mcqHTML(kind, title, m) {
   const ti = TALLY.push(m) - 1;
   const ai = letters.indexOf(m.ans);
@@ -2083,13 +2122,13 @@ function studentMCQ(m, key, num) {
   const opts = m.graphs
     ? m.graphs.map((g, i) => `<button type="button" class="smc-opt smc-g" data-i="${i}" aria-pressed="false"><span class="smc-l">${letters[i]}</span><span class="svgwrap">${graph(g, 260)}</span></button>`).join("")
     : m.opts.map((o, i) => `<button type="button" class="smc-opt" data-i="${i}" aria-pressed="false"><span class="smc-l">${letters[i]}</span><span class="smc-t">${tex(o)}</span></button>`).join("");
-  el.innerHTML = `<div class="qt"><span class="qn" style="background:var(--blue)">Multiple choice ${num}</span><span class="smc-q">${tex(m.q)}</span></div><div class="smc-body"><div class="smc-grid${m.graphs ? " smc-grid4" : ""}">${opts}</div><div class="smc-show" aria-live="polite"><span class="smc-show-h">My answer</span><span class="smc-big">?</span></div></div>`;
+  el.innerHTML = `<div class="qt"><span class="qn" style="background:${num === "Hinge" ? "var(--coral)" : "var(--blue)"}">${num === "Hinge" ? "Hinge question" : `Multiple choice ${num}`}</span><span class="smc-q">${tex(m.q)}</span></div><div class="smc-body"><div class="smc-grid${m.graphs ? " smc-grid4" : ""}">${opts}</div><div class="smc-show" aria-live="polite"><span class="smc-show-h">My answer</span><span class="smc-big">?</span></div></div>`;
   const pick = (i) => {
     el.querySelectorAll(".smc-opt").forEach((b) => { const on = +b.dataset.i === i; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
     el.querySelector(".smc-big").textContent = i === undefined ? "?" : letters[i];
     el.querySelector(".smc-show").classList.toggle("set", i !== undefined);
   };
-  el.querySelectorAll(".smc-opt").forEach((b) => (b.onclick = () => { const i = +b.dataset.i; state[key] = { pick: i }; save(); pick(i); }));
+  el.querySelectorAll(".smc-opt").forEach((b) => (b.onclick = () => { const i = +b.dataset.i; state[key] = { pick: i }; if (m.__id) { state.mcp = state.mcp || {}; state.mcp[m.__id] = [i, Date.now()]; } save(); pick(i); if (window.__live) window.__live.beatSoon(400); }));
   pick(st.pick);
   return el;
 }
@@ -2169,38 +2208,74 @@ function openPrereq(slideEl) {
 // ---------- multiple choice and hinge: tally the class's answers ----------
 const TALLY_COUNTS = {};
 function openTally(slideEl, ti) {
-  const m = TALLY[ti], ai = letters.indexOf(m.ans), n = (m.graphs || m.opts).length, c = TALLY_COUNTS[ti] || (TALLY_COUNTS[ti] = Array(n).fill(0));
+  const m = TALLY[ti], ai = letters.indexOf(m.ans), n = (m.graphs || m.opts).length, manual = TALLY_COUNTS[ti] || (TALLY_COUNTS[ti] = Array(n).fill(0));
+  let c = manual, live = false, hide = false, since = 0, who = Array(n).fill(null).map(() => []), pollT = null, cls = "", openWho = new Set();
   const md = document.createElement("div"); md.className = "kw-modal";
-  md.innerHTML = `<div class="ty-panel" role="dialog" aria-label="Tally the answers"><div class="mt-head"><b>Tally the Answers</b><span class="muted">Click a row (or press A, B, C, D) for each student. − takes one off.</span><button class="kw-close" aria-label="Close">✕</button></div><div class="ty-rows">${[...Array(n)].map((_, i) => `<div class="ty-row" data-i="${i}"><button type="button" class="ty-add" data-i="${i}"><span class="smc-l">${letters[i]}</span><span class="ty-opt">${m.graphs ? `Graph ${letters[i]}` : tex(m.opts[i])}</span><span class="ty-bar"><i></i></span><b class="ty-n">0</b></button><button type="button" class="ty-sub" data-i="${i}" aria-label="One fewer for ${letters[i]}">−</button></div>`).join("")}</div><div class="ty-foot"><span class="ty-total"></span><button type="button" class="ty-reset">Reset</button><button type="button" class="ty-show primary">Show the Verdict</button></div><div class="ty-verdict" hidden></div></div>`;
+  md.innerHTML = `<div class="ty-panel" role="dialog" aria-label="Tally the answers"><div class="mt-head"><b>Tally the Answers</b><span class="muted ty-help">Click a row (or press A, B, C, D) for each student. − takes one off.</span>${LIVE.url ? `<button type="button" class="ty-live">📡 Live from class</button>` : ""}<button class="kw-close" aria-label="Close">✕</button></div>
+    <div class="ty-lbar" hidden><label>Class <select class="ty-cls"><option value="">All</option></select></label><label class="ty-hide"><input type="checkbox" class="ty-hidecb"> 🙈 Hide the counts</label><button type="button" class="ty-fresh" title="Only count answers chosen from now on">↺ Start fresh</button><span class="ty-lst muted small"></span></div>
+    <div class="ty-rows">${[...Array(n)].map((_, i) => `<div class="ty-row" data-i="${i}"><button type="button" class="ty-add" data-i="${i}"><span class="smc-l">${letters[i]}</span><span class="ty-opt">${m.graphs ? `Graph ${letters[i]}` : tex(m.opts[i])}</span><span class="ty-bar"><i></i></span><b class="ty-n">0</b></button><button type="button" class="ty-sub" data-i="${i}" aria-label="One fewer for ${letters[i]}">−</button><div class="ty-who" hidden></div></div>`).join("")}</div><div class="ty-foot"><span class="ty-total"></span><button type="button" class="ty-reset">Reset</button><button type="button" class="ty-show primary">Show the Verdict</button></div><div class="ty-verdict" hidden></div></div>`;
   slideEl.appendChild(md); titleCase(md);
-  const verdict = md.querySelector(".ty-verdict");
+  const verdict = md.querySelector(".ty-verdict"), q = (x) => md.querySelector(x);
   const draw = () => {
     const tot = c.reduce((a, b) => a + b, 0), mx = Math.max(1, ...c);
-    md.querySelectorAll(".ty-row").forEach((r, i) => { r.querySelector(".ty-n").textContent = c[i]; r.querySelector(".ty-bar i").style.width = (c[i] / mx) * 100 + "%"; });
-    md.querySelector(".ty-total").textContent = `${tot} answer${tot === 1 ? "" : "s"}`;
-    if (!verdict.hidden) show();
+    md.querySelectorAll(".ty-row").forEach((r, i) => { r.querySelector(".ty-n").textContent = hide ? "?" : c[i]; r.querySelector(".ty-bar i").style.width = hide ? "0%" : (c[i] / mx) * 100 + "%";
+      const w = r.querySelector(".ty-who"); w.hidden = !(live && !hide && openWho.has(i)); if (!w.hidden) w.innerHTML = who[i].length ? who[i].map((x) => `<span>${esc(x)}</span>`).join("") : `<i class="muted">Nobody yet</i>`; });
+    q(".ty-total").textContent = `${tot} answer${tot === 1 ? "" : "s"}${live ? " in so far" : ""}`;
+    if (!verdict.hidden && !hide) show(true);
   };
-  const show = () => {
-    const tot = c.reduce((a, b) => a + b, 0); verdict.hidden = false; md.querySelector(".ty-panel").classList.add("v");
+  const show = (fromDraw) => {
+    if (hide) { hide = false; q(".ty-hidecb").checked = false; }
+    const tot = c.reduce((a, b) => a + b, 0); verdict.hidden = false; q(".ty-panel").classList.add("v");
     md.querySelectorAll(".ty-row").forEach((r, i) => r.classList.toggle("right", i === ai));
     if (!tot) { verdict.innerHTML = "Add the class's answers first."; return; }
     const pct = Math.round((c[ai] / tot) * 100), wrong = c.map((v, i) => [v, i]).filter(([v, i]) => i !== ai && v > 0).sort((a, b) => b[0] - a[0]);
     const go = pct >= 75;
     verdict.innerHTML = `<div class="ty-call ${go ? "go" : "stop"}">${go ? "Move on" : "Reteach"}: <b>${pct}%</b> chose the right answer, <b>${letters[ai]}</b>.</div>` +
-      (wrong.length ? `<div class="ty-why">${wrong.slice(0, 2).map(([v, i]) => `<div><b>${letters[i]}</b> (${v} student${v === 1 ? "" : "s"}): ${tex((m.why || [])[i] || "")}</div>`).join("")}</div>` : "") +
+      (wrong.length ? `<div class="ty-why">${wrong.slice(0, 2).map(([v, i]) => `<div><b>${letters[i]}</b> (${v} student${v === 1 ? "" : "s"}${live && who[i].length ? `: ${who[i].slice(0, 8).map(esc).join(", ")}${who[i].length > 8 ? "…" : ""}` : ""}): ${tex((m.why || [])[i] || "")}</div>`).join("")}</div>` : "") +
       (m.notes ? `<div class="ty-note"><b>Teacher note:</b> ${tex(m.notes)}</div>` : "");
+    if (!fromDraw) draw();
   };
-  const add = (i, d) => { c[i] = Math.max(0, c[i] + d); draw(); };
+  // live: everyone's choice on the student page, refreshed every 4 seconds
+  async function poll() {
+    clearTimeout(pollT); if (!live || !md.isConnected) return;
+    const key = (() => { try { return localStorage.getItem("jw-live-key") || ""; } catch (e) { return ""; } })();
+    if (!key) { q(".ty-lst").textContent = "Open ⚙ → 📡 Live class once and type your key first."; return; }
+    try {
+      const j = await (await fetch(`${LIVE.url}?t=live&lesson=${encodeURIComponent(L.id)}&key=${encodeURIComponent(key)}`)).json();
+      if (!j.ok) throw new Error(j.error);
+      const all = Object.values(j.students || {}), sel = q(".ty-cls"), classes = [...new Set(all.map((x) => x.cls))].sort();
+      sel.innerHTML = `<option value="">All</option>` + classes.map((k) => `<option${k === cls ? " selected" : ""}>${esc(k)}</option>`).join("");
+      const lc = Array(n).fill(0); who = Array(n).fill(null).map(() => []);
+      all.filter((x) => !cls || x.cls === cls).forEach((x) => { const v = x.mc && x.mc[m.__id]; if (v && v[0] < n && v[1] >= since) { lc[v[0]]++; who[v[0]].push(x.name); } });
+      who.forEach((w) => w.sort((a, b) => a.localeCompare(b)));
+      c = lc; const joined = all.filter((x) => !cls || x.cls === cls).length;
+      q(".ty-lst").textContent = `${c.reduce((a, b) => a + b, 0)} of ${joined} student${joined === 1 ? "" : "s"} have answered · updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
+      draw();
+    } catch (e) { q(".ty-lst").textContent = e.message === "key" ? "Your Live class key wasn't accepted. Re-enter it in ⚙ → 📡 Live class." : "Can't reach the live server. Trying again…"; }
+    pollT = setTimeout(poll, 4000);
+  }
+  const setLive = (on) => {
+    live = on; c = on ? Array(n).fill(0) : manual; q(".ty-lbar").hidden = !on; q(".ty-panel").classList.toggle("live", on);
+    const lb = q(".ty-live"); if (lb) { lb.classList.toggle("on", on); lb.textContent = on ? "✋ Count by hand instead" : "📡 Live from class"; }
+    q(".ty-help").textContent = on ? "Live: students' answers on their page. Click a row to see who chose it." : "Click a row (or press A, B, C, D) for each student. − takes one off.";
+    verdict.hidden = true; q(".ty-panel").classList.remove("v"); md.querySelectorAll(".ty-row").forEach((r) => r.classList.remove("right"));
+    draw(); if (on) poll(); else clearTimeout(pollT);
+  };
+  const add = (i, d) => { if (live) return; manual[i] = Math.max(0, manual[i] + d); draw(); };
   const keys = (e) => { if (!md.isConnected) return document.removeEventListener("keydown", keys); const k = e.key.toUpperCase(), i = "ABCD".indexOf(k) >= 0 ? "ABCD".indexOf(k) : "1234".indexOf(k); if (i >= 0 && i < n) { e.preventDefault(); add(i, e.shiftKey ? -1 : 1); } };
   document.addEventListener("keydown", keys);
+  q(".ty-cls").onchange = (e) => { cls = e.target.value; poll(); };
+  q(".ty-hidecb").onchange = (e) => { hide = e.target.checked; if (hide) { verdict.hidden = true; q(".ty-panel").classList.remove("v"); md.querySelectorAll(".ty-row").forEach((r) => r.classList.remove("right")); } draw(); };
   md.addEventListener("click", (e) => {
     e.stopPropagation();
-    if (e.target === md || e.target.closest(".kw-close")) { md.remove(); document.removeEventListener("keydown", keys); return; }
+    if (e.target === md || e.target.closest(".kw-close")) { md.remove(); clearTimeout(pollT); document.removeEventListener("keydown", keys); return; }
     const b = e.target.closest("button"); if (!b) return;
-    if (b.classList.contains("ty-add")) add(+b.dataset.i, 1);
+    if (b.classList.contains("ty-live")) return setLive(!live);
+    if (b.classList.contains("ty-fresh")) { since = Date.now(); poll(); return; }
+    if (b.classList.contains("ty-add")) { if (live) { const i = +b.dataset.i; openWho.has(i) ? openWho.delete(i) : openWho.add(i); draw(); } else add(+b.dataset.i, 1); }
     if (b.classList.contains("ty-sub")) add(+b.dataset.i, -1);
-    if (b.classList.contains("ty-reset")) { c.fill(0); verdict.hidden = true; md.querySelector(".ty-panel").classList.remove("v"); md.querySelectorAll(".ty-row").forEach((r) => r.classList.remove("right")); draw(); }
-    if (b.classList.contains("ty-show")) show();
+    if (b.classList.contains("ty-reset")) { if (live) { since = Date.now(); poll(); } else manual.fill(0); verdict.hidden = true; q(".ty-panel").classList.remove("v"); md.querySelectorAll(".ty-row").forEach((r) => r.classList.remove("right")); draw(); }
+    if (b.classList.contains("ty-show")) show(false);
   });
   draw();
 }
@@ -2732,7 +2807,7 @@ const STUDENT_ONLY = /*STUDENT_ONLY*/false;
 const save = () => { try { localStorage.setItem(SAVE, JSON.stringify(state)); } catch (e) { /* storage not available */ } if (window.__live) window.__live.beatSoon(); };
 
 function parseNum(s) {
-  let t = String(s).trim().replace(/[−–]/g, "-").replace(/\s+/g, "");
+  let t = String(s).trim().replace(/[−–]/g, "-").replace(/\s+/g, "").replace(/^(-?)£/, "$1").replace(/(\d),(?=\d{3}(\D|$))/g, "$1").replace(/(\d)(p|cm|mm|km|kg|g|m|ml|l|s|m²|cm²|people)$/i, "$1");
   t = t.replace(/[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛]/g, (c) => `${FR[c][0]}/${FR[c][1]}`);
   t = t.replace(/°$/, "");
   const m = t.match(/^(-?)(\d*\.?\d+)(?:\/(\d*\.?\d+))?$/);
@@ -2745,7 +2820,9 @@ function checkPart(spec, val) {
   if (val === undefined || val === null || val === "") return null;
   switch (spec.t) {
     case "yn": case "choice": return val === spec.v;
-    case "num": { const v = parseNum(val); return isFinite(v) && Math.abs(v - spec.v) < 1e-6; }
+    case "num": { const v = parseNum(val); if (!(isFinite(v) && Math.abs(v - spec.v) < 1e-6)) return false;
+      if (spec.keep) { const t = String(val).trim().replace(/[−–]/g, "-").replace(/\s+/g, "").replace(/^(-?)£/, "$1").replace(/,/g, ""); return t.replace(/^(-?)0+(?=\d)/, "$1") === String(spec.keep).replace(/,/g, ""); } // e.g. 3.40 to 2 d.p.: the zero must be written
+      return true; }
     case "eq": { const r = parseLine(val), e = parseLine(spec.v); return !r.error && sameLine(r, e); }
     case "text": { const t = String(val).toLowerCase().replace(/\s+/g, "").replace(/[−–]/g, "-"); return spec.v.includes(t); }
     case "coords": {
@@ -2780,19 +2857,49 @@ function withConfidence(card, key) {
   const actions = card.querySelector(".qactions"); actions.parentNode.insertBefore(row, actions); paint();
   return card;
 }
+const QTEXT = {}; // question key → { q, parts }: what each question asked, for the teacher's view of answers
+// the lines a question asks students to draw: "Draw y = 3x − 1." or "Draw y = 3x + 2 and y = −3x + 2 on the same grid."
+function drawLinesIn(text) {
+  const t = String(text || "").replace(/\$/g, "").replace(/\\frac\{(-?\d+)\}\{(\d+)\}/g, "$1/$2");
+  const m = t.match(/(?:^|[.?!:]\s+)(?:now\s+|then\s+)?(?:draw|sketch)\b((?:[^.?!]|\.(?=\d))*)/i); if (!m) return []; // an instruction to draw, not "Sam was asked to draw…"
+  const out = [], re = /\b([xy])\s*=\s*((?:[^,;:]|\.(?=\d))+?)(?=\s+(?:and|on|then|from|for|using|with|to)\b|[,;:]|$)/gi; let r;
+  while ((r = re.exec(m[1]))) {
+    const txt = `${r[1]} = ${r[2].trim()}`; if (!/[\dx]/.test(r[2]) || /[a-wz]/i.test(r[2].replace(/x/g, ""))) continue;
+    try { const p = parseLine(txt); if (p && !p.error && isFinite(p.A) && isFinite(p.B) && isFinite(p.C)) out.push(drawKind(Object.assign({ text: txt, A: p.A, B: p.B, C: p.C }, /^y/i.test(r[1]) && Math.abs(p.B) > 1e-12 ? { m: -p.A / p.B, c: p.C / p.B } : {}))); } catch (e) { /* not a line we can draw */ }
+  }
+  return out;
+}
+// "Draw it": the question's line(s) on the same grid as the Draw graphs tab, checked, and saved for the teacher to see
+function openDrawQ(key) {
+  const Q = QTEXT[key], lines = Q ? drawLinesIn(Q.q) : []; if (!lines.length) return;
+  const st = state[key] || (state[key] = { v: [], tries: 0 }); st.dr = st.dr || [];
+  const small = (its) => (its || []).map((it) => { const r2 = (v) => Math.round(v * 100) / 100, p2 = (p) => ({ x: r2(p.x), y: r2(p.y) });
+    return it.k === "ln" ? { k: "ln", a: p2(it.a), b: p2(it.b) } : it.k === "pt" ? { k: "pt", x: r2(it.x), y: r2(it.y) } : { k: "pen", p: it.p.filter((_, i, a) => i % Math.max(1, Math.ceil(a.length / 40)) === 0 || i === a.length - 1).map(p2) }; });
+  const keep = (i, items, ok) => { if (!items.length && !(st.dr[i] && st.dr[i].ok)) return; if (st.dr[i] && st.dr[i].ok && !ok) return; st.dr[i] = { ok: ok ? 1 : 0, items: small(items) }; st.drq = lines.map((l) => ({ text: l.text, A: l.A, B: l.B, C: l.C })); save(); if (window.__live) window.__live.beatSoon(800); };
+  const ov = document.createElement("div"); ov.className = "np-ov";
+  ov.innerHTML = `<div class="np-win dgm-win" role="dialog" aria-label="Draw it"><div class="np-head"><b>📈 Draw it · ${esc(QLABEL[key] || QLABEL[key.split("~")[0]] || "Question")}</b><button type="button" data-x>✓ Done</button></div><div class="np-q">${tex(Q.q)}</div><div class="dgm"><div data-dg></div></div></div>`;
+  document.body.appendChild(ov);
+  const box = ov.querySelector(".dgm");
+  const api = mountDrawGraphs(ov.querySelector("[data-dg]"), { fixed: lines, mode: "free", modal: () => box.clientHeight - 24, saved: st.dr, onSolve: (i, items) => keep(i, items, true), onLeave: (i, items, ok) => keep(i, items, ok) });
+  const close = () => { keep(api.index(), api.items(), api.solved()); ov.remove(); const b = document.querySelector(`[data-drawq="${CSS.escape(key)}"]`); if (b) { const all = lines.every((_, i) => st.dr[i] && st.dr[i].ok); b.classList.toggle("has", all); b.textContent = all ? "📈 Drawn ✓" : "📈 Draw it"; } };
+  ov.querySelector("[data-x]").onclick = close; ov.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+}
+document.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest("[data-drawq]"); if (!b) return; e.preventDefault(); e.stopPropagation(); gather(); openDrawQ(b.dataset.drawq); }, true);
 function qCard(key, num, numCol, qText, model, parts, extra = "", retry = null) {
   const st = state[key] || (state[key] = { v: [], tries: 0 });
+  QTEXT[key] = { q: qText, parts: parts || null };
   const el = document.createElement("div");
   el.className = "q"; el.dataset.key = key;
   const inputs = (parts || []).map((p, i) => {
     const lab = p.label ? `<label>${esc(p.label)}</label>` : "";
     if (p.t === "yn") return `<div class="part" data-p="${i}">${lab}<button data-val="true">Yes</button><button data-val="false">No</button><span class="res"></span></div>`;
     if (p.t === "choice") return `<div class="part" data-p="${i}">${lab}${p.opts.map((o, k) => `<button data-val="${k}">${tex(o)}</button>`).join("")}<span class="res"></span></div>`;
-    const ph = { num: "e.g. −1/2", eq: "e.g. y = 2x + 1", lines2: "e.g. y = 2x + 1", coords: "e.g. (1, 4), (2, 5)", text: "" }[p.t] || "";
+    const ph = { num: p.ph || (typeof NUM_PH !== "undefined" ? NUM_PH : "e.g. −1/2"), eq: "e.g. y = 2x + 1", lines2: "e.g. y = 2x + 1", coords: "e.g. (1, 4), (2, 5)", text: "" }[p.t] || "";
     return `<div class="part" data-p="${i}">${lab}<input type="text" placeholder="${ph}" aria-label="${esc(p.label || "Answer")}"><span class="res"></span></div>`;
   }).join("");
   const ladder = !/^ex[AB]/.test(key) && (LIVE.url || (retry && (retry.hint || retry.how)));
-  el.innerHTML = `<div class="qt"><button type="button" class="npbtn" data-np="${esc(key)}">📝 Notepad</button>${ladder ? `<button type="button" class="askhelp" data-ladder title="Get help with this question">💡 Help</button>` : ""}<span class="qn" style="background:${numCol}">${num}</span>${retry && retry.look ? texLook(qText, retry.look) : tex(qText)}${retry ? `<span class="wrongs" aria-live="polite"></span>` : ""}</div>${extra && retry && retry.lookGraph ? extra.replace('class="svgwrap"', 'class="svgwrap lookg"') : extra}${parts ? inputs : `<textarea aria-label="Your working"></textarea>`}
+  const dl = drawLinesIn(qText), drawn = dl.length && st.dr && dl.every((_, i) => st.dr[i] && st.dr[i].ok);
+  el.innerHTML = `<div class="qt"><button type="button" class="npbtn" data-np="${esc(key)}">📝 Notepad</button>${dl.length ? `<button type="button" class="npbtn drawbtn${drawn ? " has" : ""}" data-drawq="${esc(key)}">📈 ${drawn ? "Drawn ✓" : "Draw it"}</button>` : ""}${ladder ? `<button type="button" class="askhelp" data-ladder title="Get help with this question">💡 Help</button>` : ""}<span class="qn" style="background:${numCol}">${num}</span>${retry && retry.look ? texLook(qText, retry.look) : tex(qText)}${retry ? `<span class="wrongs" aria-live="polite"></span>` : ""}</div>${extra && retry && retry.lookGraph ? extra.replace('class="svgwrap"', 'class="svgwrap lookg"') : extra}${parts ? inputs : `<textarea aria-label="Your working"></textarea>`}
     <div class="qactions">${parts ? `<button class="primary" data-check>Check</button>` : ""}<button data-show ${parts ? "hidden" : ""}>Show the answer</button>${retry ? `<button class="primary" data-new hidden>Try a similar question</button>` : ""}<span class="fb small"></span></div>${retry ? `<div class="model hint hidden"><b>Hint:</b> ${tex(retry.hint)}${retry.look || retry.lookGraph ? ` <span class="small" style="color:var(--amber)">Look at the highlighted part of the question.</span>` : ""}</div>` : ""}<div class="helpbox" hidden></div>
     <div class="model hidden">${tex(model)}${parts ? "" : `<div class="qactions"><button data-self="1">I got it</button><button data-self="0">Not yet</button></div>`}</div>`;
   const parts$ = el.querySelectorAll(".part");
@@ -2806,6 +2913,8 @@ function qCard(key, num, numCol, qText, model, parts, extra = "", retry = null) 
     const inp = pe.querySelector("input");
     if (inp) { inp.value = st.v[i] || ""; inp.oninput = () => { st.v[i] = inp.value; save(); }; }
   });
+  const wta = el.querySelector('textarea[aria-label="Your working"]'); // self-marked questions: keep what they write
+  if (wta) { wta.value = st.work || ""; wta.oninput = () => { st.work = wta.value; save(); }; }
   const showModel = () => el.querySelector(".model:not(.hint)").classList.remove("hidden");
   function mark(silent) {
     let all = true;
@@ -3030,6 +3139,7 @@ function buildStudent() {
       pb.appendChild(qCard(`prob${ci}`, "?", "var(--purple)", `${P.context} ${P.question}`, P.answer.join(" "), CHECKS.problem[0], `<div class="small muted">Think about: ${P.think.map(tex).join(" ")}</div>`));
       d.appendChild(pb);
     }
+    if (cy.hinge) { const hh = document.createElement("div"); hh.innerHTML = `<h2 style="font-size:22px">Hinge question</h2><p class="intro">Choose your answer when your teacher asks.</p>`; hh.appendChild(studentMCQ(cy.hinge, `hinge${ci}`, "Hinge")); d.appendChild(hh); }
     return d;
   }
   const open = (k) => {
@@ -4265,6 +4375,21 @@ function gather() {
   return rows;
 }
 
+// every answer so far, keyed by question, for the teacher's live view: the question, what they put, and how it went
+function answersNow() {
+  const out = {}, txt = (v) => String(v == null ? "" : v);
+  Object.keys(QTEXT).forEach((k) => {
+    const base = k.split("~")[0], b = state[base] || {}, cur = /^a\d/.test(base) && b.ver ? `${base}~${b.ver}` : base;
+    if (k !== cur) return;
+    const st = state[k] || {}, Q = QTEXT[k], parts = Q.parts || [];
+    const a = parts.length ? parts.map((p, i) => { const v = (st.v || [])[i]; if (v === undefined || v === null || v === "") return ""; const val = p.t === "yn" ? (v ? "Yes" : "No") : p.t === "choice" ? txt(p.opts[v]) : txt(v); return (p.label ? p.label.replace(/[:\s]+$/, "") + ": " : "") + val; }).filter(Boolean).join("  ·  ") : txt(st.work).trim();
+    const dr = st.dr && st.dr.some(Boolean) ? st.dr : null;
+    if (!a && !st.tries && !dr && st.ok === undefined && !st.shown) { out[base] = { k, q: txt(Q.q).slice(0, 400), ok: -1, t: 0 }; return; } // seen but not answered: the teacher still needs the question
+    out[base] = { k, q: txt(Q.q).slice(0, 400), a: a.slice(0, 300), ok: st.ok === true ? 1 : st.tries || st.ok === false ? 0 : -1, t: st.tries || 0, w: st.wrongN || 0, sh: st.shown ? 1 : 0, dr: dr || undefined, lines: dr && st.drq ? st.drq : undefined };
+  });
+  return out;
+}
+
 function handinSection() {
   const d = document.createElement("div");
   d.className = "handin";
@@ -4362,6 +4487,23 @@ const NP = (() => {
 .np-head b { font: 800 17px var(--body); flex: 1; min-width: 0; }
 .np-q { padding: 8px 14px; background: #fff; border-bottom: 1px solid var(--line); font-size: 16px; line-height: 1.4; max-height: 22vh; overflow: auto; }
 .np-q .svgwrap svg { max-height: 18vh; width: auto; }
+.dgm-win { width: min(1200px, 100%); }
+.dgm { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px; background: var(--page, #FBFAF6); }
+.drawbtn { border-color: var(--blue); }
+.np-gone { max-width: 860px; margin: 0 auto 8px; padding: 8px 12px; border: 2px dashed #C98A00; border-radius: 8px; background: #FFF8E6; font: 600 14px var(--body); color: #7A5200; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.np-gone[hidden] { display: none; } .np-gone .tx { flex-basis: 100%; font-size: 13px; }
+.np-gone button { font: 800 13px var(--body); padding: 3px 10px; border: 2px solid #C98A00; border-radius: 6px; background: #fff; cursor: pointer; }
+.lv-wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; padding: 14px 18px; overflow: auto; flex: 1; align-content: start; }
+.lv-tile { border: 2px solid var(--ink); border-radius: 10px; background: #fff; cursor: pointer; overflow: hidden; display: flex; flex-direction: column; }
+.lv-tile:hover { box-shadow: 0 0 0 3px var(--blue); }
+.lv-tile .th { display: flex; gap: 6px; align-items: baseline; padding: 6px 10px; border-bottom: 1px solid var(--line); font: 800 15px var(--body); }
+.lv-tile .th span { font: 600 12px var(--body); color: var(--muted); } .lv-tile .th .sp { flex: 1; }
+.lv-tile .tq { padding: 3px 10px; font: 700 12px var(--body); color: var(--ink2); }
+.lv-tile .pv { height: 320px; overflow: hidden; background: #FFFBEA; }
+.lv-tile .pv canvas { display: block; }
+.lv-tile .gn { padding: 3px 10px; font: 700 12px var(--body); color: #8A5A00; background: #FFF8E6; }
+.lv-tile.fresh { border-color: #1F9D55; }
+.np-qlab { font: 800 12px var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
 .np-tools { display: flex; gap: 6px; padding: 8px 12px; flex-wrap: wrap; align-items: center; background: #F7F3E6; border-bottom: 1px solid #D8D0B8; }
 .np-win.left .np-tools { flex-direction: row-reverse; }
 .np-tools button, .np-head button { font: 800 14px var(--body); padding: 7px 11px; border-radius: 8px; border: 2px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer; }
@@ -4384,12 +4526,16 @@ const NP = (() => {
 .np-tin { position: absolute; z-index: 3; border: 1.5px dashed #1E8E3E; background: rgba(255,255,255,.55); outline: 0; resize: none; padding: 0 2px; margin: 0; overflow: hidden; font-family: var(--hand); }
 .np-fbnote { max-width: 860px; margin: 0 auto 8px; font: 800 14px var(--body); color: #1E8E3E; }
 .np-set { position: absolute; right: 14px; top: 110px; z-index: 5; width: min(360px, calc(100% - 28px)); background: #fff; border: 2px solid var(--ink); border-radius: 10px; box-shadow: 4px 4px 0 var(--ink); padding: 12px 14px; font: 600 14px var(--body); display: flex; flex-direction: column; gap: 10px; }
+.np-set.cfg { top: 54px; max-height: calc(100% - 66px); overflow: auto; overscroll-behavior: contain; padding-top: 0; }
+.np-set .cfg-h { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 8px; margin: 0 -14px; padding: 10px 14px 8px; background: #fff; border-bottom: 1px solid var(--line); }
+.np-set .cfg-h b { flex: 1; font: 800 16px var(--body); }
+.np-set .cfg-h button { font: 800 14px var(--body); padding: 5px 10px; border: 2px solid var(--ink); background: var(--ink); color: #fff; }
 .np-set .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .np-set .row > span { width: 100%; font-weight: 800; }
 .np-set button { font: 700 13px var(--body); padding: 5px 9px; border-radius: 6px; border: 2px solid var(--line); background: #fff; cursor: pointer; }
 .np-set button.on { border-color: var(--ink); background: var(--ink); color: #fff; }
 .np-q, .np-tools, .np-scroll { min-width: 0; } .np-q .katex-display, .np-q .svgwrap { overflow-x: auto; max-width: 100%; }
-@media (max-width: 600px) { .np-ov { padding: 4px; } .np-head b { font-size: 15px; } .np-tools button, .np-head button { padding: 6px 8px; font-size: 13px; } .np-tools .sw { width: 22px; height: 22px; } .np-scroll { padding: 10px 6px; } .np-set { top: 60px; right: 6px; width: calc(100% - 12px); max-height: 75vh; overflow: auto; } }
+@media (max-width: 600px) { .np-ov { padding: 4px; } .np-head b { font-size: 15px; } .np-tools button, .np-head button { padding: 6px 8px; font-size: 13px; } .np-tools .sw { width: 22px; height: 22px; } .np-scroll { padding: 10px 6px; } .np-set { top: 60px; right: 6px; width: calc(100% - 12px); max-height: calc(100% - 70px); overflow: auto; } }
 .np-saved { font: 700 12px var(--body); color: var(--muted); }
 `; document.head.appendChild(st); })();
 
@@ -4418,12 +4564,15 @@ const NP = (() => {
       let y = TOP + S.gap * 0.84; const maxW = (W - MARGIN - 24) * k;
       for (const para of d.t.split("\n")) { let line = ""; for (const w of para.split(" ")) { const t = line ? line + " " + w : w; if (ctx.measureText(t).width > maxW && line) { ctx.fillText(line, (MARGIN + 6) * k, y * k); y += S.gap; line = w; } else line = t; } ctx.fillText(line, (MARGIN + 6) * k, y * k); y += S.gap; }
     }
+    if (opts.gone && d && d.gone) { ctx.save(); ctx.globalAlpha = 0.28; d.gone.forEach((g) => strokes(g.s)); ctx.restore(); }
     strokes(d && d.s);
     if (opts.fb) { strokes(opts.fb.s); (opts.fb.w || []).forEach((it) => { // the teacher's words and ticks, written on the page
       const hand = (getComputedStyle(document.body).getPropertyValue("--hand") || "").trim() || "'Comic Sans MS', cursive";
       ctx.fillStyle = it.c || "#1E8E3E"; ctx.font = `${it.k ? 700 : 400} ${it.z * k}px ${hand}`; ctx.textBaseline = "alphabetic";
       String(it.s || "").split("\n").forEach((ln, i) => ctx.fillText(ln, it.x * k, (it.y + i * it.z * 1.15) * k)); }); }
   }
+  function NP_fbExtent(fb) { let y = fbBottom(fb); ((fb && fb.s) || []).forEach((st) => { for (let i = 1; i < st.p.length; i += 2) y = Math.max(y, st.p[i]); }); return y; }
+  let openPad = null; // the notepad open on screen, so the teacher's live writing can be drawn onto it
   function fbBottom(fb) { let y = 0; ((fb && fb.w) || []).forEach((it) => (y = Math.max(y, it.y + (String(it.s || "").split("\n").length - 1) * it.z * 1.15 + 10))); return y; }
   function used(d, fb) { // how far down the page the work goes
     let y = 0; const S = set(); [...(d.s || []), ...((fb && fb.s) || [])].forEach((st) => { for (let i = 1; i < st.p.length; i += 2) y = Math.max(y, st.p[i]); });
@@ -4431,23 +4580,23 @@ const NP = (() => {
     if (d.t) { const lines = d.t.split("\n").reduce((a, para) => a + Math.max(1, Math.ceil((para.length * S.gap * 0.58 * S.text * 0.52) / (W - MARGIN - 24))), 0); y = Math.max(y, TOP + lines * S.gap); }
     return Math.min(d.h || 1000, Math.max(300, y + S.gap * 1.5));
   }
-  function image(key, scale = 0.6, type = "image/jpeg") { // for the hand-in PDF
-    const d = pad(key); if (!d) return null; const cv = document.createElement("canvas"), h = used(d, state.npFb && state.npFb[key]); cv.width = W * scale; cv.height = h * scale;
-    paint(cv.getContext("2d"), d, scale, { paper: true, text: true, set: state.npSet, fb: state.npFb && state.npFb[key] }); return cv.toDataURL(type, 0.8);
+  function image(key, scale = 0.6, type = "image/jpeg", gone = false) { // for the hand-in PDF (the teacher's copy shows rubbed-out work faded)
+    const d = pad(key); if (!d) return null; const cv = document.createElement("canvas"), h = used(gone ? Object.assign({}, d, { s: [...d.s, ...(d.gone || []).flatMap((g) => g.s)] }) : d, state.npFb && state.npFb[key]); cv.width = W * scale; cv.height = h * scale;
+    paint(cv.getContext("2d"), d, scale, { paper: true, text: true, set: state.npSet, fb: state.npFb && state.npFb[key], gone }); return cv.toDataURL(type, 0.8);
   }
 
   // ---- the notepad window ----
   function open(key, label, qHTML) {
     const S = set(); state.np = state.np || {};
     const d = state.np[key] || (state.np[key] = { s: [], t: "", h: 1000, v: 0 });
-    const fb = state.npFb && state.npFb[key];
+    const fbNow = () => state.npFb && state.npFb[key], fb = fbNow();
     const ov = document.createElement("div"); ov.className = "np-ov";
     ov.innerHTML = `<div class="np-win${S.left ? " left" : ""}" role="dialog" aria-label="Notepad">
       <div class="np-head"><b>📝 Notepad · ${esc(label)}</b><span class="np-saved" data-saved>Saved</span><button type="button" data-close>✓ Done</button></div>
       <div class="np-q">${qHTML || ""}</div>
-      <div class="np-tools"><button type="button" data-tool="pen">✏️ Pen</button><button type="button" data-tool="type">⌨ Type</button><button type="button" data-tool="erase">🧽 Rubber</button>
+      <div class="np-tools"><button type="button" data-tool="pen">✏️ Pen</button><button type="button" data-tool="type">⌨ Type</button><button type="button" data-tool="erase">🧽 Rubber</button><button type="button" data-tool="scroll" title="Move the page with your finger">✋ Scroll</button>
         <span data-sw></span><button type="button" data-undo>↶ Undo</button><button type="button" data-clear>🗑 Clear</button><span class="sp"></span><button type="button" data-set>⚙ Settings</button></div>
-      <div class="np-scroll">${fb ? `<div class="np-fbnote">✏️ Your teacher has marked this page in green.</div>` : ""}<div class="np-page"><canvas class="fbl"></canvas><canvas class="ink"></canvas><textarea aria-label="Type your working" spellcheck="false"></textarea></div><button type="button" class="np-more" data-more>＋ More paper</button></div>
+      <div class="np-scroll"><div class="np-fbnote" data-fbnote ${fb ? "" : "hidden"}>✏️ Your teacher has written on this page in green.</div><div class="np-page"><canvas class="fbl"></canvas><canvas class="ink"></canvas><textarea aria-label="Type your working" spellcheck="false"></textarea></div><button type="button" class="np-more" data-more>＋ More paper</button></div>
     </div>`;
     document.body.appendChild(ov);
     if (fb && !fb.seen) { fb.seen = Date.now(); save(); badges(); }
@@ -4455,9 +4604,20 @@ const NP = (() => {
     let tool = "pen", u = 1, hist = [], cur = null, erasing = false, saveT = null;
     const snap = () => JSON.stringify({ s: d.s, t: d.t });
     const push = () => { hist.push(snap()); if (hist.length > 40) hist.shift(); };
+    // the teacher keeps a faded record of anything that disappears; the student's page stays clean
+    const sig = (st) => `${st.c}|${st.p.length}|${st.p.slice(0, 6).join(",")}|${st.p.slice(-4).join(",")}`;
+    let prevS = new Map(d.s.map((st) => [sig(st), st])), prevT = d.t || "";
+    function record() {
+      const now = new Set(d.s.map(sig)), lost = [...prevS].filter(([g]) => !now.has(g)).map(([, st]) => st);
+      const t = d.t || "", tLost = prevT.trim() && (prevT.length - t.length >= 15 || (!t.trim() && prevT.trim().length >= 3)) ? prevT : ""; // a big chunk of typing deleted
+      if (lost.length || tLost) { d.gone = d.gone || []; d.gone.push({ at: Date.now(), s: lost, t: tLost.slice(0, 1500) || undefined });
+        while (JSON.stringify(d).length > 88000 && d.gone.length > 1) { d.gone.shift(); d.goneCut = 1; } }
+      prevS = new Map(d.s.map((st) => [sig(st), st])); prevT = t;
+    }
     const saved = (t) => (ov.querySelector("[data-saved]").textContent = t);
-    function persist() { d.v = (d.v || 0) + 1; d.upd = Date.now(); saved("Saving…"); clearTimeout(saveT); saveT = setTimeout(() => { save(); saved("Saved"); sync(key); badges(); }, 600); }
+    function persist() { record(); d.v = (d.v || 0) + 1; d.upd = Date.now(); state.npLast = key; saved("Saving…"); clearTimeout(saveT); saveT = setTimeout(() => { save(); saved("Saved"); sync(key); badges(); }, 600); }
     function layout() {
+      const f0 = fbNow(); if (f0) { let y = NP_fbExtent(f0); if (y + 80 > d.h) d.h = Math.ceil((y + 200) / 100) * 100; }
       const S2 = set(); u = page.clientWidth / W; page.style.setProperty("--u", u);
       page.style.height = d.h * u + "px"; const P = paperCSS(S2, u); page.style.background = P.background; page.style.backgroundPosition = P.pos;
       const k = window.devicePixelRatio || 1;
@@ -4469,7 +4629,7 @@ const NP = (() => {
     function render() {
       const k = (window.devicePixelRatio || 1) * u;
       ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); paint(ctx, d, k);
-      const f2 = fcv.getContext("2d"); f2.setTransform(1, 0, 0, 1, 0, 0); f2.clearRect(0, 0, fcv.width, fcv.height); if (fb) paint(f2, { h: d.h }, k, { fb });
+      const fbc = fbNow(), f2 = fcv.getContext("2d"); f2.setTransform(1, 0, 0, 1, 0, 0); f2.clearRect(0, 0, fcv.width, fcv.height); if (fbc) paint(f2, { h: d.h }, k, { fb: fbc });
       if (cur && cur.p.length) paint(ctx, { s: [cur] }, k);
     }
     const pos = (e) => { const r = cv.getBoundingClientRect(); return [Math.round(((e.clientX - r.left) / r.width) * W * 2) / 2, Math.round(((e.clientY - r.top) / r.height) * d.h * 2) / 2]; };
@@ -4482,7 +4642,7 @@ const NP = (() => {
       return changed;
     }
     cv.addEventListener("pointerdown", (e) => {
-      if (tool === "type") return; e.preventDefault(); cv.setPointerCapture(e.pointerId); push(); const [x, y] = pos(e);
+      if (tool === "type" || tool === "scroll") return; e.preventDefault(); cv.setPointerCapture(e.pointerId); push(); const [x, y] = pos(e);
       if (tool === "erase") { erasing = true; if (!eraseAt(x, y)) hist.pop(); return; }
       const S2 = set(); cur = { c: S2.pen, w: S2.size, p: [x, y] }; render();
     });
@@ -4495,14 +4655,15 @@ const NP = (() => {
     let typing = null; ta.addEventListener("input", () => { if (!typing) push(); clearTimeout(typing); typing = setTimeout(() => (typing = null), 1200); d.t = ta.value; d.tc = set().pen;
       // keep adding paper while they type
       if (ta.scrollHeight > ta.clientHeight + 2) { d.h += 400; layout(); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } persist(); });
-    function setTool(t) { tool = t; ov.querySelectorAll("[data-tool]").forEach((b) => b.classList.toggle("on", b.dataset.tool === t)); page.classList.toggle("mode-type", t === "type"); cv.style.cursor = t === "erase" ? "cell" : "crosshair"; if (t === "type") ta.focus(); }
+    function setTool(t) { tool = t; ov.querySelectorAll("[data-tool]").forEach((b) => b.classList.toggle("on", b.dataset.tool === t)); page.classList.toggle("mode-type", t === "type"); cv.style.cursor = t === "erase" ? "cell" : t === "scroll" ? "grab" : "crosshair"; cv.style.touchAction = page.style.touchAction = t === "scroll" ? "pan-y" : "none"; if (t === "type") ta.focus(); }
     function swatches() { const S2 = set(); ov.querySelector("[data-sw]").innerHTML = PENS.map((c) => `<button type="button" class="sw${c === S2.pen ? " on" : ""}" data-pen="${c}" style="background:${c}" aria-label="Pen colour"></button>`).join(""); ov.querySelectorAll("[data-pen]").forEach((b) => (b.onclick = () => { state.npSet = Object.assign(set(), { pen: b.dataset.pen }); save(); swatches(); ta.style.color = b.dataset.pen; if (tool === "erase") setTool("pen"); })); }
     ov.querySelectorAll("[data-tool]").forEach((b) => (b.onclick = () => setTool(b.dataset.tool)));
     ov.querySelector("[data-undo]").onclick = () => { const h = hist.pop(); if (!h) return; const o = JSON.parse(h); d.s = o.s; d.t = o.t; ta.value = d.t; render(); persist(); };
     ov.querySelector("[data-clear]").onclick = () => { if (!d.s.length && !d.t) return; if (!confirmIn(ov, "Clear everything on this notepad?", () => { push(); d.s = []; d.t = ""; ta.value = ""; render(); persist(); })) return; };
     ov.querySelector("[data-more]").onclick = () => { d.h += 500; layout(); persist(); ov.querySelector(".np-scroll").scrollBy({ top: 400, behavior: "smooth" }); };
     ov.querySelector("[data-set]").onclick = () => settings(ov, () => { layout(); swatches(); });
-    const close = () => { clearTimeout(saveT); save(); sync(key); badges(); ov.remove(); removeEventListener("resize", layout); };
+    const close = () => { clearTimeout(saveT); save(); sync(key); badges(); ov.remove(); removeEventListener("resize", layout); if (openPad && openPad.key === key) openPad = null; };
+    openPad = { key, refresh: () => { const f = fbNow(); ov.querySelector("[data-fbnote]").hidden = !f; if (f && !f.seen) { f.seen = Date.now(); save(); badges(); } const top = ov.querySelector(".np-scroll").scrollTop; if (!cur) layout(); ov.querySelector(".np-scroll").scrollTop = top; } };
     ov.querySelector("[data-close]").onclick = close; ov.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
     addEventListener("resize", layout); swatches(); setTool(d.t && !d.s.length ? "type" : "pen"); requestAnimationFrame(layout);
     return { close, d };
@@ -4517,17 +4678,18 @@ const NP = (() => {
     const old = ov.querySelector(".np-set.cfg"); if (old) { old.remove(); return; }
     const b = document.createElement("div"); b.className = "np-set cfg";
     const row = (title, keyName, opts) => `<div class="row"><span>${title}</span>${opts.map(([v, t]) => `<button type="button" data-k="${keyName}" data-v="${v}" class="${String(set()[keyName]) === String(v) ? "on" : ""}">${t}</button>`).join("")}</div>`;
-    b.innerHTML = row("Pen size", "size", [[2, "Thin"], [3, "Medium"], [5, "Thick"], [8, "Extra thick"]]) +
+    b.innerHTML = `<div class="cfg-h"><b>⚙ Notepad settings</b><button type="button" data-ok>✕ Close</button></div>` + row("Pen size", "size", [[2, "Thin"], [3, "Medium"], [5, "Thick"], [8, "Extra thick"]]) +
       row("Paper colour", "paper", Object.keys(PAPERS).map((p) => [p, `<i style="display:inline-block;width:12px;height:12px;border-radius:3px;border:1px solid #999;background:${PAPERS[p]};margin-right:4px;vertical-align:-1px"></i>${p[0].toUpperCase() + p.slice(1)}`])) +
       row("Paper", "style", [["lined", "Lined"], ["squared", "Squared"], ["plain", "Plain"]]) +
       row("Line spacing", "gap", [[32, "Narrow"], [40, "Normal"], [52, "Wide"], [64, "Extra wide"]]) +
       row("Typing font", "font", [["hand", "Handwriting"], ["clear", "Clear"], ["dys", "Easy-read"]]) +
       row("Typing size", "text", [[0.85, "Small"], [1, "Normal"], [1.2, "Large"]]) +
       row("Tools on the", "left", [["false", "Right-handed"], ["true", "Left-handed"]]) +
-      `<div class="row"><button type="button" data-ok class="on">Done</button></div>`;
+      `<div class="row"><button type="button" data-ok class="on">✓ Done</button></div>`;
     ov.querySelector(".np-win").appendChild(b);
     b.querySelectorAll("[data-k]").forEach((x) => (x.onclick = () => { const v = x.dataset.v, k = x.dataset.k; state.npSet = Object.assign(set(), { [k]: k === "left" ? v === "true" : isNaN(+v) ? v : +v }); save(); b.querySelectorAll(`[data-k="${k}"]`).forEach((y) => y.classList.toggle("on", y === x)); done(); }));
-    b.querySelector("[data-ok]").onclick = () => b.remove();
+    b.querySelectorAll("[data-ok]").forEach((x) => (x.onclick = () => b.remove()));
+    b.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); b.remove(); } });
   }
   // the 📝 buttons: show which questions have work, and which have new feedback
   function badges() {
@@ -4537,35 +4699,62 @@ const NP = (() => {
     });
   }
   // live: send a notepad to the teacher a moment after it changes
-  const syncT = {};
+  const syncT = {}, watching = {}; // question key → until (local time) while the teacher has this notepad open
   function sync(key) {
     if (!window.__live || !LIVE.url || !String(state.name || "").trim()) return;
     clearTimeout(syncT[key]);
-    syncT[key] = setTimeout(() => { const d = pad(key); if (!d) return; const body = JSON.stringify({ t: "np", lesson: L.id, name: state.name, cls: state.cls, q: key, label: (QLABEL[key] || QLABEL[key.split("~")[0]] || key), data: JSON.stringify({ s: d.s, t: d.t, h: d.h, tc: d.tc, v: d.v, set: state.npSet || null }).slice(0, 95000) });
-      try { fetch(LIVE.url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body }).catch(() => {}); } catch (e) { /* offline */ } }, 1800);
+    syncT[key] = setTimeout(() => { const d = pad(key); if (!d) return; const body = JSON.stringify({ t: "np", lesson: L.id, name: state.name, cls: state.cls, q: key, label: (QLABEL[key] || QLABEL[key.split("~")[0]] || key), data: JSON.stringify({ s: d.s, t: d.t, h: d.h, tc: d.tc, v: d.v, gone: d.gone, goneCut: d.goneCut, upd: d.upd, set: state.npSet || null }).slice(0, 95000) });
+      try { fetch(LIVE.url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body }).catch(() => {}); } catch (e) { /* offline */ } }, watching[key] > Date.now() ? 600 : 1800);
   }
   function index() { const o = {}; Object.keys(state.np || {}).forEach((k) => { if (has(k)) o[k] = state.np[k].v || 1; }); return o; }
   async function pullFeedback(fbIndex) { // the teacher has written on some notepads: fetch what's new
     for (const [k, at] of Object.entries(fbIndex || {})) {
       const mine = state.npFb && state.npFb[k]; if (mine && mine.at >= at) continue;
       try { const r = await fetch(`${LIVE.url}?t=fbget&lesson=${encodeURIComponent(L.id)}&id=${encodeURIComponent(String(state.cls).toUpperCase() + "|" + state.name)}&q=${encodeURIComponent(k)}`), j = await r.json();
-        if (j && j.ok && j.fb) { state.npFb = state.npFb || {}; state.npFb[k] = Object.assign(j.fb, { seen: 0 }); save(); badges(); fbPill(k); } } catch (e) { /* try next time */ }
+        if (j && j.ok && j.fb) got(k, j.fb); } catch (e) { /* try next time */ }
     }
   }
-  function fbPill(k) {
-    let p = document.getElementById("fbPill"); if (!p) { p = document.createElement("div"); p.id = "fbPill"; document.body.appendChild(p); }
-    p.innerHTML = `<span>✏️ Your teacher has marked your notepad for <b>${esc(QLABEL[k] || QLABEL[k.split("~")[0]] || "a question")}</b>.</span><button type="button" data-o>Open</button><button type="button" data-x>✕</button>`;
-    p.querySelector("[data-x]").onclick = () => p.remove();
-    p.querySelector("[data-o]").onclick = () => { p.remove(); const b = document.querySelector(`[data-np="${CSS.escape(k)}"]`); if (b) { b.closest(".q") && b.closest(".q").scrollIntoView({ block: "center" }); b.click(); } };
+  function got(k, f) { // new writing from the teacher on notepad k
+    const mine = state.npFb && state.npFb[k]; if (mine && mine.at === f.at && !!mine.final === !!f.final) return;
+    state.npFb = state.npFb || {}; const isOpen = openPad && openPad.key === k;
+    state.npFb[k] = Object.assign(f, { seen: isOpen ? Date.now() : 0 }); save(); badges();
+    if (isOpen) openPad.refresh(); else if (f.final || !pillOff[k]) fbPill(k, !f.final);
   }
-  return { open, paint, image, has, badges, sync, index, pullFeedback, W, pad, set, PAPERS, used, fbBottom };
+  // the teacher has a notepad open: check it every two seconds so their writing appears as they write
+  const polling = {}, pillOff = {}; // pillOff: the student closed the "teacher is writing" message for this question
+  function watched(wt, serverNow) {
+    const skew = serverNow ? Date.now() - serverNow : 0;
+    Object.entries(wt || {}).forEach(([k, until]) => { const u = +until + skew; if (u <= Date.now()) return; watching[k] = u; if (!polling[k]) poll(k); });
+  }
+  async function poll(k) {
+    polling[k] = true;
+    while (watching[k] > Date.now()) {
+      try { const r = await fetch(`${LIVE.url}?t=fbget&lesson=${encodeURIComponent(L.id)}&id=${encodeURIComponent(String(state.cls).toUpperCase() + "|" + state.name)}&q=${encodeURIComponent(k)}`), j = await r.json();
+        if (j && j.ok) { if (j.fb) got(k, j.fb); if (j.until) watching[k] = Math.max(+j.until + (j.now ? Date.now() - j.now : 0), Date.now() - 1); } } catch (e) { /* keep trying */ }
+      await new Promise((res) => setTimeout(res, 2000));
+    }
+    polling[k] = false;
+  }
+  function fbPill(k, writing) {
+    let p = document.getElementById("fbPill"); if (!p) { p = document.createElement("div"); p.id = "fbPill"; document.body.appendChild(p); }
+    const what = esc(QLABEL[k] || QLABEL[k.split("~")[0]] || "a question");
+    p.innerHTML = `<span>${writing ? `✏️ Your teacher is writing on your notepad for <b>${what}</b>.` : `✏️ Your teacher has marked your notepad for <b>${what}</b>.`}</span><button type="button" data-o>Open</button><button type="button" data-x>✕</button>`;
+    p.querySelector("[data-x]").onclick = () => { p.remove(); if (writing) pillOff[k] = true; };
+    p.querySelector("[data-o]").onclick = () => { p.remove(); goToQuestion(k); const b = document.querySelector(`[data-np="${CSS.escape(k)}"]`); if (b) { b.closest(".q") && b.closest(".q").scrollIntoView({ block: "center" }); b.click(); } else open(k, QLABEL[k] || QLABEL[k.split("~")[0]] || "Question", QTEXT[k] ? tex(QTEXT[k].q) : ""); };
+  }
+  return { open, paint, image, has, badges, sync, index, pullFeedback, watched, W, pad, set, PAPERS, used, fbBottom, extent: NP_fbExtent };
 })();
+// show the tab a question is on (the notepad alert can come in while the student is somewhere else)
+function goToQuestion(k) {
+  const b = k.split("~")[0], m = b.match(/^(?:a|cc|peer|prob|mc)(\d+)/), sec = /^dn/.test(b) ? "donow" : /^tp-/.test(b) ? "practice" : /^ex[AB]/.test(b) ? "exit" : /^kw/.test(b) ? "kw" : m ? `p${+m[1] + 1}` : null;
+  const t = sec && document.querySelector(`#student .tabs button[data-sec="${sec}"]`); if (t && t.getAttribute("aria-pressed") !== "true") t.click();
+}
 // open a question's notepad from its 📝 button
 document.addEventListener("click", (e) => {
   const b = e.target.closest && e.target.closest("[data-np]"); if (!b) return;
   e.preventDefault(); e.stopPropagation(); gather();
   const k = b.dataset.np, q = b.closest(".q"), qt = q && q.querySelector(".qt"), clone = qt ? qt.cloneNode(true) : null;
-  if (clone) clone.querySelectorAll("button, .wrongs").forEach((x) => x.remove());
+  if (clone) clone.querySelectorAll("button, .wrongs, .qn").forEach((x) => x.remove());
   const graph = q && q.querySelector(".svgwrap");
   NP.open(k, QLABEL[k] || QLABEL[k.split("~")[0]] || "Question", (clone ? clone.innerHTML : "") + (graph ? graph.outerHTML : ""));
 }, true);
@@ -4632,12 +4821,26 @@ const LIVE_IDLE = 90; // seconds without touching the lesson before a student sh
 .lv-det { border-top: 2px solid var(--line); max-height: 45%; overflow: auto; padding: 12px 18px; }
 .lv-det table { border-collapse: collapse; width: 100%; font-size: 14px; } .lv-det td, .lv-det th { border-bottom: 1px solid var(--line); padding: 4px 8px; text-align: left; }
 .lv-det .ok { color: #1F9D55; font-weight: 800; } .lv-det .no { color: #D93A3A; font-weight: 800; }
+.lv-al button.x { padding: 2px 8px; border-color: var(--line); color: var(--muted); }
+.lv-al button.nm { padding: 1px 8px; margin: 1px 0; border-color: #C77; background: #fff; text-decoration: underline dotted; }
+.lv-eye { font: 800 12px var(--body); color: var(--blue); background: #EEF3FF; border-radius: 10px; padding: 1px 6px; }
+.lv-card.on { box-shadow: 0 0 0 3px var(--blue); }
+.lv-dh { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.lv-dh b { font: 800 18px var(--body); } .lv-dh .muted { flex: 1; }
+.lv-dh button { font: 800 14px var(--body); padding: 4px 10px; border: 2px solid var(--ink); border-radius: 6px; background: #fff; cursor: pointer; }
+.lv-qs tr.lv-qr { cursor: pointer; } .lv-qs tr.lv-qr:hover td { background: #F6F8FC; } .lv-qs tr.lv-qr.open td { background: #EEF3FF; }
+.lv-qs .lv-ans { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink2); }
+.lv-qx td { background: #FAFBFE; }
+.lv-qd { display: flex; flex-direction: column; gap: 8px; padding: 6px 2px 10px; }
+.lv-qq { font-size: 16px; line-height: 1.45; } .lv-qa { font-size: 15px; }
+.lv-dr { display: flex; gap: 14px; flex-wrap: wrap; }
+.lv-qb button { font: 800 14px var(--body); padding: 6px 12px; border: 2px solid #1E8E3E; border-radius: 8px; background: #EEF8F0; cursor: pointer; }
 .lv-note { padding: 8px 18px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); }
 `; document.head.appendChild(st); })();
 
 window.__live = (() => {
   if (!LIVE.url) return null;
-  let lastInput = Date.now(), timer = null, soon = null, started = false;
+  let lastInput = Date.now(), timer = null, soon = null, started = false, lastAns = "", ansN = 0;
   const touch = () => { const was = Date.now() - lastInput > LIVE_IDLE * 1000; lastInput = Date.now(); if (was) beatSoon(300); };
   ["pointerdown", "keydown", "wheel", "touchstart", "input"].forEach((ev) => addEventListener(ev, touch, { passive: true, capture: true }));
   let mv = 0; addEventListener("pointermove", () => { const t = Date.now(); if (t - mv > 3000) { mv = t; touch(); } }, { passive: true });
@@ -4646,19 +4849,21 @@ window.__live = (() => {
   function payload(t) {
     const rows = gather(), btn = document.querySelector('#student .tabs button[aria-pressed="true"]');
     const bu = typeof BUILDUP === "object" && BUILDUP ? Object.keys(BUILDUP).map((ci) => `${(state["bu" + ci] && state["bu" + ci].done) || 0}/${BUILDUP[ci].cards.length}`).join(" ") : "";
-    return { t, lesson: L.id, name: String(state.name || "").trim(), cls: String(state.cls || "").trim(), vis: document.hidden ? "hidden" : "visible", focus: document.hasFocus(), idle: Math.round((Date.now() - lastInput) / 1000), sec: btn ? btn.textContent.trim() : "", bu, r: rows.map((r) => (r.ok ? "1" : r.tried ? "2" : "0")).join(""), w: rows.map((r) => Math.min(9, r.wrong || 0)).join(""), help: state.help && !state.help.seen ? state.help : null, np: NP.index() };
+    let ans; try { const a = JSON.stringify(answersNow()); if (a !== lastAns || ++ansN % 5 === 0) { ans = a.length < 90000 ? JSON.parse(a) : undefined; lastAns = a; } } catch (e) { /* answers are optional */ }
+    const npl = state.npLast && state.np && state.np[state.npLast] && NP.has(state.npLast) ? { k: state.npLast, at: state.np[state.npLast].upd || 0 } : undefined;
+    return { t, ans, npl, mc: state.mcp || {}, lesson: L.id, name: String(state.name || "").trim(), cls: String(state.cls || "").trim(), vis: document.hidden ? "hidden" : "visible", focus: document.hasFocus(), idle: Math.round((Date.now() - lastInput) / 1000), sec: btn ? btn.textContent.trim() : "", bu, r: rows.map((r) => (r.ok ? "1" : r.tried ? "2" : "0")).join(""), w: rows.map((r) => Math.min(9, r.wrong || 0)).join(""), help: state.help && !state.help.seen ? state.help : null, np: NP.index() };
   }
   function send(t) {
     if (!started) return; const p = payload(t); if (!p.name) return; const body = JSON.stringify(p);
     if (t === "bye" && navigator.sendBeacon) { try { if (navigator.sendBeacon(LIVE.url, new Blob([body], { type: "text/plain" }))) return; } catch (e) { /* fall through */ } }
     try {
       fetch(LIVE.url, { method: "POST", headers: { "Content-Type": "text/plain" }, body, keepalive: true })
-        .then((r) => r.json()).then((j) => { if (j && j.ack && state.help && !state.help.seen && j.ack >= state.help.at) { state.help.seen = Date.now(); save(); helpPill(); } if (j && j.fb) NP.pullFeedback(j.fb); })
+        .then((r) => r.json()).then((j) => { if (j && j.ack && state.help && !state.help.seen && j.ack >= state.help.at) { state.help.seen = Date.now(); save(); helpPill(); } if (j && j.fb) NP.pullFeedback(j.fb); if (j && j.wt) NP.watched(j.wt, j.now); })
         .catch(() => fetch(LIVE.url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body }).catch(() => {}));
     } catch (e) { /* offline */ }
   }
   function beatSoon(ms = 1500) { if (!started) return; clearTimeout(soon); soon = setTimeout(() => send("beat"), ms); }
-  function start() { if (started) return beatSoon(100); started = true; send("beat"); Object.keys(state.np || {}).forEach((k) => NP.sync(k)); timer = setInterval(() => send("beat"), 12000); addEventListener("pagehide", () => send("bye")); }
+  function start() { if (started) return beatSoon(100); started = true; send("beat"); Object.keys(state.np || {}).forEach((k) => NP.sync(k)); timer = setInterval(() => send("beat"), 8000); addEventListener("pagehide", () => send("bye")); }
   return { start, beatSoon, send };
 })();
 
@@ -4692,7 +4897,7 @@ function liveBar() {
   const box = document.getElementById("livebar"); if (!box || !window.__live) return;
   const on = !!(String(state.name || "").trim() && String(state.cls || "").trim());
   if (on && !box.dataset.edit) {
-    box.innerHTML = `<div class="lvb on"><span class="lvdot"></span><span>Live: your teacher can see your progress in this lesson, ${esc(state.name)} · ${esc(state.cls)}.</span><button type="button" data-me>Not you?</button><span style="flex:1"></span><button type="button" class="askhelp" data-help="general" style="float:none;margin:0;text-decoration:none">✋ I need help</button></div>`;
+    box.innerHTML = `<div class="lvb on"><span class="lvdot"></span><span>Live: your teacher can see your progress and your notepads, ${esc(state.name)} · ${esc(state.cls)}.</span><button type="button" data-me>Not you?</button><span style="flex:1"></span><button type="button" class="askhelp" data-help="general" style="float:none;margin:0;text-decoration:none">✋ I need help</button></div>`;
     box.querySelector("[data-me]").onclick = () => { box.dataset.edit = "1"; liveBar(); };
     window.__live.start(); helpPill(); return;
   }
@@ -4702,10 +4907,16 @@ function liveBar() {
 }
 
 // the written working from every notepad, with any teacher feedback, for the hand-in sheet and PDF
+// a line for the teacher's copy: what was rubbed out, undone or cleared, and any typing that was deleted
+function goneNote(d) {
+  const g = (d && d.gone) || []; if (!g.length) return "";
+  const tm = (t) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), typed = g.filter((x) => x.t).slice(-3);
+  return `<p style="margin:2px 0 4px;font-size:9.5pt;color:#8A5A00">🗑 Removed from this page ${g.length} time${g.length === 1 ? "" : "s"} (last at ${tm(g[g.length - 1].at)}). Removed writing is shown faded.${d.goneCut ? " The oldest removals were too big to keep." : ""}</p>${typed.map((x) => `<p style="margin:0 0 4px;font-size:9.5pt;color:#8A5A00">Deleted typing at ${tm(x.at)}: “${esc(x.t.slice(0, 400))}”</p>`).join("")}`;
+}
 function padsHTML(plain) {
   gather(); const keys = Object.keys(state.np || {}).filter((k) => NP.has(k)); if (!keys.length) return "";
   return `<h3 style="margin:18px 0 6px">Written working (${keys.length} notepad${keys.length === 1 ? "" : "s"})</h3>` + keys.map((k) => { const f = state.npFb && state.npFb[k];
-    return `<div style="page-break-inside:avoid;margin:0 0 14px"><p style="margin:4px 0"><b>${esc(QLABEL[k] || QLABEL[k.split("~")[0]] || k)}</b>${f ? ` · <span style="color:#1E8E3E">marked by the teacher (in green on the page)</span>` : ""}</p><img src="${NP.image(k, plain ? 0.5 : 0.6)}" alt="Notepad" style="width:${plain ? "15cm" : "100%"};max-width:640px;border:1px solid #ccc"></div>`; }).join("");
+    return `<div style="page-break-inside:avoid;margin:0 0 14px"><p style="margin:4px 0"><b>${esc(QLABEL[k] || QLABEL[k.split("~")[0]] || k)}</b>${f ? ` · <span style="color:#1E8E3E">marked by the teacher (in green on the page)</span>` : ""}</p>${plain ? goneNote(state.np[k]) : ""}<img src="${NP.image(k, plain ? 0.5 : 0.6, "image/jpeg", !!plain)}" alt="Notepad" style="width:${plain ? "15cm" : "100%"};max-width:640px;border:1px solid #ccc"></div>`; }).join("");
 }
 // a plain page for the PDF in the teacher's Drive (Google's converter ignores scripts and most styling)
 function handinHTML(name, cls, score) {
@@ -4725,10 +4936,11 @@ async function npFetch(id) {
   const key = (() => { try { return localStorage.getItem("jw-live-key") || ""; } catch (e) { return ""; } })();
   const r = await fetch(`${LIVE.url}?t=nps&lesson=${encodeURIComponent(L.id)}&id=${encodeURIComponent(id)}&key=${encodeURIComponent(key)}`); return r.json();
 }
-function npCanvas(d, fb, width, crop) {
-  const set = Object.assign({}, d.set || {}), k = width / NP.W, cv = document.createElement("canvas"), h = crop ? Math.min(d.h || 1000, Math.max(300, (() => { let y = 0; [...(d.s || []), ...((fb && fb.s) || [])].forEach((st) => { for (let i = 1; i < st.p.length; i += 2) y = Math.max(y, st.p[i]); }); y = Math.max(y, NP.fbBottom(fb)); if (d.t) y = Math.max(y, 56 + (d.t.split("\n").length + Math.floor(d.t.length / 60)) * ((set.gap || 40))); return y + 60; })())) : d.h || 1000, dpr = window.devicePixelRatio || 1;
+function npCanvas(d, fb, width, crop, hideGone) {
+  if (!hideGone && d.gone && d.gone.length) d = Object.assign({}, d, { _all: [...(d.s || []), ...d.gone.flatMap((g) => g.s)] });
+  const set = Object.assign({}, d.set || {}), k = width / NP.W, cv = document.createElement("canvas"), h = crop ? Math.min(d.h || 1000, Math.max(300, (() => { let y = 0; [...(d._all || d.s || []), ...((fb && fb.s) || [])].forEach((st) => { for (let i = 1; i < st.p.length; i += 2) y = Math.max(y, st.p[i]); }); y = Math.max(y, NP.fbBottom(fb)); if (d.t) y = Math.max(y, 56 + (d.t.split("\n").length + Math.floor(d.t.length / 60)) * ((set.gap || 40))); return y + 60; })())) : d.h || 1000, dpr = window.devicePixelRatio || 1;
   cv.width = width * dpr; cv.height = h * k * dpr; cv.style.width = width + "px"; cv.style.height = h * k + "px";
-  NP.paint(cv.getContext("2d"), d, k * dpr, { paper: true, text: true, set, fb }); return cv;
+  NP.paint(cv.getContext("2d"), d, k * dpr, { paper: true, text: true, set, fb, gone: !hideGone }); return cv;
 }
 function npTeacherDoc(s, data) { // every notepad, in question order, as one document
   const ov = document.createElement("div"); ov.className = "np-ov";
@@ -4740,29 +4952,64 @@ function npTeacherDoc(s, data) { // every notepad, in question order, as one doc
   keys.forEach((k) => { const p = data.pads[k], d = JSON.parse(p.data || "{}"), fb = (data.fbs || {})[k];
     const box = document.createElement("div"); box.style.cssText = "max-width:800px;margin:0 auto 22px";
     box.innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><b style="font:800 17px var(--body);flex:1">${esc(p.label || k)}</b>${fb ? `<span style="color:#1E8E3E;font:700 14px var(--body)">✓ Marked</span>` : ""}<button type="button" style="font:800 13px var(--body);padding:5px 10px;border-radius:6px;border:2px solid var(--ink);background:#fff">✏️ Mark this page</button></div>`;
-    box.appendChild(npCanvas(d, fb, w, true)); box.querySelector("button").onclick = () => npTeacherOne(s, k, p, fb, () => { ov.remove(); npFetch(s.cls + "|" + s.name).then((j) => npTeacherDoc(s, j)); });
+    box.appendChild(npCanvas(d, fb, w, true)); box.querySelector("button").onclick = () => npTeacherOne(s, k, { label: p.label, pad: p, fb, q: (QTEXT[k] || QTEXT[k.split("~")[0]] || {}).q, onClose: () => { ov.remove(); npFetch(s.cls + "|" + s.name).then((j) => npTeacherDoc(s, j)); } });
     list.appendChild(box); });
   ov.querySelector("[data-x]").onclick = () => ov.remove();
   ov.querySelector("[data-p]").onclick = () => { const html = `<h2>${esc(L.id)} · ${esc(s.name)} · ${esc(s.cls)}</h2>` + [...list.children].map((b) => { const c = b.querySelector("canvas"); return c ? `<div style="page-break-inside:avoid;margin-bottom:14px"><p><b>${esc(b.querySelector("b").textContent)}</b></p><img src="${c.toDataURL("image/jpeg", 0.85)}" style="width:100%"></div>` : ""; }).join(""); if (!printCopy(html, `${L.id} ${s.name}`, "")) alert("Printing is blocked here."); };
 }
 const TPENS = ["#0B5D2A", "#1E8E3E", "#34B05C", "#7CC242", "#00897B"]; // the teacher's greens: students' pens have none
-function npTeacherOne(s, k, p, fb0, after) { // the teacher marks on the student's own notepad page, in green
-  const d = JSON.parse(p.data || "{}"), fb = { s: (fb0 && fb0.s) || [], w: (fb0 && fb0.w) || [] };
+const liveKey = () => { try { return localStorage.getItem("jw-live-key") || ""; } catch (e) { return ""; } };
+async function liveGet(params) { const r = await fetch(`${LIVE.url}?` + new URLSearchParams(Object.assign({ lesson: L.id, key: liveKey() }, params))); return r.json(); }
+async function livePost(body) { const r = await fetch(LIVE.url, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify(Object.assign({ lesson: L.id, key: liveKey() }, body)) }); return r.json(); }
+
+// a student's graph, drawn small for the teacher: their lines and points on a grid, and the right line faintly behind
+function drawThumb(items, lines, size = 260) {
+  const R = 6, PAD = 0.6, s = size / (2 * (R + PAD)), X = (x) => (x + R + PAD) * s, Y = (y) => (R + PAD - y) * s;
+  let g = ""; for (let i = -R; i <= R; i++) g += `<line x1="${X(i)}" y1="${Y(-R)}" x2="${X(i)}" y2="${Y(R)}" stroke="${i ? "#DCE3EE" : "#23264A"}" stroke-width="${i ? 1 : 1.6}"/><line x1="${X(-R)}" y1="${Y(i)}" x2="${X(R)}" y2="${Y(i)}" stroke="${i ? "#DCE3EE" : "#23264A"}" stroke-width="${i ? 1 : 1.6}"/>`;
+  const right = (lines || []).map((q) => { if (!q || q.B === undefined) return ""; if (Math.abs(q.B) < 1e-9) { const x = q.C / q.A; return `<line x1="${X(x)}" y1="${Y(-R)}" x2="${X(x)}" y2="${Y(R)}" stroke="#1F9D55" stroke-width="6" stroke-opacity=".22"/>`; } const yAt = (x) => (q.C - q.A * x) / q.B; return `<line x1="${X(-R)}" y1="${Y(yAt(-R))}" x2="${X(R)}" y2="${Y(yAt(R))}" stroke="#1F9D55" stroke-width="6" stroke-opacity=".22"/>`; }).join("");
+  const mine = (items || []).map((it) => it.k === "ln" ? `<line x1="${X(it.a.x)}" y1="${Y(it.a.y)}" x2="${X(it.b.x)}" y2="${Y(it.b.y)}" stroke="#2B3A8C" stroke-width="2"/>` : it.k === "pt" ? `<circle cx="${X(it.x)}" cy="${Y(it.y)}" r="3.2" fill="#2B3A8C"/>` : it.p ? `<polyline points="${it.p.map((p) => `${X(p.x)},${Y(p.y)}`).join(" ")}" fill="none" stroke="#2B3A8C" stroke-width="2"/>` : "").join("");
+  return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" style="background:#FFFEF8;border:1px solid #C9CFDB;border-radius:4px"><defs><clipPath id="tc"><rect width="${size}" height="${size}"/></clipPath></defs><g clip-path="url(#tc)">${g}${right}${mine}</g></svg>`;
+}
+
+// the teacher writes on a student's notepad in green. Everything shows on the student's screen as it is written;
+// "Finished" tells the student it's done and closes the alert for that question.
+function npTeacherOne(s, k, o = {}) {
+  const id = s.cls + "|" + s.name, fb = { s: (o.fb && o.fb.s) || [], w: (o.fb && o.fb.w) || [] };
+  let d = o.pad && o.pad.data ? JSON.parse(o.pad.data) : { s: [], t: "", h: 1000 }, lastData = o.pad ? o.pad.data : "", extra = 0;
   const ov = document.createElement("div"); ov.className = "np-ov";
-  ov.innerHTML = `<div class="np-win"><div class="np-head"><b>📝 ${esc(s.name)} · ${esc(p.label || k)}</b><span class="np-saved" data-st></span><button type="button" data-send class="np-send">Send to student</button><button type="button" data-x>✕ Close</button></div>
-    <div class="np-tools"><button type="button" data-t="pen" class="on">🖍 Pen</button><button type="button" data-t="type">⌨ Write words</button><button type="button" data-t="ok">✓</button><button type="button" data-t="half">½</button><button type="button" data-t="no">✗</button><button type="button" data-t="rub">🧽 Rubber</button><button type="button" data-u>↶ Undo</button>
+  const qHTML = o.q ? `<div class="np-qlab">${esc(o.label || "")}</div>${tex(o.q)}` : `<div class="np-qlab">${esc(o.label || k)}</div><span class="muted">The question will show here once ${esc(s.name)} has started it.</span>`;
+  ov.innerHTML = `<div class="np-win" role="dialog" aria-label="Student notepad"><div class="np-head"><b>📝 ${esc(s.name)} · ${esc(s.cls)}</b><span class="np-saved" data-st>Opening…</span><button type="button" data-fin class="np-send">✅ Finished</button><button type="button" data-x>✕ Close</button></div>
+    <div class="np-q">${qHTML}</div>
+    <div class="np-tools"><button type="button" data-t="pen" class="on">🖍 Pen</button><button type="button" data-t="type">⌨ Write words</button><button type="button" data-t="ok">✓</button><button type="button" data-t="half">½</button><button type="button" data-t="no">✗</button><button type="button" data-t="rub">🧽 Rubber</button><button type="button" data-t="scroll">✋ Scroll</button><button type="button" data-u>↶ Undo</button>
       ${TPENS.map((c, i) => `<button type="button" class="sw${i === 1 ? " on" : ""}" data-tc="${c}" style="background:${c}" aria-label="Green shade ${i + 1}"></button>`).join("")}</div>
-    <div class="np-scroll"><div class="np-thelp">Pen, words, ✓ ½ ✗: tap the page where you want them. Everything you add is green and goes onto the student's own page.</div><div data-pg style="position:relative;max-width:860px;margin:0 auto"></div></div></div>`;
+    <div class="np-scroll"><div class="np-gone" data-gone hidden></div><div class="np-thelp">Everything you write appears on ${esc(s.name)}'s screen as you write it. Press <b>✅ Finished</b> when you're done: it closes the alert for this question. Use <b>✋ Scroll</b> to move up and down with a finger.</div><div data-pg style="position:relative;max-width:860px;margin:0 auto"></div><button type="button" class="np-more" data-more>＋ More paper</button></div></div>`;
   document.body.appendChild(ov);
-  const host = ov.querySelector("[data-pg]"), st = ov.querySelector("[data-st]"); let cv, tool = "pen", cur = null, hist = [], tcol = TPENS[1], dirty = false;
-  const snap = () => hist.push(JSON.stringify(fb)), changed = () => { dirty = true; st.textContent = "Not sent yet"; st.style.color = "#B8860B"; };
-  const draw = () => { const w = host.clientWidth; host.querySelectorAll("canvas").forEach((c) => c.remove()); cv = npCanvas(d, fb, w); cv.style.touchAction = "none"; cv.style.cursor = tool === "type" ? "text" : "crosshair"; host.prepend(cv); bind(); };
-  const pos = (e) => { const r = cv.getBoundingClientRect(); return [Math.round(((e.clientX - r.left) / r.width) * NP.W), Math.round(((e.clientY - r.top) / r.height) * (d.h || 1000))]; };
+  const host = ov.querySelector("[data-pg]"), st = ov.querySelector("[data-st]"), scroller = ov.querySelector(".np-scroll");
+  let cv, tool = "pen", cur = null, hist = [], tcol = TPENS[1], alive = true, pushT = null, dirty = false, busy = false, hideGone = false;
+  const goneBox = ov.querySelector("[data-gone]");
+  function goneInfo() { // what the student has rubbed out, undone or cleared: shown faded on the page, typing listed here
+    const g = d.gone || []; goneBox.hidden = !g.length; if (!g.length) return;
+    const tm = (t) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), typed = g.filter((x) => x.t).slice(-3).reverse();
+    goneBox.innerHTML = `<span>🗑 ${esc(s.name)} has removed writing from this page ${g.length} time${g.length === 1 ? "" : "s"} (last at ${tm(g[g.length - 1].at)}). ${hideGone ? "It's hidden." : "It's shown faded."}</span><button type="button" data-tg>${hideGone ? "Show removed writing" : "Hide removed writing"}</button>${typed.map((x) => `<div class="tx">Deleted typing at ${tm(x.at)}: “${esc(x.t.slice(0, 300))}”</div>`).join("")}`;
+    goneBox.querySelector("[data-tg]").onclick = () => { hideGone = !hideGone; draw(); };
+  }
+  const H = () => Math.max(d.h || 1000, NP.extent(fb) + 200, (d.h || 1000) + extra);
+  const status = (t, c) => { st.textContent = t; st.style.color = c || ""; };
+  const snap = () => hist.push(JSON.stringify(fb));
+  async function push(final) { // send the teacher's layer; the student sees it within a couple of seconds
+    clearTimeout(pushT); dirty = false; busy = true;
+    try { const j = await livePost({ t: "fb", id, q: k, fb, label: o.label || "", final: final ? 1 : 0 }); if (!j.ok) throw new Error(j.error); status(final ? "✓ Finished" : "● Live on their screen", "#1F9D55"); return true; }
+    catch (e) { status("Couldn't reach the live server. Trying again…", "#D93A3A"); dirty = true; pushT = setTimeout(() => push(false), 3000); return false; }
+    finally { busy = false; }
+  }
+  const changed = () => { dirty = true; status("Sending…", "#B8860B"); clearTimeout(pushT); pushT = setTimeout(() => push(false), 500); };
+  const draw = () => { const w = host.clientWidth; host.querySelectorAll("canvas").forEach((c) => c.remove()); cv = npCanvas(Object.assign({}, d, { h: H() }), fb, w, false, hideGone); goneInfo(); cv.style.touchAction = tool === "scroll" ? "pan-y" : "none"; cv.style.cursor = tool === "type" ? "text" : tool === "scroll" ? "grab" : "crosshair"; host.prepend(cv); bind(); };
+  const pos = (e) => { const r = cv.getBoundingClientRect(); return [Math.round(((e.clientX - r.left) / r.width) * NP.W), Math.round(((e.clientY - r.top) / r.height) * H())]; };
   const STAMP = { ok: "✓", half: "½", no: "✗" };
   function words(x, y) { // a box on the page to write a comment in; Enter or tapping away puts it on the page
     const old = host.querySelector(".np-tin"); if (old) old.blur();
-    const k = cv.clientWidth / NP.W, z = 26, t = document.createElement("textarea"); t.className = "np-tin"; t.rows = 1;
-    Object.assign(t.style, { left: x * k + "px", top: (y - z * 0.9) * k + "px", width: Math.max(160, (NP.W - x - 10) * k) + "px", fontSize: z * k + "px", lineHeight: z * 1.15 * k + "px", color: tcol });
+    const k2 = cv.clientWidth / NP.W, z = 26, t = document.createElement("textarea"); t.className = "np-tin"; t.rows = 1;
+    Object.assign(t.style, { left: x * k2 + "px", top: (y - z * 0.9) * k2 + "px", width: Math.max(160, (NP.W - x - 10) * k2) + "px", fontSize: z * k2 + "px", lineHeight: z * 1.15 * k2 + "px", color: tcol });
     host.appendChild(t); setTimeout(() => t.focus(), 0);
     let done = false; const fin = () => { if (done) return; done = true; const v = t.value.replace(/\s+$/, ""); t.remove(); if (v) { snap(); fb.w.push({ x, y, s: v, c: tcol, z }); changed(); } draw(); };
     t.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); fin(); } if (e.key === "Escape") { t.value = ""; fin(); } });
@@ -4770,35 +5017,43 @@ function npTeacherOne(s, k, p, fb0, after) { // the teacher marks on the student
     t.addEventListener("blur", fin);
   }
   function bind() {
-    cv.onpointerdown = (e) => { e.preventDefault(); const [x, y] = pos(e);
+    cv.onpointerdown = (e) => { if (tool === "scroll") return; e.preventDefault(); const [x, y] = pos(e);
       if (tool === "type") return words(x, y);
       if (STAMP[tool]) { snap(); fb.w.push({ x: x - 14, y: y + 16, s: STAMP[tool], c: tcol, z: 46, k: 1 }); changed(); return draw(); }
       cv.setPointerCapture(e.pointerId); snap(); if (tool === "rub") { rub(x, y); cur = { rub: 1 }; return; } cur = { c: tcol, w: 3, p: [x, y] }; };
-    cv.onpointermove = (e) => { if (!cur) return; const [x, y] = pos(e); if (cur.rub) return rub(x, y); cur.p.push(x, y); const ctx = cv.getContext("2d"), k = cv.width / NP.W; NP.paint(ctx, { s: [{ c: cur.c, w: cur.w, p: cur.p.slice(-4) }] }, k); };
-    cv.onpointerup = () => { if (cur && !cur.rub && cur.p.length > 1) { fb.s.push(cur); changed(); } cur = null; draw(); };
+    cv.onpointermove = (e) => { if (!cur) return; const [x, y] = pos(e); if (cur.rub) return rub(x, y); cur.p.push(x, y); const ctx = cv.getContext("2d"), k2 = cv.width / NP.W; NP.paint(ctx, { s: [{ c: cur.c, w: cur.w, p: cur.p.slice(-4) }] }, k2); };
+    cv.onpointerup = cv.onpointercancel = () => { if (cur && !cur.rub && cur.p.length > 1) { fb.s.push(cur); changed(); } cur = null; draw(); };
   }
   function rub(x, y) { // rubs out the teacher's own marks only; the student's work can't be touched
     const n = fb.s.length + fb.w.length;
     fb.s = fb.s.filter((q) => { for (let i = 0; i < q.p.length; i += 2) if ((q.p[i] - x) ** 2 + (q.p[i + 1] - y) ** 2 < 300) return false; return true; });
     fb.w = fb.w.filter((it) => { const ls = String(it.s).split("\n"), wd = Math.max(...ls.map((l) => l.length)) * it.z * 0.5 + 10; return !(x > it.x - 6 && x < it.x + wd && y > it.y - it.z && y < it.y + (ls.length - 1) * it.z * 1.15 + 8); });
     if (fb.s.length + fb.w.length !== n) { changed(); draw(); } }
-  const setTool = (t) => { tool = t; ov.querySelectorAll("[data-t]").forEach((x) => x.classList.toggle("on", x.dataset.t === t)); if (cv) cv.style.cursor = t === "type" ? "text" : "crosshair"; };
-  ov.querySelectorAll("[data-tc]").forEach((b) => (b.onclick = () => { tcol = b.dataset.tc; ov.querySelectorAll("[data-tc]").forEach((x) => x.classList.toggle("on", x === b)); if (tool === "rub") setTool("pen"); }));
+  const setTool = (t) => { tool = t; ov.querySelectorAll("[data-t]").forEach((x) => x.classList.toggle("on", x.dataset.t === t)); if (cv) { cv.style.touchAction = t === "scroll" ? "pan-y" : "none"; cv.style.cursor = t === "type" ? "text" : t === "scroll" ? "grab" : "crosshair"; } };
+  ov.querySelectorAll("[data-tc]").forEach((b) => (b.onclick = () => { tcol = b.dataset.tc; ov.querySelectorAll("[data-tc]").forEach((x) => x.classList.toggle("on", x === b)); if (tool === "rub" || tool === "scroll") setTool("pen"); }));
   ov.querySelectorAll("[data-t]").forEach((b) => (b.onclick = () => setTool(b.dataset.t)));
-  ov.querySelector("[data-u]").onclick = () => { const h = hist.pop(); if (h) { const o = JSON.parse(h); fb.s = o.s; fb.w = o.w; changed(); draw(); } };
-  ov.querySelector("[data-send]").onclick = async () => {
-    const t = host.querySelector(".np-tin"); if (t) t.blur();
-    st.textContent = "Sending…"; st.style.color = ""; fb.at = Date.now();
-    const key = (() => { try { return localStorage.getItem("jw-live-key") || ""; } catch (e) { return ""; } })();
-    try { const r = await fetch(LIVE.url, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ t: "fb", key, lesson: L.id, id: s.cls + "|" + s.name, q: k, fb }) }); const j = await r.json(); if (!j.ok) throw new Error(j.error);
-      dirty = false; st.textContent = "✓ Sent. It appears on their page within a few seconds."; st.style.color = "#1F9D55"; } catch (e) { st.textContent = "Couldn't send. Check the key and try again."; st.style.color = "#D93A3A"; }
-  };
-  ov.querySelector("[data-x]").onclick = () => { if (dirty && !confirmClose()) return; ov.remove(); if (after) after(); };
-  function confirmClose() { if (ov.querySelector(".np-ask")) return false; const a = document.createElement("div"); a.className = "np-set np-ask"; a.style.top = "60px";
-    a.innerHTML = `<b>You haven't sent these marks.</b><div class="row" style="margin-top:8px"><button type="button" data-y class="on">Send them</button><button type="button" data-n>Close without sending</button><button type="button" data-c>Keep marking</button></div>`;
-    ov.querySelector(".np-win").appendChild(a); a.querySelector("[data-y]").onclick = async () => { a.remove(); await ov.querySelector("[data-send]").onclick(); if (!dirty) { ov.remove(); if (after) after(); } };
-    a.querySelector("[data-n]").onclick = () => { ov.remove(); if (after) after(); }; a.querySelector("[data-c]").onclick = () => a.remove(); return false; }
-  requestAnimationFrame(draw);
+  ov.querySelector("[data-u]").onclick = () => { const h = hist.pop(); if (h) { const o2 = JSON.parse(h); fb.s = o2.s; fb.w = o2.w; changed(); draw(); } };
+  ov.querySelector("[data-more]").onclick = () => { extra += 500; draw(); scroller.scrollBy({ top: 400, behavior: "smooth" }); };
+  // keep the student's own writing up to date while this is open, and keep their screen checking for this teacher's writing
+  async function follow() {
+    let n = 0;
+    while (alive) {
+      try {
+        if (n % 4 === 0) await liveGet({ t: "watch", id, q: k });
+        const j = await liveGet({ t: "pad", id, q: k });
+        if (j && j.ok && j.pad && j.pad.data !== lastData && !cur && !host.querySelector(".np-tin")) { lastData = j.pad.data; d = JSON.parse(j.pad.data || "{}"); const top = scroller.scrollTop; draw(); scroller.scrollTop = top; }
+        if (st.textContent === "Opening…") status("● Live on their screen", "#1F9D55");
+      } catch (e) { /* try again */ }
+      n++; await new Promise((res) => setTimeout(res, 2500));
+    }
+  }
+  const shut = async () => { alive = false; clearTimeout(pushT); ov.remove(); if (dirty) await push(false); try { await liveGet({ t: "watch", id, q: k, stop: 1 }); } catch (e) { /* it runs out by itself */ } if (o.onClose) o.onClose(); };
+  ov.querySelector("[data-x]").onclick = shut;
+  ov.querySelector("[data-fin]").onclick = async () => { const t = host.querySelector(".np-tin"); if (t) t.blur(); status("Finishing…"); if (await push(true)) { alive = false; ov.remove(); if (o.onFinish) o.onFinish(); if (o.onClose) o.onClose(); } };
+  ov.addEventListener("keydown", (e) => { if (e.key === "Escape" && !e.target.closest(".np-tin")) shut(); });
+  requestAnimationFrame(() => { draw(); follow(); });
+  if (o.onOpen) o.onOpen();
+  return { close: shut };
 }
 
 // ---------- the teacher's live class view ----------
@@ -4812,22 +5067,27 @@ function liveStatus(s, now) {
   return ["ok", "Working", "#1F9D55"];
 }
 function openLive() {
+  if (!studentBuilt) { studentBuilt = true; buildStudent(); } // so every question's text is known here too
   const ov = document.createElement("div"); ov.className = "lv-ov";
-  ov.innerHTML = `<div class="lv-p" role="dialog" aria-label="Live class"><div class="lv-h"><b class="t">📡 Live class · ${esc(L.id)}</b><label class="small">Class <select data-cls><option value="">All</option></select></label><label class="snd"><input type="checkbox" data-snd checked> 🔔 Sound</label><button type="button" data-key>🔑 Key</button><button type="button" data-x>✕ Close</button></div><div class="lv-counts"></div><div class="lv-alerts" aria-live="polite"></div><div class="lv-grid"><div class="lv-empty">Connecting…</div></div><div class="lv-det" hidden></div><div class="lv-note">✋ = a student asked for help (press On my way so they know you've seen it). ⚠️ = ${3} wrong answers in a row on the same question. Updates every 5 seconds. Students show here once they type their name and class at the top of the lesson. "Not on the lesson" means the lesson isn't the window they're using, for example another app or the page around the lesson.</div></div>`;
+  ov.innerHTML = `<div class="lv-p" role="dialog" aria-label="Live class"><div class="lv-h"><b class="t">📡 Live class · ${esc(L.id)}</b><label class="small">Class <select data-cls><option value="">All</option></select></label><label class="snd"><input type="checkbox" data-snd checked> 🔔 Sound</label><button type="button" data-wall>📝 Notepads wall</button><button type="button" data-key>🔑 Key</button><button type="button" data-x>✕ Close</button></div><div class="lv-counts"></div><div class="lv-alerts" aria-live="polite"></div><div class="lv-grid"><div class="lv-empty">Connecting…</div></div><div class="lv-det" hidden></div><div class="lv-note">✋ = a student asked for help. ⚠️ = 3 wrong answers in a row on the same question. Click a name in an alert to open their work for that question; ✕ hides an alert. Click a student, then any question, to see their answer and write on their notepad. Updates every 5 seconds.</div></div>`;
   document.body.appendChild(ov);
   const grid = ov.querySelector(".lv-grid"), counts = ov.querySelector(".lv-counts"), det = ov.querySelector(".lv-det"), sel = ov.querySelector("[data-cls]"), alerts = ov.querySelector(".lv-alerts");
   const seenAlerts = new Set(); let firstPoll = true, ac = null, title0 = document.title;
   function chime() { if (!ov.querySelector("[data-snd]").checked) return; try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); const t = ac.currentTime; [880, 1320].forEach((f, i) => { const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = f; o.type = "sine"; g.gain.setValueAtTime(0.0001, t + i * 0.16); g.gain.exponentialRampToValueAtTime(0.25, t + i * 0.16 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.16 + 0.5); o.connect(g).connect(ac.destination); o.start(t + i * 0.16); o.stop(t + i * 0.16 + 0.55); }); } catch (e) { /* no sound */ } }
   const STUCK = 3; // wrong answers in a row on one question before it counts as stuck
   const ago = (ms) => { const s2 = Math.max(0, Math.round(ms / 1000)); return s2 < 60 ? `${s2}s ago` : `${Math.round(s2 / 60)} min ago`; };
-  async function ack(id) { try { await fetch(`${LIVE.url}?t=ack&lesson=${encodeURIComponent(L.id)}&id=${encodeURIComponent(id)}&key=${encodeURIComponent(keyGet())}`); } catch (e) { /* try again next poll */ } poll(); }
-  const labels = gather().map((r) => [r.sec, r.label]);
-  // which notepad key goes with each row of the table (by its label)
+  async function ack(id) { try { await liveGet({ t: "ack", id }); } catch (e) { /* try again next poll */ } poll(); }
+  const labels = gather().map((r) => [r.sec, r.label]), labelText = (i) => (labels[i] ? `${labels[i][0]} · ${labels[i][1]}` : `Question ${+i + 1}`);
   const byLabel = {}; Object.entries(QLABEL).forEach(([k, lab]) => { byLabel[lab] = byLabel[lab] || k; });
   const keysByLabel = labels.map(([sec, lab]) => byLabel[`${sec} · ${lab}`]);
   const npKey = (s, base) => base && Object.keys(s.np || {}).filter((k) => k.split("~")[0] === base).sort((a, b) => (s.np[b] || 0) - (s.np[a] || 0))[0];
-  let data = {}, picked = null, tm = null, alive = true;
-  const keyGet = () => { try { return localStorage.getItem("jw-live-key") || ""; } catch (e) { return ""; } };
+  // alerts the teacher has dealt with: student + question → how many wrong answers there were when it was dealt with
+  const HK = `jw-live-handled-${L.id}`;
+  let handled = (() => { try { return JSON.parse(localStorage.getItem(HK)) || {}; } catch (e) { return {}; } })();
+  const saveHandled = () => { try { localStorage.setItem(HK, JSON.stringify(handled)); } catch (e) { /* storage not available */ } };
+  const looking = new Set(), answers = {}; // id → { base: { k, q, a, ok, t, w, dr } }
+  let data = {}, picked = null, tm = null, alive = true, openRows = new Set();
+  const sid = (s) => s.cls + "|" + s.name;
   function askKey(msg) {
     grid.innerHTML = `<div class="lv-empty">${msg || "Type your teacher key (the word you set in the script)."}<br><br><input type="password" data-lvk style="font:700 16px var(--body);padding:6px 10px;border:2px solid var(--ink);border-radius:6px"> <button type="button" data-lvks style="font:800 15px var(--body);padding:6px 14px;border-radius:6px;border:2px solid var(--ink);background:var(--ink);color:#fff">Save</button></div>`;
     const k = grid.querySelector("[data-lvk]"); k.focus();
@@ -4836,13 +5096,26 @@ function openLive() {
   }
   async function poll() {
     clearTimeout(tm); if (!alive) return;
-    const key = keyGet(); if (!key) return askKey();
+    if (!liveKey()) return askKey();
     try {
-      const r = await fetch(`${LIVE.url}?t=live&lesson=${encodeURIComponent(L.id)}&key=${encodeURIComponent(key)}`), j = await r.json();
+      const j = await liveGet({ t: "live" });
       if (!j.ok && j.error === "key") return askKey("That key wasn't right. Type it again.");
-      data = j; draw();
+      data = j; if (picked) await loadAnswers(picked); draw();
     } catch (e) { counts.innerHTML = `<span class="lv-chip" style="color:#D93A3A">Can't reach the live server. Trying again…</span>`; }
     tm = setTimeout(poll, 5000);
+  }
+  async function loadAnswers(id) { try { const j = await liveGet({ t: "ans", id }); if (j && j.ok) answers[id] = j.ans || {}; } catch (e) { /* keep the last copy */ } }
+  // open a student's notepad for question row i (from an alert or their answers)
+  async function openPad(s, i, k0) {
+    const id = sid(s), base = k0 ? k0.split("~")[0] : keysByLabel[i]; if (!base) return;
+    if (i === undefined || i < 0) i = keysByLabel.indexOf(base);
+    if (!answers[id]) await loadAnswers(id);
+    const an = (answers[id] || {})[base], k = k0 || (an && an.k) || npKey(s, base) || base, lk = `${id}|${i}`;
+    let pad = null, fb = null; try { const j = await liveGet({ t: "pad", id, q: k }); if (j && j.ok) { pad = j.pad; fb = j.fb; } } catch (e) { /* open a fresh page */ }
+    npTeacherOne(s, k, { label: i > -1 ? labelText(i) : QLABEL[k] || QLABEL[base] || k, q: (an && an.q) || (QTEXT[k] || QTEXT[base] || {}).q || "", pad, fb,
+      onOpen: () => { looking.add(lk); draw(); },
+      onClose: () => { looking.delete(lk); draw(); },
+      onFinish: () => { if (i > -1) { handled[lk] = Math.max(1, +((s.w || "")[i] || 0)); saveHandled(); } if (s.help && i > -1 && s.help.q === labelText(i)) ack(id); else poll(); } });
   }
   function draw() {
     const now = data.now || Date.now(), all = Object.values(data.students || {});
@@ -4851,35 +5124,85 @@ function openLive() {
     const list = all.filter((s) => !sel.value || s.cls === sel.value).sort((a, b) => a.name.localeCompare(b.name));
     const st = list.map((s) => [s, liveStatus(s, now)]), n = (k) => st.filter(([, x]) => x[0] === k).length;
     counts.innerHTML = [["ok", "Working", "#1F9D55"], ["idle", "Idle", "#D9A400"], ["away", "Elsewhere", "#E8833A"], ["gone", "Gone", "#8A93A8"]].map(([k, t, c]) => `<span class="lv-chip"><i style="background:${c}"></i>${t}: ${n(k)}</span>`).join("") + `<span class="lv-chip">${list.length} student${list.length === 1 ? "" : "s"}</span>`;
-    // alerts: help requests first, then questions students are stuck on
+    // alerts: help requests first, then questions students are stuck on. Dealt-with students drop off.
     const helpers = list.filter((s) => s.help && s.help.at && !(s.ack >= s.help.at) && liveStatus(s, now)[0] !== "gone").sort((a, b) => a.help.at - b.help.at);
-    const stuck = {};
-    list.forEach((s) => { const w = s.w || "", r = s.r || ""; for (let i = 0; i < w.length; i++) if (+w[i] >= STUCK && r[i] !== "1") (stuck[i] || (stuck[i] = [])).push(s); });
-    const fresh = [];
-    const html = helpers.map((s) => { const id = `h|${s.cls}|${s.name}|${s.help.at}`; const nw = !seenAlerts.has(id); if (nw) { seenAlerts.add(id); fresh.push(id); }
-      return `<div class="lv-al help${nw && !firstPoll ? " new" : ""}">✋ <span><b>${esc(s.name)}</b> (${esc(s.cls)}) needs help with <b>${esc(s.help.q)}</b> <span class="ago">${ago(now - s.help.at)}</span></span><span class="sp"></span><button type="button" data-ack="${esc(s.cls + "|" + s.name)}">✓ On my way</button></div>`; }).concat(
-      Object.entries(stuck).sort((a, b) => b[1].length - a[1].length).map(([i, ss]) => { const lab = labels[i] ? `${labels[i][0]} · ${labels[i][1]}` : `Question ${+i + 1}`, id = `s|${i}|${ss.map((x) => x.name).sort().join(",")}`, nw = !seenAlerts.has(id); if (nw) { seenAlerts.add(id); fresh.push(id); }
-        return `<div class="lv-al stuck${nw && !firstPoll ? " new" : ""}">⚠️ <span><b>${ss.length === 1 ? esc(ss[0].name) + " is" : ss.length + " students are"}</b> stuck on <b>${esc(lab)}</b>${ss.length > 1 ? `: ${ss.map((x) => esc(x.name)).join(", ")}` : ` (${Math.max(...ss.map((x) => +x.w[i]))} wrong in a row)`}</span></div>`; })).join("");
+    const stuck = {}, isStuck = (s, i) => { const w = +((s.w || "")[i] || 0); return w >= STUCK && (s.r || "")[i] !== "1" && !(handled[`${sid(s)}|${i}`] >= w); };
+    list.forEach((s) => { for (let i = 0; i < (s.w || "").length; i++) if (isStuck(s, i)) (stuck[i] || (stuck[i] = [])).push(s); });
+    const fresh = [], eye = (s, i) => (looking.has(`${sid(s)}|${i}`) ? ` <span class="lv-eye">👀 open</span>` : "");
+    const html = helpers.map((s) => { const id = `h|${sid(s)}|${s.help.at}`, nw = !seenAlerts.has(id), i = labels.findIndex((_, j) => labelText(j) === s.help.q); if (nw) { seenAlerts.add(id); fresh.push(id); }
+      return `<div class="lv-al help${nw && !firstPoll ? " new" : ""}">✋ <span><b>${esc(s.name)}</b> (${esc(s.cls)}) needs help with <b>${esc(s.help.q)}</b>${i > -1 ? eye(s, i) : ""} <span class="ago">${ago(now - s.help.at)}</span></span><span class="sp"></span>${i > -1 ? `<button type="button" data-open="${esc(sid(s))}" data-i="${i}">📝 Open their work</button>` : ""}<button type="button" data-ack="${esc(sid(s))}">✓ On my way</button><button type="button" class="x" data-ack="${esc(sid(s))}" title="Hide this alert">✕</button></div>`; }).concat(
+      Object.entries(stuck).sort((a, b) => b[1].length - a[1].length).map(([i, ss]) => { const id = `s|${i}|${ss.map((x) => x.name).sort().join(",")}`, nw = !seenAlerts.has(id); if (nw) { seenAlerts.add(id); fresh.push(id); }
+        return `<div class="lv-al stuck${nw && !firstPoll ? " new" : ""}">⚠️ <span><b>${ss.length === 1 ? "1 student is" : ss.length + " students are"}</b> stuck on <b>${esc(labelText(i))}</b>: ${ss.map((x) => `<button type="button" class="nm" data-open="${esc(sid(x))}" data-i="${i}" title="Open their work">${esc(x.name)}</button>${eye(x, i)}`).join(" ")}</span><span class="sp"></span><button type="button" class="x" data-dis="${i}" title="Hide this alert">✕</button></div>`; })).join("");
     alerts.innerHTML = html;
-    alerts.querySelectorAll("[data-ack]").forEach((b) => (b.onclick = () => { b.disabled = true; b.textContent = "…"; ack(b.dataset.ack); }));
+    alerts.querySelectorAll("[data-ack]").forEach((b) => (b.onclick = () => { b.disabled = true; ack(b.dataset.ack); }));
+    alerts.querySelectorAll("[data-dis]").forEach((b) => (b.onclick = () => { const i = +b.dataset.dis; (stuck[i] || []).forEach((s) => (handled[`${sid(s)}|${i}`] = +((s.w || "")[i] || 0))); saveHandled(); draw(); }));
+    alerts.querySelectorAll("[data-open]").forEach((b) => (b.onclick = () => { const s = list.find((x) => sid(x) === b.dataset.open); if (s) openPad(s, +b.dataset.i); }));
     if (fresh.length && !firstPoll) { chime(); document.title = `(${helpers.length || "!"}) ${title0}`; setTimeout(() => (document.title = title0), 8000); }
     firstPoll = false;
-    if (!list.length) { grid.innerHTML = `<div class="lv-empty">No students yet. They appear when they type their name and class at the top of the lesson.</div>`; return; }
-    grid.innerHTML = st.map(([s, x]) => { const code = s.r || "", ok = (code.match(/1/g) || []).length, bad = (code.match(/2/g) || []).length;
-      return `<div class="lv-card" data-id="${esc(s.cls + "|" + s.name)}" style="border-left-color:${x[2]}"><div class="n">${esc(s.name)}<span>${esc(s.cls)}</span></div><div class="s" style="color:${x[2]}">● ${x[1]}</div><div class="m">${s.sec ? `On <b>${esc(s.sec)}</b>` : ""}${s.bu ? ` · Build it up ${esc(s.bu)}` : ""}</div><div class="m">${ok} right · ${bad} wrong · ${code.length - ok - bad} not tried</div>${s.help && !(s.ack >= s.help.at) ? `<div class="hl">✋ Asked for help: ${esc(s.help.q)}</div>` : ""}${[...(s.w || "")].some((c, i) => +c >= STUCK && code[i] !== "1") ? `<div class="st">⚠️ Stuck on ${[...(s.w || "")].map((c, i) => (+c >= STUCK && code[i] !== "1" ? (labels[i] ? labels[i][1] : `Q${i + 1}`) : null)).filter(Boolean).map(esc).join(", ")}</div>` : ""}${s.np && Object.keys(s.np).length ? `<div class="m">📝 ${Object.keys(s.np).length} notepad${Object.keys(s.np).length === 1 ? "" : "s"} with working</div>` : ""}<div class="lv-bar">${[...code].map((c) => `<i class="${c === "1" ? "k" : c === "2" ? "w" : ""}"></i>`).join("")}</div></div>`; }).join("");
-    grid.querySelectorAll(".lv-card").forEach((c) => (c.onclick = () => { picked = c.dataset.id; detail(); }));
+    if (!list.length) { grid.innerHTML = `<div class="lv-empty">No students yet. They appear when they type their name and class at the top of the lesson.</div>`; det.hidden = true; return; }
+    grid.innerHTML = st.map(([s, x]) => { const code = s.r || "", ok = (code.match(/1/g) || []).length, bad = (code.match(/2/g) || []).length, stk = [...(s.w || "")].map((c, i) => (isStuck(s, i) ? labels[i] ? labels[i][1] : `Q${i + 1}` : null)).filter(Boolean);
+      return `<div class="lv-card${sid(s) === picked ? " on" : ""}" data-id="${esc(sid(s))}" style="border-left-color:${x[2]}"><div class="n">${esc(s.name)}<span>${esc(s.cls)}</span></div><div class="s" style="color:${x[2]}">● ${x[1]}</div><div class="m">${s.sec ? `On <b>${esc(s.sec)}</b>` : ""}${s.bu ? ` · Build it up ${esc(s.bu)}` : ""}</div><div class="m">${ok} right · ${bad} wrong · ${code.length - ok - bad} not tried</div>${s.help && !(s.ack >= s.help.at) ? `<div class="hl">✋ Asked for help: ${esc(s.help.q)}</div>` : ""}${stk.length ? `<div class="st">⚠️ Stuck on ${stk.map(esc).join(", ")}</div>` : ""}${s.np && Object.keys(s.np).length ? `<div class="m">📝 ${Object.keys(s.np).length} notepad${Object.keys(s.np).length === 1 ? "" : "s"}</div>` : ""}<div class="lv-bar">${[...code].map((c) => `<i class="${c === "1" ? "k" : c === "2" ? "w" : ""}"></i>`).join("")}</div></div>`; }).join("");
+    grid.querySelectorAll(".lv-card").forEach((c) => (c.onclick = async () => { if (picked !== c.dataset.id) openRows = new Set(); picked = c.dataset.id; grid.querySelectorAll(".lv-card").forEach((x) => x.classList.toggle("on", x === c)); detail(); await loadAnswers(picked); detail(); }));
     detail();
   }
+  // one student: every question, what they answered, and their notepad for it
   function detail() {
-    const s = Object.values(data.students || {}).find((x) => x.cls + "|" + x.name === picked); if (!s) { det.hidden = true; return; }
-    const code = s.r || ""; det.hidden = false;
-    const nps = Object.keys(s.np || {});
-    det.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="font:800 18px var(--body);flex:1">${esc(s.name)} · ${esc(s.cls)}</b>${nps.length ? `<button type="button" data-all style="font:800 14px var(--body);padding:4px 10px;border:2px solid var(--blue);border-radius:6px;background:#EEF3FF">📝 All written work (${nps.length})</button>` : ""}<button type="button" data-c style="font:800 14px var(--body);padding:4px 10px;border:2px solid var(--ink);border-radius:6px;background:#fff">Close</button></div><table><tr><th>Section</th><th>Question</th><th>So far</th></tr>${labels.map(([sec, lab], i) => `<tr><td>${esc(sec)}</td><td>${esc(lab)}</td><td class="${code[i] === "1" ? "ok" : code[i] === "2" ? "no" : ""}">${code[i] === "1" ? "✓ Correct" : code[i] === "2" ? "✗ Not right yet" : "Not tried"}</td><td>${npKey(s, keysByLabel[i]) ? `<button type="button" data-one="${esc(npKey(s, keysByLabel[i]))}" style="font:800 12px var(--body);padding:2px 8px;border:2px solid var(--ink);border-radius:6px;background:#fff">📝 Open</button>` : ""}</td></tr>`).join("")}</table>`;
-    const id = s.cls + "|" + s.name, openAll = async () => { try { npTeacherDoc(s, await npFetch(id)); } catch (e) { alert("Couldn't load the notepads."); } };
-    if (det.querySelector("[data-all]")) det.querySelector("[data-all]").onclick = openAll;
-    det.querySelectorAll("[data-one]").forEach((b) => (b.onclick = async () => { try { const j = await npFetch(id), k = b.dataset.one; if (j.pads && j.pads[k]) npTeacherOne(s, k, j.pads[k], (j.fbs || {})[k]); else alert("That notepad hasn't arrived yet. Try again in a few seconds."); } catch (e) { alert("Couldn't load the notepad."); } }));
-    det.querySelector("[data-c]").onclick = () => { picked = null; det.hidden = true; };
+    const s = Object.values(data.students || {}).find((x) => sid(x) === picked); if (!s) { det.hidden = true; return; }
+    const code = s.r || "", id = sid(s), an = answers[id] || {}; det.hidden = false;
+    const nps = Object.keys(s.np || {}), top = det.scrollTop;
+    const res = (i) => (code[i] === "1" ? `<span class="ok">✓ Correct</span>` : code[i] === "2" ? `<span class="no">✗ Not right yet</span>` : `<span class="muted">Not tried</span>`);
+    det.innerHTML = `<div class="lv-dh"><b>${esc(s.name)} · ${esc(s.cls)}</b><span class="muted small">Click a question to see their answer and write on their notepad.</span>${nps.length ? `<button type="button" data-all>📝 All written work (${nps.length})</button>` : ""}<button type="button" data-c>Close</button></div>
+      <table class="lv-qs"><tr><th>Section</th><th>Question</th><th>So far</th><th>Their answer</th><th></th></tr>${labels.map(([sec, lab], i) => { const b = keysByLabel[i], a = b && an[b], hasPad = !!npKey(s, b), open = openRows.has(i);
+        return `<tr class="lv-qr${open ? " open" : ""}" data-row="${i}"><td>${esc(sec)}</td><td>${esc(lab)}</td><td>${res(i)}${a && a.w ? ` <span class="small muted">(${a.w} wrong)</span>` : a && a.t > 1 && a.ok === 1 ? ` <span class="small muted">(${a.t} tries)</span>` : ""}</td><td class="lv-ans">${a && a.a ? esc(a.a) : a && a.dr ? "📈 graph" : ""}</td><td>${hasPad ? "📝" : ""}${looking.has(`${id}|${i}`) ? " 👀" : ""}</td></tr>${open ? `<tr class="lv-qx"><td colspan="5">${rowDetail(s, i, a)}</td></tr>` : ""}`; }).join("")}</table>`;
+    det.scrollTop = top;
+    if (det.querySelector("[data-all]")) det.querySelector("[data-all]").onclick = async () => { try { npTeacherDoc(s, await npFetch(id)); } catch (e) { alert("Couldn't load the notepads."); } };
+    det.querySelectorAll("[data-row]").forEach((r) => (r.onclick = () => { const i = +r.dataset.row; openRows.has(i) ? openRows.delete(i) : openRows.add(i); detail(); }));
+    det.querySelectorAll("[data-pad]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); openPad(s, +b.dataset.pad); }));
+    det.querySelector("[data-c]").onclick = () => { picked = null; det.hidden = true; grid.querySelectorAll(".lv-card").forEach((x) => x.classList.remove("on")); };
   }
+  function rowDetail(s, i, a) {
+    const base = keysByLabel[i], q = (a && a.q) || (QTEXT[base] || {}).q || "", hasPad = !!npKey(s, base);
+    const dr = a && a.dr ? `<div class="lv-dr">${a.dr.map((it, j) => it ? `<div><div class="small"><b>${esc(((a.lines || [])[j] || {}).text || "Their graph")}</b> ${it.ok ? `<span class="ok">✓ drawn correctly</span>` : `<span class="no">not right yet</span>`}</div>${drawThumb(it.items, [(a.lines || [])[j]])}</div>` : "").join("")}</div>` : "";
+    return `<div class="lv-qd">${q ? `<div class="lv-qq">${tex(q)}</div>` : `<div class="muted">They haven't opened this question yet.</div>`}
+      ${a ? `<div class="lv-qa"><b>Their answer:</b> ${a.a ? esc(a.a) : `<span class="muted">nothing typed</span>`}${a.t ? ` <span class="small muted">· ${a.t} ${a.t === 1 ? "check" : "checks"}${a.sh ? " · looked at the answer" : ""}</span>` : ""}</div>` : ""}${dr}
+      <div class="lv-qb"><button type="button" data-pad="${i}">📝 ${hasPad ? "Open their notepad" : "Write a note on their notepad"}</button></div></div>`;
+  }
+  // every student's latest notepad at a glance, refreshing every few seconds; click one to open it
+  function openWall() {
+    const w = document.createElement("div"); w.className = "lv-ov";
+    w.innerHTML = `<div class="lv-p" role="dialog" aria-label="Notepads wall"><div class="lv-h"><b class="t">📝 Notepads wall · ${esc(L.id)}${sel.value ? " · " + esc(sel.value) : ""}</b><span class="muted small" data-ws>Loading…</span><button type="button" data-x>✕ Close</button></div><div class="lv-note" style="border:0">Each student's most recent notepad, updating every 5 seconds. Faded writing was rubbed out, undone or cleared. Click a notepad to open it and write on it.</div><div class="lv-wall"><div class="lv-empty">Loading…</div></div></div>`;
+    document.body.appendChild(w);
+    const wall = w.querySelector(".lv-wall"), ws = w.querySelector("[data-ws]"), seen = {}; let on = true, t2 = null;
+    async function tick() {
+      clearTimeout(t2); if (!on) return;
+      try {
+        const j = await liveGet({ t: "wall", cls: sel.value || "" }); if (!j.ok) throw new Error(j.error);
+        const pads = (j.pads || []).filter((x) => x.pad && x.pad.data).sort((a, b) => a.name.localeCompare(b.name)), now = j.now || Date.now();
+        ws.textContent = `${pads.length} notepad${pads.length === 1 ? "" : "s"} · updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
+        if (!pads.length) { wall.innerHTML = `<div class="lv-empty">No one has written in a notepad yet.</div>`; }
+        else {
+          if (wall.querySelector(".lv-empty")) wall.innerHTML = "";
+          const ids = new Set(pads.map((x) => x.id + "|" + x.q));
+          wall.querySelectorAll(".lv-tile").forEach((t) => { if (!ids.has(t.dataset.k)) t.remove(); });
+          pads.forEach((x, n) => {
+            const key = x.id + "|" + x.q; let t = wall.querySelector(`.lv-tile[data-k="${CSS.escape(key)}"]`);
+            if (!t) { t = document.createElement("div"); t.className = "lv-tile"; t.dataset.k = key; t.innerHTML = `<div class="th">${esc(x.name)} <span>${esc(x.cls)}</span><span class="sp"></span><span data-ago></span></div><div class="tq">${esc(x.pad.label || QLABEL[x.q] || x.q)}</div><div class="pv"></div><div class="gn" hidden></div>`;
+              t.onclick = () => { const s = Object.values(data.students || {}).find((y) => sid(y) === x.id); if (s) openPad(s, -1, x.q); }; }
+            if (wall.children[n] !== t) wall.insertBefore(t, wall.children[n] || null);
+            t.querySelector("[data-ago]").textContent = x.at ? ago(now - x.at) : "";
+            t.classList.toggle("fresh", x.at && now - x.at < 20000);
+            if (seen[key] !== x.pad.data) { seen[key] = x.pad.data; const d = JSON.parse(x.pad.data || "{}"), pv = t.querySelector(".pv"); pv.innerHTML = ""; pv.appendChild(npCanvas(d, null, pv.clientWidth || 320, true));
+              const gn = t.querySelector(".gn"), g = d.gone || []; gn.hidden = !g.length; gn.textContent = g.length ? `🗑 Removed writing ${g.length} time${g.length === 1 ? "" : "s"}${g.some((y) => y.t) ? " (incl. typing)" : ""}` : ""; }
+          });
+        }
+      } catch (e) { ws.textContent = "Can't reach the live server. Trying again…"; }
+      t2 = setTimeout(tick, 5000);
+    }
+    const shut = () => { on = false; clearTimeout(t2); w.remove(); };
+    w.querySelector("[data-x]").onclick = shut; w.addEventListener("click", (e) => { if (e.target === w) shut(); });
+    tick();
+  }
+  ov.querySelector("[data-wall]").onclick = () => { if (!liveKey()) return askKey(); openWall(); };
   sel.onchange = draw;
   ov.querySelector("[data-key]").onclick = () => askKey();
   const close = () => { alive = false; clearTimeout(tm); ov.remove(); document.title = title0; };
@@ -4979,12 +5302,13 @@ function drawQ0(level) {
   return { text: "y = 2x + 1", A: -2, B: 1, C: 1, m: 2, c: 1 };
 }
 
-function mountDrawGraphs(host) {
+function mountDrawGraphs(host, opts = {}) { // opts.fixed: the lines to draw for one question (instead of random practice)
+  const FX = opts.fixed && opts.fixed.length ? opts.fixed : null; let fi = 0;
   const num = (v) => String(+(+v).toFixed(2)).replace("-", "−");
   const R = 6, S = 560, PAD = 0.6, s = S / (2 * (R + PAD)), X = (x) => (x + R + PAD) * s, Y = (y) => (R + PAD - y) * s;
   const ux = (px) => px / s - R - PAD, uy = (py) => R + PAD - py / s;
-  const st = state.draw || (state.draw = { right: 0, tried: 0, streak: 0, best: 0, level: "easy" });
-  let level = st.level || "easy", Q = drawQ(level), tool = "ruler", items = [], hintN = 0, wrongN = 0, solved = false;
+  const st = FX ? { right: 0, tried: 0, streak: 0, best: 0, mode: opts.mode || "free" } : state.draw || (state.draw = { right: 0, tried: 0, streak: 0, best: 0, level: "easy" });
+  let level = st.level || "easy", Q = FX ? FX[0] : drawQ(level), tool = "ruler", items = [], hintN = 0, wrongN = 0, solved = false;
   let mode = st.mode || "assist", step = 0;
   host.innerHTML = `<div class="dg"><div class="dg-left"><div class="dg-eqtop" aria-hidden="true"><span class="lbl">Draw</span><span data-eqtop></span></div><div class="dg-paper"><svg viewBox="0 0 ${S} ${S}" role="img" aria-label="Graph paper"></svg></div></div>
     <div class="dg-side">
@@ -5000,21 +5324,24 @@ function mountDrawGraphs(host) {
         <p class="dg-tip" data-tip></p></div>
     </div></div>`;
   const svg = host.querySelector("svg"), q = (sel) => host.querySelector(sel);
+  if (FX) { q(".dg-lv").style.display = "none"; q(".dg-score").style.display = "none"; const nb = q("[data-n]"); nb.textContent = "Next line ▶"; nb.hidden = FX.length < 2; if (q("[data-dghelp]")) q("[data-dghelp]").remove(); }
+  const doneMsg = () => (FX ? (fi < FX.length - 1 ? " Press Next line ▶ for the next one." : " All done: press ✓ Done to go back to the question.") : " Press Next equation for another.");
+  const lineLabel = () => (FX && FX.length > 1 ? `Line ${fi + 1} of ${FX.length}` : "Draw the line");
   // the whole grid always fits on the screen, under the lesson's sticky bars, so a line can be ruled corner to corner
   const paperEl = host.querySelector(".dg-paper"), eqTop = host.querySelector("[data-eqtop]"), eqMain = host.querySelector("[data-eq]");
   const stickyH = () => { const tb = document.querySelector("#student .tabs"), bar = document.querySelector(".topbar"); let h = 0; if (bar && getComputedStyle(bar).position !== "static") h = Math.max(h, bar.getBoundingClientRect().height); if (tb && getComputedStyle(tb).position === "sticky") h = Math.max(h, (parseFloat(getComputedStyle(tb).top) || 0) + tb.getBoundingClientRect().height); return h; };
   function fit() {
     if (!host.offsetParent) return; const narrow = innerWidth <= 900, top = host.querySelector(".dg-eqtop"), extra = narrow && top ? top.getBoundingClientRect().height + 8 : 0;
-    const room = innerHeight - stickyH() - extra - 14, colW = host.querySelector(".dg-left").clientWidth;
+    const room = opts.modal ? opts.modal() : innerHeight - stickyH() - extra - 14, colW = host.querySelector(".dg-left").clientWidth;
     paperEl.style.width = Math.round(Math.max(240, Math.min(560, colW, room))) + "px";
   }
   function inView() { // bring the whole grid (and, on narrow screens, the equation above it) into view
-    if (!host.offsetParent) return; fit(); const first = innerWidth <= 900 ? host.querySelector(".dg-eqtop") : paperEl, r1 = first.getBoundingClientRect(), r2 = paperEl.getBoundingClientRect(), sh = stickyH();
+    if (!host.offsetParent || opts.modal) return; fit(); const first = innerWidth <= 900 ? host.querySelector(".dg-eqtop") : paperEl, r1 = first.getBoundingClientRect(), r2 = paperEl.getBoundingClientRect(), sh = stickyH();
     if (r1.top < sh + 2 || r2.bottom > innerHeight - 2) window.scrollTo({ top: Math.max(0, scrollY + r1.top - sh - 8), behavior: "smooth" });
   }
   if (eqMain && eqTop) { const copy = () => (eqTop.innerHTML = eqMain.innerHTML); new MutationObserver(copy).observe(eqMain, { childList: true, subtree: true, characterData: true }); copy(); }
   addEventListener("resize", fit); if (window.ResizeObserver) new ResizeObserver(fit).observe(host);
-  let wasShown = false; setInterval(() => { const shown = !!host.offsetParent; if (shown && !wasShown) setTimeout(inView, 60); wasShown = shown; }, 300);
+  let wasShown = false; const shownT = setInterval(() => { if (!host.isConnected) return clearInterval(shownT); const shown = !!host.offsetParent; if (shown && !wasShown) setTimeout(inView, 60); wasShown = shown; }, 300);
   const TIPS = { ruler: "Press where the line starts and drag to where it ends. The ruler snaps to your points.", point: "Tap to plot a point. Points snap to the grid corners.", pen: "Draw freehand. For a straight line, use the ruler.", rubber: "Drag over anything to rub it out." };
   // graph paper
   let g = `<defs><pattern id="dgsm" width="${s / 5}" height="${s / 5}" patternUnits="userSpaceOnUse" x="${X(0)}" y="${Y(0)}"><path d="M ${s / 5} 0 L 0 0 0 ${s / 5}" fill="none" stroke="#E3ECF5" stroke-width=".6"/></pattern></defs>`;
@@ -5023,7 +5350,7 @@ function mountDrawGraphs(host) {
   g += `<line class="dg-yax" x1="${X(0)}" y1="${Y(-R - .3)}" x2="${X(0)}" y2="${Y(R + .3)}" stroke="#23264A" stroke-width="2"/><line x1="${X(-R - .3)}" y1="${Y(0)}" x2="${X(R + .3)}" y2="${Y(0)}" stroke="#23264A" stroke-width="2"/>`;
   for (let i = -R; i <= R; i++) if (i) g += `<text x="${X(i)}" y="${Y(0) + 16}" text-anchor="middle" font-size="12" font-weight="700" fill="#4A5070">${String(i).replace("-", "−")}</text><text x="${X(0) - 7}" y="${Y(i) + 4}" text-anchor="end" font-size="12" font-weight="700" fill="#4A5070">${String(i).replace("-", "−")}</text>`;
   g += `<text x="${X(0) - 7}" y="${Y(0) + 16}" text-anchor="end" font-size="12" font-weight="700" fill="#4A5070">0</text><text x="${X(R + .45)}" y="${Y(0) + 5}" font-size="17" font-style="italic" font-weight="700" fill="#23264A">x</text><text x="${X(0) + 6}" y="${Y(R + .35)}" font-size="17" font-style="italic" font-weight="700" fill="#23264A">y</text>`;
-  svg.innerHTML = g + `<g data-ans></g><g data-items></g><g data-live></g><circle data-hy r="13" fill="none" stroke="#FFC93C" stroke-width="4" cx="-99" cy="-99"/>`;
+  svg.innerHTML = g + `<clipPath id="dgclip${(mountDrawGraphs.n = (mountDrawGraphs.n || 0) + 1)}"><rect x="${X(-R)}" y="${Y(R)}" width="${2 * R * s}" height="${2 * R * s}"/></clipPath><g data-ans clip-path="url(#dgclip${mountDrawGraphs.n})"></g><g data-items></g><g data-live></g><circle data-hy r="13" fill="none" stroke="#FFC93C" stroke-width="4" cx="-99" cy="-99"/>`;
   const layer = svg.querySelector("[data-items]"), live = svg.querySelector("[data-live]"), ans = svg.querySelector("[data-ans]");
   const toU = (e) => { const r = svg.getBoundingClientRect(); return { x: ux(((e.clientX - r.left) / r.width) * S), y: uy(((e.clientY - r.top) / r.height) * S) }; };
   const snapGrid = (p, d) => { const g2 = { x: Math.round(p.x), y: Math.round(p.y) }; return Math.hypot(g2.x - p.x, g2.y - p.y) < d ? g2 : p; };
@@ -5091,7 +5418,8 @@ function mountDrawGraphs(host) {
     if (onLine) {
       solved = true; st.right++; st.streak++; st.best = Math.max(st.best, st.streak); save(); score();
       ans.innerHTML = `<line x1="${X(-R)}" y1="${Y(yAt(-R))}" x2="${X(R)}" y2="${Y(yAt(R))}" stroke="#1F9D55" stroke-width="7" stroke-opacity=".35" stroke-linecap="round"/>`;
-      return fbSet(`✓ Correct! That's ${Q.text}.${badPt ? " (One of your points isn't on the line, though.)" : ""} Press Next equation for another.`, "ok");
+      if (opts.onSolve) opts.onSolve(fi, items.slice());
+      return fbSet(`✓ Correct! That's ${Q.text}.${badPt ? " (One of your points isn't on the line, though.)" : ""}${doneMsg()}`, "ok");
     }
     if (Q.kind === "vert") return wrong(Math.abs(seg.b.x - seg.a.x) < 0.2 ? `Vertical is right, but it's in the wrong place. Every point on it has x = ${num(Q.k)}.` : "This line is vertical: every point on it has the same x-coordinate.");
     if (Math.abs(seg.b.x - seg.a.x) < 0.2) return wrong(Q.kind === "horiz" ? "This line is horizontal, not vertical: every point has the same y-coordinate." : "Your line is vertical. Lines like this one slope across. Plot c first, then use the gradient.");
@@ -5185,7 +5513,7 @@ function mountDrawGraphs(host) {
     if (Math.hypot(ln.b.x - ln.a.x, ln.b.y - ln.a.y) < 5) return bounce(ln, "Through both points, yes. Now make it longer: rule it right across the grid.");
     step = 3; solved = true; void pts; st.tried++; st.right++; st.streak++; st.best = Math.max(st.best, st.streak); save(); score();
     ans.innerHTML = `<line x1="${X(-R)}" y1="${Y(yAt(-R))}" x2="${X(R)}" y2="${Y(yAt(R))}" stroke="#1F9D55" stroke-width="7" stroke-opacity=".35" stroke-linecap="round"/>`;
-    q("[data-eq]").innerHTML = tex(Q.text); fbSet(`✓ Correct! That's ${Q.text}. Press Next equation for another.`, "ok"); stepsUI();
+    q("[data-eq]").innerHTML = tex(Q.text); fbSet(`✓ Correct! That's ${Q.text}.${doneMsg()}`, "ok"); stepsUI(); if (opts.onSolve) opts.onSolve(fi, items.slice());
     void pts;
   }
   function replay() { // after Undo, Clear or the rubber: work out which step they're on from what's left
@@ -5216,9 +5544,10 @@ function mountDrawGraphs(host) {
     else { q("[data-eq]").innerHTML = eqHTML("m"); h.innerHTML = `💡 Now the highlighted part: it's <b>m</b>, the gradient. From your first point, go 1 across and ${Q.m < 0 ? "<b>down</b>" : "up"} by m${Number.isInteger(Q.m) ? "" : " (for a fraction, rise over run: ½ is 2 across, 1 up)"}. Plot a few points, then rule a line through them.`; }
   }
   function newQ(keep) {
-    if (!keep) Q = drawQ(level); items = []; hintN = 0; wrongN = 0; solved = false; ans.innerHTML = ""; draw();
-    q("[data-eq]").innerHTML = tex(Q.text); q("[data-hint]").hidden = true; fbSet(""); step = 0; stepsUI(); if (typeof inView === "function") setTimeout(inView, 30);
+    if (!keep) Q = FX ? FX[fi] : drawQ(level); items = []; hintN = 0; wrongN = 0; solved = false; ans.innerHTML = ""; draw();
+    q("[data-eq]").innerHTML = tex(Q.text); q(".dg-eq .lbl").textContent = lineLabel(); q("[data-hint]").hidden = true; fbSet(""); step = 0; stepsUI(); if (typeof inView === "function") setTimeout(inView, 30);
     const hb = q("[data-dghelp]"); if (hb) { hb.textContent = "✋ Ask my teacher"; hb.classList.remove("on"); hb.hidden = true; }
+    if (FX && opts.saved && opts.saved[fi]) { const sv = opts.saved[fi]; items = (sv.items || []).map((it) => Object.assign({}, it)); draw(); if (sv.ok) { solved = true; ans.innerHTML = `<line x1="${X(-R)}" y1="${Y(yAt(-R))}" x2="${X(R)}" y2="${Y(yAt(R))}" stroke="#1F9D55" stroke-width="7" stroke-opacity=".35" stroke-linecap="round"/>`; fbSet(`✓ You've drawn this one correctly.${doneMsg()}`, "ok"); } else replay(); }
   }
   host.querySelectorAll("[data-t]").forEach((b) => (b.onclick = () => { tool = b.dataset.t; host.querySelectorAll("[data-t]").forEach((x) => x.classList.toggle("on", x === b)); q("[data-tip]").textContent = TIPS[tool]; }));
   host.querySelectorAll("[data-lv]").forEach((b) => (b.onclick = () => { level = st.level = b.dataset.lv; save(); host.querySelectorAll("[data-lv]").forEach((x) => x.classList.toggle("on", x === b)); newQ(); }));
@@ -5233,9 +5562,9 @@ function mountDrawGraphs(host) {
   }
   host.querySelectorAll("[data-md]").forEach((b) => (b.onclick = () => setMode(b.dataset.md)));
   q("[data-go]").onclick = check; q("[data-h]").onclick = showHint;
-  if (q("[data-dghelp]")) q("[data-dghelp]").onclick = () => { askHelp(`Draw graphs · ${Q.text} (${mode === "assist" ? "assisted" : "unassisted"})`); q("[data-dghelp]").textContent = "✋ Asked"; q("[data-dghelp]").classList.add("on"); }; q("[data-n]").onclick = () => newQ();
+  if (q("[data-dghelp]")) q("[data-dghelp]").onclick = () => { askHelp(`Draw graphs · ${Q.text} (${mode === "assist" ? "assisted" : "unassisted"})`); q("[data-dghelp]").textContent = "✋ Asked"; q("[data-dghelp]").classList.add("on"); }; q("[data-n]").onclick = () => { if (FX) { if (opts.onLeave) opts.onLeave(fi, items.slice(), solved); fi = (fi + 1) % FX.length; } newQ(); };
   host.querySelector('[data-t="ruler"]').click(); score(); setMode(mode);
-  return { check, get Q() { return Q; }, items: () => items, setItems: (a) => { items = a; draw(); } };
+  return { check, get Q() { return Q; }, items: () => items, setItems: (a) => { items = a; draw(); }, index: () => fi, solved: () => solved };
 }
 
 // questions whose hint points at part of the question: look = ["c", "m", "eq", "pt", "num", "m@1", /phrase/]; the marks only light up when the hint shows
