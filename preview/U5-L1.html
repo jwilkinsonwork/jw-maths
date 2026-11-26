@@ -5785,6 +5785,7 @@ const BOARD = (() => {
 .sb-pop button { font: 800 14px var(--body); padding: 5px 10px; border: 2px solid var(--ink); border-radius: 8px; background: #fff; cursor: pointer; }
 .sb-pop button.on { background: var(--ink); color: #fff; }
 .sb-pop input[type=number] { width: 70px; font: 700 16px var(--body); padding: 4px 6px; border: 2px solid var(--ink); border-radius: 6px; }
+.sb-gpop { width: min(560px, calc(100% - 28px)); } .sb-gpop .gax > span { text-transform: none; letter-spacing: 0; font: 800 14px var(--body); color: var(--ink); } .sb-gpop .gax label { display: flex; flex-direction: column; font: 700 12px var(--body); color: var(--muted); gap: 2px; } .sb-gpop .gax input[type=number] { width: 78px; } .sb-gpop .gax .lbl input { width: 150px; font: 700 15px var(--body); padding: 4px 6px; border: 2px solid var(--ink); border-radius: 6px; }
 .sb-pill { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 9700; background: var(--ink); color: #fff; border-radius: 30px; padding: 10px 16px; font: 800 16px var(--body); display: flex; gap: 10px; align-items: center; box-shadow: 0 6px 20px rgba(0,0,0,.3); }
 .sb-pill button { font: 800 15px var(--body); padding: 5px 12px; border-radius: 20px; border: 0; background: #FFE66D; cursor: pointer; }
 `; document.head.appendChild(css);
@@ -5804,21 +5805,36 @@ const BOARD = (() => {
       if (p.length === 2) ctx.lineTo(p[0] * k + 0.1, p[1] * k); for (let i = 2; i < p.length; i += 2) ctx.lineTo(p[i] * k, p[i + 1] * k); ctx.stroke(); });
   }
   // the objects as SVG in board units
+  function gridSpec(o) { if (o.x0 == null) { const r = o.r || 6; return { x0: -r, x1: r, y0: -r, y1: r, xs: 1, ys: 1, xn: 1, yn: 1, eq: true, xl: "x", yl: "y" }; } return o; }
+  function gfmt(v) { return String(+(+v).toFixed(6)).replace("-", "−"); }
   function objSVG(o, sel) {
     const { x, y, w, h } = o; let g = "";
-    if (o.k === "grid") { // a coordinate grid with axes and numbers
-      const r = o.r || 6, n = 2 * r, s = Math.min(w, h) / (n + 1.2), ox = x + (w - n * s) / 2, oy = y + (h - n * s) / 2, X = (v) => ox + (v + r) * s, Y = (v) => oy + (r - v) * s, fs = Math.max(11, s * 0.42);
-      for (let i = -r; i <= r; i++) g += `<line x1="${X(i)}" y1="${Y(-r)}" x2="${X(i)}" y2="${Y(r)}" stroke="#C9D6E8" stroke-width="1.2"/><line x1="${X(-r)}" y1="${Y(i)}" x2="${X(r)}" y2="${Y(i)}" stroke="#C9D6E8" stroke-width="1.2"/>`;
-      g += `<line x1="${X(-r)}" y1="${Y(0)}" x2="${X(r)}" y2="${Y(0)}" stroke="#23264A" stroke-width="2.4"/><line x1="${X(0)}" y1="${Y(-r)}" x2="${X(0)}" y2="${Y(r)}" stroke="#23264A" stroke-width="2.4"/>`;
-      for (let i = -r; i <= r; i++) if (i) g += `<text x="${X(i)}" y="${Y(0) + fs + 3}" font-size="${fs}" text-anchor="middle" fill="#4A5070" font-weight="700" font-family="Nunito,sans-serif">${String(i).replace("-", "−")}</text><text x="${X(0) - 5}" y="${Y(i) + fs / 3}" font-size="${fs}" text-anchor="end" fill="#4A5070" font-weight="700" font-family="Nunito,sans-serif">${String(i).replace("-", "−")}</text>`;
-      g += `<text x="${X(r) + 6}" y="${Y(0) + 5}" font-size="${fs * 1.3}" font-style="italic" fill="#23264A">x</text><text x="${X(0) + 6}" y="${Y(r) - 4}" font-size="${fs * 1.3}" font-style="italic" fill="#23264A">y</text>`;
+    if (o.k === "grid") { // a coordinate grid: the teacher sets each axis (from, to, grid line every, number every)
+      const P = gridSpec(o), nx = P.x1 - P.x0, ny = P.y1 - P.y0, fs = Math.max(13, Math.min(22, Math.sqrt(w * h) / 30, h / 14)), FF = 'font-family="Nunito,sans-serif" font-weight="700" fill="#4A5070"';
+      const longX = (P.xl || "").length > 2, longY = (P.yl || "").length > 2, ndig = Math.max(...[P.y0, P.y1].map((v) => gfmt(v).length));
+      const L = fs * (0.7 * ndig + 1) + (longY ? fs * 1.6 : 0), B = fs * 2 + (longX ? fs * 1.5 : 0), Tm = fs * (longY ? 0.9 : 1.8), R = fs * (longX ? 0.9 : 1.8);
+      let px = (w - L - R) / nx, py = (h - Tm - B) / ny; if (P.eq) px = py = Math.min(px, py);
+      const ox = x + L + (w - L - R - nx * px) / 2, oy = y + Tm + (h - Tm - B - ny * py) / 2, X = (v) => ox + (v - P.x0) * px, Y = (v) => oy + (P.y1 - v) * py;
+      const steps = (a, b, st) => { const out = []; for (let k = Math.ceil(a / st - 1e-9); k * st <= b + 1e-9; k++) out.push(+(k * st).toFixed(8)); return out; };
+      steps(P.x0, P.x1, P.xs).forEach((v) => (g += `<line x1="${X(v)}" y1="${Y(P.y0)}" x2="${X(v)}" y2="${Y(P.y1)}" stroke="#C9D6E8" stroke-width="1.2"/>`));
+      steps(P.y0, P.y1, P.ys).forEach((v) => (g += `<line x1="${X(P.x0)}" y1="${Y(v)}" x2="${X(P.x1)}" y2="${Y(v)}" stroke="#C9D6E8" stroke-width="1.2"/>`));
+      g += `<rect x="${X(P.x0)}" y="${Y(P.y1)}" width="${nx * px}" height="${ny * py}" fill="none" stroke="#C9D6E8" stroke-width="1.2"/>`;
+      const xw = Math.max(...[P.x0, P.x1, P.x0 + P.xn].map((v) => gfmt(v).length)) * fs * 0.62 + 6; let xn = P.xn, yn = P.yn; while (xn * px < xw) xn += P.xn; while (yn * py < fs * 1.15) yn += P.yn;
+      const ax = P.y0 <= 0 && P.y1 >= 0 ? 0 : P.y0, ay = P.x0 <= 0 && P.x1 >= 0 ? 0 : P.x0, origin = ax === 0 && ay === 0;
+      g += `<line x1="${X(P.x0)}" y1="${Y(ax)}" x2="${X(P.x1)}" y2="${Y(ax)}" stroke="#23264A" stroke-width="2.4"/><line x1="${X(ay)}" y1="${Y(P.y0)}" x2="${X(ay)}" y2="${Y(P.y1)}" stroke="#23264A" stroke-width="2.4"/>`;
+      steps(P.x0, P.x1, xn).forEach((v) => { if (origin && v === 0) return; g += `<text x="${X(v)}" y="${Y(ax) + fs + 3}" font-size="${fs}" text-anchor="middle" ${FF}>${gfmt(v)}</text>`; });
+      steps(P.y0, P.y1, yn).forEach((v) => { if (origin && v === 0) return; g += `<text x="${X(ay) - 5}" y="${Y(v) + fs / 3}" font-size="${fs}" text-anchor="end" ${FF}>${gfmt(v)}</text>`; });
+      if (origin) g += `<text x="${X(0) - 5}" y="${Y(0) + fs + 3}" font-size="${fs}" text-anchor="end" ${FF}>0</text>`;
+      const esc = (t) => String(t || "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+      if (P.xl) g += longX ? `<text x="${X(P.x0) + nx * px / 2}" y="${Y(ax) + fs * 2.6 + 3}" font-size="${fs * 1.1}" text-anchor="middle" fill="#23264A" font-weight="800" font-family="Nunito,sans-serif">${esc(P.xl)}</text>` : `<text x="${X(P.x1) + 6}" y="${Y(ax) + 5}" font-size="${fs * 1.3}" font-style="italic" fill="#23264A">${esc(P.xl)}</text>`;
+      if (P.yl) { const cy = Y(P.y1) + ny * py / 2, lx = X(ay) - fs * (0.7 * ndig + 1.2); g += longY ? `<text x="${lx}" y="${cy}" font-size="${fs * 1.1}" text-anchor="middle" fill="#23264A" font-weight="800" font-family="Nunito,sans-serif" transform="rotate(-90 ${lx} ${cy})">${esc(P.yl)}</text>` : `<text x="${X(ay) + 6}" y="${Y(P.y1) - 4}" font-size="${fs * 1.3}" font-style="italic" fill="#23264A">${esc(P.yl)}</text>`; }
     } else if (o.k === "sq") { for (let yy = y + G / 2; yy < y + h; yy += G) for (let xx = x + G / 2; xx < x + w; xx += G) g += `<circle cx="${xx}" cy="${yy}" r="3" fill="#4A5070"/>`; }
     else if (o.k === "iso") { const dx = G * Math.sqrt(3) / 2; for (let i = 0, xx = x + G / 2; xx < x + w; xx += dx, i++) for (let yy = y + (i % 2 ? G : G / 2); yy < y + h; yy += G) g += `<circle cx="${xx}" cy="${yy}" r="3" fill="#4A5070"/>`; }
     else if (o.k === "table") { const R = o.rows || 3, C = o.cols || 3; g += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#23264A" stroke-width="2.4"/>`;
       for (let i = 1; i < R; i++) g += `<line x1="${x}" y1="${y + (h * i) / R}" x2="${x + w}" y2="${y + (h * i) / R}" stroke="#23264A" stroke-width="${i === 1 && o.head ? 3 : 1.6}"/>`;
       for (let j = 1; j < C; j++) g += `<line x1="${x + (w * j) / C}" y1="${y}" x2="${x + (w * j) / C}" y2="${y + h}" stroke="#23264A" stroke-width="1.6"/>`; }
     const frame = o.k === "table" ? "" : `<rect class="frame" x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#B9C2D6" stroke-width="1.5"/>`;
-    const handle = sel ? `<rect class="sb-h" x="${x + w - 16}" y="${y + h - 16}" width="32" height="32" rx="6" fill="var(--blue)" style="cursor:nwse-resize"/><g class="sb-del" style="cursor:pointer"><circle cx="${x + w}" cy="${y}" r="17" fill="var(--coral)"/><text x="${x + w}" y="${y + 7}" font-size="22" text-anchor="middle" fill="#fff" font-weight="800">✕</text></g>` : "";
+    const handle = sel ? `<rect class="sb-h" x="${x + w - 16}" y="${y + h - 16}" width="32" height="32" rx="6" fill="var(--blue)" style="cursor:nwse-resize"/>${o.k === "grid" || o.k === "table" ? `<g class="sb-edit" style="cursor:pointer"><circle cx="${x}" cy="${y}" r="19" fill="var(--blue)"/><text x="${x}" y="${y + 7}" font-size="20" text-anchor="middle" fill="#fff">⚙</text></g>` : ""}<g class="sb-del" style="cursor:pointer"><circle cx="${x + w}" cy="${y}" r="17" fill="var(--coral)"/><text x="${x + w}" y="${y + 7}" font-size="22" text-anchor="middle" fill="#fff" font-weight="800">✕</text></g>` : "";
     return `<g class="sb-obj${sel ? " sel" : ""}" data-id="${o.id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#fff" fill-opacity="0.94"/>${frame}${g}${handle}</g>`;
   }
   // rub out only the bits under the rubber
@@ -5865,11 +5881,12 @@ const BOARD = (() => {
       if (!T || tool !== "move") return;
       svg.querySelectorAll(".sb-obj").forEach((g) => {
         g.onpointerdown = (e) => { e.preventDefault(); e.stopPropagation(); const o = S.objs.find((x) => x.id === g.dataset.id); if (!o) return;
+          if (e.target.closest(".sb-edit")) { sel = o.id; drawAll(); return o.k === "grid" ? gridAsk(o) : tableAsk(o); }
           if (e.target.closest(".sb-del")) { snap(); S.objs = S.objs.filter((x) => x !== o); sel = null; drawAll(); push("o"); return; }
-          snap(); sel = o.id; const resize = !!e.target.closest(".sb-h"), r = svg.getBoundingClientRect(), x0 = e.clientX, y0 = e.clientY, start = { ...o }, sc = BW / r.width;
+          snap(); sel = o.id; S.objs = S.objs.filter((x) => x !== o).concat(o); const resize = !!e.target.closest(".sb-h"), r = svg.getBoundingClientRect(), x0 = e.clientX, y0 = e.clientY, start = { ...o }, sc = BW / r.width;
           svg.setPointerCapture(e.pointerId);
           svg.onpointermove = (ev) => { const dx = (ev.clientX - x0) * sc, dy = (ev.clientY - y0) * sc;
-            if (resize) { o.w = Math.max(120, Math.min(BW - o.x, start.w + dx)); o.h = Math.max(100, Math.min(BH - o.y, start.h + dy)); if (o.k === "grid") o.h = o.w = Math.min(o.w, o.h, BH - o.y, BW - o.x); }
+            if (resize) { o.w = Math.max(120, Math.min(BW - o.x, start.w + dx)); o.h = Math.max(100, Math.min(BH - o.y, start.h + dy)); }
             else { o.x = Math.max(0, Math.min(BW - o.w, start.x + dx)); o.y = Math.max(0, Math.min(BH - o.h, start.y + dy)); }
             o.x = Math.round(o.x); o.y = Math.round(o.y); o.w = Math.round(o.w); o.h = Math.round(o.h); svg.innerHTML = S.objs.map((x) => objSVG(x, x.id === sel)).join(""); };
           svg.onpointerup = () => { svg.onpointermove = null; svg.onpointerup = null; drawAll(); push("o"); };
@@ -5877,7 +5894,7 @@ const BOARD = (() => {
       });
     }
     function add(kind, extra = {}) {
-      snap(); const id = "o" + Date.now().toString(36), n = S.objs.length, base = { grid: [520, 520], sq: [560, 400], iso: [560, 420], table: [600, 300] }[kind];
+      snap(); const id = "o" + Date.now().toString(36), n = S.objs.length, base = { grid: [560, 560], sq: [560, 400], iso: [560, 420], table: [600, 300] }[kind];
       S.objs.push(Object.assign({ id, k: kind, x: 60 + (n % 4) * 60, y: 60 + (n % 4) * 40, w: base[0], h: base[1] }, extra)); sel = id; setTool("move"); push("o");
     }
     // settings: paper (teacher), pen size; always closeable
@@ -5897,18 +5914,54 @@ const BOARD = (() => {
       p.querySelector("[data-rub]").onclick = () => { setTool("rub"); p.remove(); };
       p.addEventListener("keydown", (e) => { if (e.key === "Escape") p.remove(); });
     }
-    function tableAsk() {
+    function tableAsk(ed) {
       if (q(".sb-pop")) q(".sb-pop").remove();
       const p = document.createElement("div"); p.className = "sb-pop";
-      p.innerHTML = `<div class="h"><b>➕ Table</b><button type="button" data-x>✕ Close</button></div><div class="row"><label>Rows <input type="number" min="1" max="12" value="3" data-r></label><label>Columns <input type="number" min="1" max="10" value="4" data-c></label></div><div class="row"><label><input type="checkbox" data-hd checked> Heading row</label></div><div class="row"><button type="button" data-ok class="on">Add the table</button></div>`;
+      p.innerHTML = `<div class="h"><b>${ed ? "⚙ Change the table" : "➕ Table"}</b><button type="button" data-x>✕ Close</button></div><div class="row"><label>Rows <input type="number" min="1" max="12" value="${ed ? ed.rows : 3}" data-r></label><label>Columns <input type="number" min="1" max="10" value="${ed ? ed.cols : 4}" data-c></label></div><div class="row"><label><input type="checkbox" data-hd ${!ed || ed.head ? "checked" : ""}> Heading row</label></div><div class="row"><button type="button" data-ok class="on">${ed ? "Change it" : "Add the table"}</button></div>`;
       q(".sb-win").appendChild(p); p.querySelector("[data-x]").onclick = () => p.remove();
-      p.querySelector("[data-ok]").onclick = () => { const R = Math.max(1, Math.min(12, +p.querySelector("[data-r]").value || 3)), C = Math.max(1, Math.min(10, +p.querySelector("[data-c]").value || 3)); add("table", { rows: R, cols: C, head: p.querySelector("[data-hd]").checked, w: Math.min(1400, C * 150), h: Math.min(900, R * 70) }); p.remove(); };
+      p.addEventListener("keydown", (e) => { if (e.key === "Escape") p.remove(); });
+      p.querySelector("[data-ok]").onclick = () => { const R = Math.max(1, Math.min(12, +p.querySelector("[data-r]").value || 3)), C = Math.max(1, Math.min(10, +p.querySelector("[data-c]").value || 3)), hd = p.querySelector("[data-hd]").checked;
+        if (ed) { snap(); Object.assign(ed, { rows: R, cols: C, head: hd }); drawAll(); push("o"); } else add("table", { rows: R, cols: C, head: hd, w: Math.min(1400, C * 150), h: Math.min(900, R * 70) }); p.remove(); };
+    }
+    // coordinate grid: choose each axis
+    const GPRESETS = [["−6 to 6", [-6, 6, -6, 6, 1, 1, 1, 1]], ["−10 to 10", [-10, 10, -10, 10, 1, 1, 2, 2]], ["0 to 10", [0, 10, 0, 10, 1, 1, 1, 1]], ["0 to 20", [0, 20, 0, 20, 1, 1, 2, 2]], ["0 to 100 (tens)", [0, 100, 0, 100, 10, 10, 10, 10]], ["x 0–10, y 0–50", [0, 10, 0, 50, 1, 5, 1, 5]]];
+    function gridAsk(ed) {
+      if (q(".sb-pop")) q(".sb-pop").remove();
+      const P = ed ? gridSpec(ed) : { x0: -6, x1: 6, y0: -6, y1: 6, xs: 1, ys: 1, xn: 1, yn: 1, eq: true, xl: "x", yl: "y" };
+      const p = document.createElement("div"); p.className = "sb-pop sb-gpop";
+      const inp = (k, v) => `<input type="number" step="any" value="${v}" data-g="${k}">`;
+      p.innerHTML = `<div class="h"><b>${ed ? "⚙ Change the grid" : "➕ Coordinate grid"}</b><button type="button" data-x>✕ Close</button></div>
+        <div class="row"><span>Quick start</span>${GPRESETS.map(([t], i) => `<button type="button" data-pre="${i}">${t}</button>`).join("")}</div>
+        <div class="row gax"><span>x-axis (across)</span><label>From ${inp("x0", P.x0)}</label><label>To ${inp("x1", P.x1)}</label><label>Grid line every ${inp("xs", P.xs)}</label><label>Number every ${inp("xn", P.xn)}</label><label class="lbl">Label <input type="text" maxlength="30" value="${String(P.xl || "").replace(/"/g, "&quot;")}" data-g="xl" placeholder="x"></label></div>
+        <div class="row gax"><span>y-axis (up)</span><label>From ${inp("y0", P.y0)}</label><label>To ${inp("y1", P.y1)}</label><label>Grid line every ${inp("ys", P.ys)}</label><label>Number every ${inp("yn", P.yn)}</label><label class="lbl">Label <input type="text" maxlength="30" value="${String(P.yl || "").replace(/"/g, "&quot;")}" data-g="yl" placeholder="y"></label></div>
+        <div class="row"><label><input type="checkbox" data-g="eq" ${P.eq ? "checked" : ""}> Same scale on both axes (square boxes)</label></div>
+        <div class="row"><b class="gerr" style="color:var(--coral)"></b></div>
+        <div class="row"><button type="button" data-ok class="on">${ed ? "Change it" : "Add the grid"}</button></div>`;
+      q(".sb-win").appendChild(p);
+      const f = (k) => p.querySelector(`[data-g="${k}"]`);
+      p.querySelector("[data-x]").onclick = () => p.remove();
+      p.addEventListener("keydown", (e) => { if (e.key === "Escape") p.remove(); if (e.key === "Enter") p.querySelector("[data-ok]").click(); });
+      p.querySelectorAll("[data-pre]").forEach((b) => (b.onclick = () => { const v = GPRESETS[+b.dataset.pre][1]; ["x0", "x1", "y0", "y1", "xs", "ys", "xn", "yn"].forEach((k, i) => (f(k).value = v[i])); f("eq").checked = v[0] === v[2] && v[1] === v[3]; }));
+      p.querySelector("[data-ok]").onclick = () => {
+        const g = {}; ["x0", "x1", "y0", "y1", "xs", "ys", "xn", "yn"].forEach((k) => (g[k] = parseFloat(String(f(k).value).replace("−", "-"))));
+        const bad = (m) => (p.querySelector(".gerr").textContent = m);
+        if (Object.values(g).some((v) => !isFinite(v))) return bad("Fill in every box with a number.");
+        if (g.x1 <= g.x0 || g.y1 <= g.y0) return bad("Each axis needs 'To' bigger than 'From'.");
+        if (g.xs <= 0 || g.ys <= 0 || g.xn <= 0 || g.yn <= 0) return bad("The 'every' boxes must be more than 0.");
+        if ((g.x1 - g.x0) / g.xs > 60 || (g.y1 - g.y0) / g.ys > 60) return bad("That's more than 60 grid lines on one axis. Make 'Grid line every' bigger.");
+        if ((g.x1 - g.x0) / g.xn > 30 || (g.y1 - g.y0) / g.yn > 30) return bad("That's more than 30 numbers on one axis. Make 'Number every' bigger.");
+        g.eq = f("eq").checked; g.xl = f("xl").value.trim(); g.yl = f("yl").value.trim();
+        if (g.eq) { const W0 = ed ? ed.w : 600, asp = (g.y1 - g.y0) / (g.x1 - g.x0); let gw = W0, gh = Math.round(W0 * asp + 90); if (gh > 860) { gh = 860; gw = Math.round((gh - 90) / asp + 110); } g.w = Math.max(240, Math.min(1500, gw)); g.h = Math.max(200, gh); if (ed) { g.w = Math.min(g.w, BW - ed.x); g.h = Math.min(g.h, BH - ed.y); } }
+        else if (!ed) { g.w = 640; g.h = 520; }
+        if (ed) { snap(); delete ed.r; Object.assign(ed, g); drawAll(); push("o"); } else add("grid", g);
+        p.remove(); };
+      f("x0").focus();
     }
     ov.querySelectorAll("[data-t]").forEach((b) => (b.onclick = () => setTool(b.dataset.t)));
     q("[data-u]").onclick = () => { const h = hist.pop(); if (!h) return; const o = JSON.parse(h); S[mine] = o.m; if (T) { S.objs = o.o; S.paper = o.p; push("o"); } drawAll(); push(mine); };
     q("[data-clr]").onclick = () => { if (!S[mine].length) return; snap(); S[mine] = []; inkDraw(); push(mine); };
     q("[data-set]").onclick = settings;
-    ov.querySelectorAll("[data-add]").forEach((b) => (b.onclick = () => (b.dataset.add === "table" ? tableAsk() : add(b.dataset.add))));
+    ov.querySelectorAll("[data-add]").forEach((b) => (b.onclick = () => (b.dataset.add === "table" ? tableAsk() : b.dataset.add === "grid" ? gridAsk() : add(b.dataset.add))));
     if (T) q("[data-end]").onclick = () => { alive = false; ov.remove(); removeEventListener("resize", fit); opts.onEnd && opts.onEnd(); };
     else q("[data-hide]").onclick = () => { ov.style.display = "none"; opts.onHide && opts.onHide(); };
     // the other person's writing (and the teacher's paper and objects) arrive every 1.2 seconds
