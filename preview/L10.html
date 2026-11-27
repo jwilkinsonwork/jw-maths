@@ -639,6 +639,10 @@ function classify(str) {
   for (let i = 0; i < str.length; i++) {
     const ch = str[i], prev = str[i - 1], next = str[i + 1];
     const alone = !isLetter(prev) && !isQuote(prev) && !isLetter(next) && !isQuote(next);
+    // "d.p." (decimal places) is an abbreviation, not the variable d
+    if (ch === "d" && next === "." && str[i + 2] === "p" && !isLetter(prev)) { cls.push("T"); continue; }
+    // "(c)" as a question label (after a space or at the start, followed by a space or the end) is text, not the variable c
+    if (prev === "(" && next === ")" && /[a-z]/.test(ch) && (i < 2 || /\s/.test(str[i - 2])) && (i + 2 >= str.length || /[\s.,:;?]/.test(str[i + 2]))) { cls.push("T"); continue; }
     if (alone && VARS.has(ch)) { cls.push("V"); continue; }
     // "mx" in y = mx + c: both letters are variables
     if (ch === "m" && next === "x" && !isLetter(prev) && !isLetter(str[i + 2])) { cls.push("V"); continue; }
@@ -1745,7 +1749,7 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
         const parts = raw.replace(/\s+/g, "").replace(/^[a-z]+=/i, "").split("=").filter((t) => t !== ""), vals = parts.map(val);
         if (!vals.length || vals.some((v) => !isFinite(v))) return { ok: false, form: true, msg: "Type a number, like 3, −2 or 1/2." };
         const v = vals[vals.length - 1];
-        if (vals.every(close)) return { ok: true };
+        if (vals.every(close)) { if (s.keep && parts[parts.length - 1].replace(/,/g, "") !== String(s.keep)) return { ok: false, msg: s.keepMsg || `Right value. Write it as ${s.keep} to show the decimal places.` }; return { ok: true }; }
         if (vals.length > 1 && close(v)) return { ok: false, msg: "Your answer is right, but part of your working doesn't equal it. Check each part." };
         if (vals.length > 1 && vals.some(close)) return { ok: false, msg: "Your working is right. Check the last part." };
         return { ok: false, msg: (s.why && s.why(v, ctx)) || "Not yet. Look at the graph again." };
@@ -2962,6 +2966,8 @@ function qCard(key, num, numCol, qText, model, parts, extra = "", retry = null) 
       if (!ok) all = false;
     });
     st.ok = all;
+    // the right value in the wrong form (e.g. 13 for 13.0 to 1 d.p.): say so instead of "not quite"
+    const formNote = all || silent ? "" : parts.map((p, i) => (p.t === "num" && p.keep && checkPart(p, st.v[i]) === false && Math.abs(parseNum(st.v[i]) - p.v) < 1e-6 ? p.keep : "")).filter(Boolean).map((k) => `Right value: write it as ${k} to show the decimal places.`)[0] || "";
     if (retry) {
       const w = Math.min(st.wrongN || 0, 3);
       const badge = el.querySelector(".wrongs");
@@ -2974,12 +2980,12 @@ function qCard(key, num, numCol, qText, model, parts, extra = "", retry = null) 
         el.querySelector(".fb").style.color = "var(--coral)";
         return all;
       }
-      el.querySelector(".fb").textContent = all ? "Correct!" : silent ? "" : w >= 2 ? "Not yet. Read the hint and try again: one more try before the answer." : "Not quite. Check your working and try again.";
+      el.querySelector(".fb").textContent = all ? "Correct!" : silent ? "" : formNote || (w >= 2 ? "Not yet. Read the hint and try again: one more try before the answer." : "Not quite. Check your working and try again.");
       el.querySelector(".fb").style.color = all ? "var(--teal)" : "var(--coral)";
       if (all) { showModel(); const nb = el.querySelector("[data-new]"); nb.hidden = false; nb.textContent = "More practice: new numbers"; nb.classList.remove("primary"); }
       return all;
     }
-    el.querySelector(".fb").textContent = all ? "Correct!" : silent ? "" : st.tries >= 2 ? "Have another look, or check the answer." : "Not quite. Check your working and try again.";
+    el.querySelector(".fb").textContent = all ? "Correct!" : silent ? "" : formNote || (st.tries >= 2 ? "Have another look, or check the answer." : "Not quite. Check your working and try again.");
     el.querySelector(".fb").style.color = all ? "var(--teal)" : "var(--coral)";
     if (all || st.tries >= 2) { el.querySelector("[data-show]").hidden = false; }
     if (all) showModel();

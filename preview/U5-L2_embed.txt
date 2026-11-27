@@ -639,6 +639,10 @@ function classify(str) {
   for (let i = 0; i < str.length; i++) {
     const ch = str[i], prev = str[i - 1], next = str[i + 1];
     const alone = !isLetter(prev) && !isQuote(prev) && !isLetter(next) && !isQuote(next);
+    // "d.p." (decimal places) is an abbreviation, not the variable d
+    if (ch === "d" && next === "." && str[i + 2] === "p" && !isLetter(prev)) { cls.push("T"); continue; }
+    // "(c)" as a question label (after a space or at the start, followed by a space or the end) is text, not the variable c
+    if (prev === "(" && next === ")" && /[a-z]/.test(ch) && (i < 2 || /\s/.test(str[i - 2])) && (i + 2 >= str.length || /[\s.,:;?]/.test(str[i + 2]))) { cls.push("T"); continue; }
     if (alone && VARS.has(ch)) { cls.push("V"); continue; }
     // "mx" in y = mx + c: both letters are variables
     if (ch === "m" && next === "x" && !isLetter(prev) && !isLetter(str[i + 2])) { cls.push("V"); continue; }
@@ -3156,7 +3160,7 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
         const parts = raw.replace(/\s+/g, "").replace(/^[a-z]+=/i, "").split("=").filter((t) => t !== ""), vals = parts.map(val);
         if (!vals.length || vals.some((v) => !isFinite(v))) return { ok: false, form: true, msg: "Type a number, like 3, −2 or 1/2." };
         const v = vals[vals.length - 1];
-        if (vals.every(close)) return { ok: true };
+        if (vals.every(close)) { if (s.keep && parts[parts.length - 1].replace(/,/g, "") !== String(s.keep)) return { ok: false, msg: s.keepMsg || `Right value. Write it as ${s.keep} to show the decimal places.` }; return { ok: true }; }
         if (vals.length > 1 && close(v)) return { ok: false, msg: "Your answer is right, but part of your working doesn't equal it. Check each part." };
         if (vals.length > 1 && vals.some(close)) return { ok: false, msg: "Your working is right. Check the last part." };
         return { ok: false, msg: (s.why && s.why(v, ctx)) || "Not yet. Look at the graph again." };
@@ -4373,6 +4377,8 @@ function qCard(key, num, numCol, qText, model, parts, extra = "", retry = null) 
       if (!ok) all = false;
     });
     st.ok = all;
+    // the right value in the wrong form (e.g. 13 for 13.0 to 1 d.p.): say so instead of "not quite"
+    const formNote = all || silent ? "" : parts.map((p, i) => (p.t === "num" && p.keep && checkPart(p, st.v[i]) === false && Math.abs(parseNum(st.v[i]) - p.v) < 1e-6 ? p.keep : "")).filter(Boolean).map((k) => `Right value: write it as ${k} to show the decimal places.`)[0] || "";
     if (retry) {
       const w = Math.min(st.wrongN || 0, 3);
       const badge = el.querySelector(".wrongs");
@@ -4385,12 +4391,12 @@ function qCard(key, num, numCol, qText, model, parts, extra = "", retry = null) 
         el.querySelector(".fb").style.color = "var(--coral)";
         return all;
       }
-      el.querySelector(".fb").textContent = all ? "Correct!" : silent ? "" : w >= 2 ? "Not yet. Read the hint and try again: one more try before the answer." : "Not quite. Check your working and try again.";
+      el.querySelector(".fb").textContent = all ? "Correct!" : silent ? "" : formNote || (w >= 2 ? "Not yet. Read the hint and try again: one more try before the answer." : "Not quite. Check your working and try again.");
       el.querySelector(".fb").style.color = all ? "var(--teal)" : "var(--coral)";
       if (all) { showModel(); const nb = el.querySelector("[data-new]"); nb.hidden = false; nb.textContent = "More practice: new numbers"; nb.classList.remove("primary"); }
       return all;
     }
-    el.querySelector(".fb").textContent = all ? "Correct!" : silent ? "" : st.tries >= 2 ? "Have another look, or check the answer." : "Not quite. Check your working and try again.";
+    el.querySelector(".fb").textContent = all ? "Correct!" : silent ? "" : formNote || (st.tries >= 2 ? "Have another look, or check the answer." : "Not quite. Check your working and try again.");
     el.querySelector(".fb").style.color = all ? "var(--teal)" : "var(--coral)";
     if (all || st.tries >= 2) { el.querySelector("[data-show]").hidden = false; }
     if (all) showModel();
@@ -5388,15 +5394,16 @@ function mountRounder(host, cfg) {
     const m = M[mi], f = (x) => U5.fmt(x, { money: m.money, dp: m.money ? 2 : undefined }), N = U5.nlFor(v, m.step, { money: m.money, arrow: true, mid: false });
     lo = N.lo; hi = N.hi; const r = N.r, half = U5.fix((lo + hi) / 2);
     line.innerHTML = graph(N, 460);
-    q("[data-v]").textContent = f(v); q("[data-b]").textContent = `${U5.fmt(lo, { money: m.money })} and ${U5.fmt(hi, { money: m.money })}`; q("[data-h]").textContent = U5.fmt(half, { money: m.money, dp: m.money && m.step < 1 ? 2 : undefined }); q("[data-r]").textContent = U5.fmt(r, { money: m.money });
+    q("[data-v]").textContent = f(v); q("[data-b]").textContent = `${U5.fmt(lo, { money: m.money })} and ${U5.fmt(hi, { money: m.money })}`; q("[data-h]").textContent = U5.fmt(half, { money: m.money, dp: m.money && m.step < 1 ? 2 : undefined }); q("[data-r]").textContent = U5.fmt(r, { money: m.money, dp: m.dp });
     const d1 = U5.fix(v - lo), d2 = U5.fix(hi - v);
-    q("[data-why]").innerHTML = Math.abs(v - half) < 1e-9 ? `<b>${f(v)}</b> is exactly halfway. We always round halfway <b>up</b>, so it rounds to <b>${U5.fmt(r, { money: m.money })}</b>.`
-      : `<b>${f(v)}</b> is ${U5.fmt(d1, { money: m.money, dp: m.money ? 2 : undefined })} above ${U5.fmt(lo, { money: m.money })} and ${U5.fmt(d2, { money: m.money, dp: m.money ? 2 : undefined })} below ${U5.fmt(hi, { money: m.money })}. It is nearer to <b>${U5.fmt(r, { money: m.money })}</b>${v < half ? ": it is below halfway, so round down" : ": it is past halfway, so round up"}.`;
+    q("[data-why]").innerHTML = Math.abs(v - half) < 1e-9 ? `<b>${f(v)}</b> is exactly halfway. We always round halfway <b>up</b>, so it rounds to <b>${U5.fmt(r, { money: m.money, dp: m.dp })}</b>.`
+      : `<b>${f(v)}</b> is ${U5.fmt(d1, { money: m.money, dp: m.money ? 2 : undefined })} above ${U5.fmt(lo, { money: m.money })} and ${U5.fmt(d2, { money: m.money, dp: m.money ? 2 : undefined })} below ${U5.fmt(hi, { money: m.money })}. It is nearer to <b>${U5.fmt(r, { money: m.money, dp: m.dp })}</b>${v < half ? ": it is below halfway, so round down" : ": it is past halfway, so round up"}.`;
     host.querySelectorAll("[data-m]").forEach((b) => b.classList.toggle("on", +b.dataset.m === mi));
+    if (cfg.onDraw) cfg.onDraw(v, m, r); // a lesson can add its own display (e.g. a place-value chart)
   }
   const snap = (x) => { const m = M[mi]; return U5.fix(Math.round(x / m.fine) * m.fine); };
   const clamp = (x) => Math.min(M[mi].max, Math.max(M[mi].min, x));
-  host.querySelectorAll("[data-m]").forEach((b) => (b.onclick = () => { mi = +b.dataset.m; const m = M[mi]; if (v < m.min || v > m.max || Math.abs(v - U5.roundTo(v, m.fine)) > 1e-9) v = m.start ?? snap(U5.R(m.min / m.fine, m.max / m.fine) * m.fine); draw(); }));
+  host.querySelectorAll("[data-m]").forEach((b) => (b.onclick = () => { mi = +b.dataset.m; const m = M[mi]; if (v < m.min || v > m.max || (!cfg.keepOnSwitch && Math.abs(v - U5.roundTo(v, m.fine)) > 1e-9)) v = m.start ?? snap(U5.R(m.min / m.fine, m.max / m.fine) * m.fine); draw(); }));
   host.querySelectorAll("[data-n]").forEach((b) => (b.onclick = () => { v = clamp(U5.fix(v + +b.dataset.n * M[mi].fine)); draw(); }));
   q("[data-rand]").onclick = () => { const m = M[mi]; v = snap(U5.R(Math.ceil(m.min / m.fine), Math.floor(m.max / m.fine)) * m.fine); draw(); };
   q("[data-in]").addEventListener("change", (e) => { const x = parseNum(e.target.value); if (isFinite(x)) { v = clamp(snap(x)); draw(); } e.target.value = ""; });
@@ -5447,7 +5454,7 @@ U5.bounds = (r, step, unit) => { const lo = U5.fix(r - step / 2), hi = U5.fix(r 
 // the number line for a rounded value: the bounds as dashed lines and the range as a bracket
 U5.boundsLine = (r, step, o = {}) => {
   const B = U5.bounds(r, step, o.unit), f = (x) => U5.fmt(x, { money: o.money, dp: o.money ? (step >= 1 && !o.pence ? 0 : 2) : undefined }) + (o.suffix ? " " + o.suffix : "");
-  const nl = { from: U5.fix(r - step), to: U5.fix(r + step), major: step, minor: step / 10, money: !!o.money, dp: o.money ? (step >= 1 ? 0 : 2) : U5.dpOf(step / 2),
+  const nl = { from: U5.fix(r - step), to: U5.fix(r + step), major: step, minor: step / 10, money: !!o.money, dp: o.money ? (step >= 1 ? 0 : 2) : U5.dpOf(step),
     halves: o.noBounds ? [] : [{ v: B.lo, label: o.boundLabels === false ? "" : f(B.lo) }, { v: B.hi, label: o.boundLabels === false ? "" : f(B.hi) }],
     marks: [{ v: r, label: "", color: "accent1" }] };
   if (o.bracket !== false) nl.bracket = { from: B.lo, to: o.unit ? B.top : B.hi, hiOpen: !o.unit, label: o.label || "" };
