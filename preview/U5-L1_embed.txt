@@ -2231,7 +2231,7 @@ function tex(str) {
   if (str == null) return "";
   return MF.pieces(String(str)).map((p) => {
     if (!p.math) return esc(p.text);
-    if (window.katex) { try { return katex.renderToString(toTex(p.text), { throwOnError: false }); } catch (e) { /* fall through */ } }
+    if (window.katex) { try { return katex.renderToString(toTex(p.text).replace(/(\d),(?=\d{3}(?!\d))/g, "$1{,}"), { throwOnError: false }); } catch (e) { /* fall through */ } }
     return `<span class="m">${esc(p.text)}</span>`;
   }).join("");
 }
@@ -2265,13 +2265,16 @@ function nline(o, px = 300) {
   const minor = o.minor || (o.major || 1) / 10, major = o.major || minor * 10, n = Math.round(span / minor);
   for (let i = 0; i <= n; i++) { const v = o.from + i * minor, big = near(Math.round((v - o.from) / major) * major + o.from, v), x = X(v), h = big ? fs * 0.85 : fs * 0.42;
     g += `<line x1="${x}" y1="${base - h}" x2="${x}" y2="${base + h}" stroke="#23264A" stroke-width="${big ? W / 330 : W / 600}"/>`;
-    if (big && o.labels !== false && !(o.hide || []).some((h2) => near(h2, v))) g += `<text x="${x}" y="${base + fs * 2.1}" font-size="${fs}" text-anchor="middle" font-weight="700" fill="#23264A" font-family="Nunito,sans-serif">${fmt(v)}</text>`; }
+    if (big && o.labels !== false && !(o.hide || []).some((h2) => near(h2, v))) g += `<text x="${Math.min(Math.max(x, fmt(v).length * fs * 0.29 + 4), W - fmt(v).length * fs * 0.29 - 4)}" y="${base + fs * 2.1}" font-size="${fs}" text-anchor="middle" font-weight="700" fill="#23264A" font-family="Nunito,sans-serif">${fmt(v)}</text>`; }
   (o.extra || []).forEach((v) => (g += `<text x="${X(v)}" y="${base + fs * 2.1}" font-size="${fs * 0.85}" text-anchor="middle" font-weight="700" fill="#4A4F75" font-family="Nunito,sans-serif">${fmt(v)}</text>`));
   if (o.half !== undefined) g += `<line x1="${X(o.half)}" y1="${base - fs * 2.2}" x2="${X(o.half)}" y2="${base + fs * 0.9}" stroke="var(--purple)" stroke-width="${W / 300}" stroke-dasharray="${fs * 0.35} ${fs * 0.25}"/><text x="${X(o.half)}" y="${base - fs * 2.5}" font-size="${fs * 0.8}" text-anchor="middle" font-weight="800" fill="var(--purple)" font-family="Nunito,sans-serif">halfway ${o.halfLabel === false ? "" : fmtX(o.half)}</text>`;
-  if (o.bracket) { const b = o.bracket, y = base - fs * 1.6, c = col(b.color, "var(--teal)");
+  // bounds: dashed lines either side (lower and upper bound), each with its own label
+  (o.halves || []).forEach((h) => { const v = typeof h === "object" ? h.v : h, lab = typeof h === "object" && h.label !== undefined ? h.label : "halfway " + fmtX(v), c = col(typeof h === "object" && h.color, "var(--purple)");
+    g += `<line x1="${X(v)}" y1="${base - fs * 2.2}" x2="${X(v)}" y2="${base + fs * 0.9}" stroke="${c}" stroke-width="${W / 300}" stroke-dasharray="${fs * 0.35} ${fs * 0.25}"/>${lab ? `<text x="${X(v)}" y="${base - fs * 2.5}" font-size="${fs * 0.8}" text-anchor="middle" font-weight="800" fill="${c}" font-family="Nunito,sans-serif">${esc(lab)}</text>` : ""}`; });
+  if (o.bracket) { const b = o.bracket, y = base - fs * (b.lift || 1.6), c = col(b.color, "var(--teal)");
     g += `<line x1="${X(b.from)}" y1="${y}" x2="${X(b.to)}" y2="${y}" stroke="${c}" stroke-width="${W / 160}"/>`;
     [["from", b.loOpen], ["to", b.hiOpen]].forEach(([k, open]) => (g += `<circle cx="${X(b[k])}" cy="${y}" r="${fs * 0.32}" fill="${open ? "#fff" : c}" stroke="${c}" stroke-width="${W / 300}"/>`));
-    if (b.label) g += `<text x="${(X(b.from) + X(b.to)) / 2}" y="${y - fs * 0.6}" font-size="${fs * 0.9}" text-anchor="middle" font-weight="800" fill="${c}" font-family="Nunito,sans-serif">${esc(b.label)}</text>`; }
+    if (b.label) g += `<text x="${(X(b.from) + X(b.to)) / 2}" y="${o.halves || o.half !== undefined ? base - fs * 3.45 : y - fs * 0.6}" font-size="${fs * 0.9}" text-anchor="middle" font-weight="800" fill="${c}" font-family="Nunito,sans-serif">${esc(b.label)}</text>`; }
   (o.arrows || []).forEach((a) => { const x1 = X(a.from), x2 = X(a.to), c = col(a.color, "var(--teal)"), up = base - fs * (a.high || 1.4), mx = (x1 + x2) / 2;
     g += `<path d="M ${x1} ${base - fs * 0.5} Q ${mx} ${up - fs * 1.2} ${x2} ${base - fs * 0.6}" fill="none" stroke="${c}" stroke-width="${W / 280}" marker-end="url(#nlar)"/>`; });
   (o.marks || []).forEach((m) => { const x = X(m.v), c = col(m.color, "var(--coral)"), y = base - fs * (m.lift || 1.1);
@@ -5072,7 +5075,7 @@ const U5 = (() => {
 .u5x-top button { font: 800 16px var(--body); padding: 6px 12px; }
 .u5x-top button.on { background: var(--ink); color: #fff; }
 .u5x-line { background: #fff; border-radius: 14px; border: 2px solid var(--line, #E1E6F0); padding: 4px 8px; touch-action: none; cursor: ew-resize; user-select: none; }
-.u5x-line svg { width: 100%; height: auto; display: block; }
+.u5x-line svg { width: 100%; max-width: 760px; margin: 0 auto; height: auto; display: block; }
 .u5x-read { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .u5x-read div { background: #fff; border: 2px solid var(--line, #E1E6F0); border-radius: 12px; padding: 8px 10px; }
 .u5x-read b { display: block; font: 800 12px var(--body); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
@@ -5161,6 +5164,58 @@ function u5Ext(spec) {
   }
   return { widget, make: spec.make, title: spec.title, intro: spec.intro };
 }
+
+// ---------- the backwards rounder: from a rounded number back to the range it came from ----------
+// cfg.modes: [{ key, label, step, unit: 1 (whole numbers) | 0.01 (money) | 0 (any value), money?, suffix?, name?, min, max, start }]
+// U5.bounds(r, step, unit) → { lo, hi, top } where top is the largest value (or null when there isn't one)
+U5.bounds = (r, step, unit) => { const lo = U5.fix(r - step / 2), hi = U5.fix(r + step / 2); return { lo, hi, top: unit ? U5.fix(hi - unit) : null }; };
+// the number line for a rounded value: the bounds as dashed lines and the range as a bracket
+U5.boundsLine = (r, step, o = {}) => {
+  const B = U5.bounds(r, step, o.unit), f = (x) => U5.fmt(x, { money: o.money, dp: o.money ? (step >= 1 && !o.pence ? 0 : 2) : undefined }) + (o.suffix ? " " + o.suffix : "");
+  const nl = { from: U5.fix(r - step), to: U5.fix(r + step), major: step, minor: step / 10, money: !!o.money, dp: o.money ? (step >= 1 ? 0 : 2) : U5.dpOf(step / 2),
+    halves: o.noBounds ? [] : [{ v: B.lo, label: o.boundLabels === false ? "" : f(B.lo) }, { v: B.hi, label: o.boundLabels === false ? "" : f(B.hi) }],
+    marks: [{ v: r, label: "", color: "accent1" }] };
+  if (o.bracket !== false) nl.bracket = { from: B.lo, to: o.unit ? B.top : B.hi, hiOpen: !o.unit, label: o.label || "" };
+  if (o.pin !== undefined) nl.marks.push({ v: o.pin, label: o.pinLabel !== undefined ? o.pinLabel : U5.fmt(o.pin, { money: o.money, dp: o.money ? 2 : undefined }), lift: 1.15 });
+  return { nl, ...B };
+};
+function mountBounds(host, cfg) {
+  const M = cfg.modes; let mi = Math.max(0, M.findIndex((m) => m.key === cfg.start)), r = M[mi].start, pin = null;
+  host.innerHTML = `<div class="u5x"><div class="u5x-top"><span class="lbl">Rounded to</span>${M.map((m, i) => `<button type="button" data-m="${i}">${esc(m.label)}</button>`).join("")}</div>
+    <div class="u5x-row"><b>The rounded number:</b><button type="button" data-r="-1" aria-label="Smaller rounded number">◀</button><span class="u5b-r" data-rv></span><button type="button" data-r="1" aria-label="Bigger rounded number">▶</button><span style="flex:1"></span><label class="small">Type a rounded number <input type="text" data-in inputmode="decimal" aria-label="Rounded number"></label></div>
+    <div class="u5x-line" data-line title="Drag along the line to test a number"></div>
+    <div class="u5x-read"><div><b>Lower bound</b><span data-lo></span></div><div><b>Upper bound</b><span data-hi></span></div><div><b>Smallest</b><span data-sm></span></div><div class="ans"><b>Largest</b><span data-lg></span></div></div>
+    <div class="u5x-why" data-why></div><div class="u5x-why" data-pin></div></div>`;
+  const q = (s) => host.querySelector(s), line = q("[data-line]");
+  const m = () => M[mi], f = (x, pence) => U5.fmt(x, { money: m().money, dp: m().money ? (pence || Math.abs(x - Math.round(x)) > 1e-9 ? 2 : 0) : undefined }) + (m().suffix ? " " + m().suffix : "");
+  const fine = () => (m().unit || m().step / 100);
+  function draw() {
+    const md = m(), B = U5.bounds(r, md.step, md.unit), N = U5.boundsLine(r, md.step, { unit: md.unit, money: md.money, pin: pin === null ? undefined : pin, pinLabel: pin === null ? undefined : f(pin, true) });
+    line.innerHTML = graph(N, 460);
+    q("[data-rv]").textContent = f(r); q("[data-lo]").textContent = f(B.lo, md.money); q("[data-hi]").textContent = f(B.hi, md.money);
+    q("[data-sm]").textContent = f(B.lo, md.money); q("[data-lg]").textContent = md.unit ? f(B.top, md.money) : `less than ${f(B.hi)}`;
+    const nm = md.name || "number";
+    q("[data-why]").innerHTML = md.unit === 1 ? `Half of ${U5.fmt(md.step)} is ${U5.fmt(md.step / 2)}. Any whole number from <b>${f(B.lo)}</b> to <b>${f(B.top)}</b> rounds to ${f(r)}. ${f(B.hi)} itself rounds <b>up</b> to ${f(r + md.step)}.`
+      : md.unit ? `Half of ${f(md.step)} is ${f(md.step / 2, true)}. Any ${nm} from <b>${f(B.lo, true)}</b> to <b>${f(B.top, true)}</b> rounds to ${f(r)}. ${f(B.hi, true)} rounds <b>up</b>, so the largest is 1p less.`
+      : `Half of ${f(md.step)} is ${f(md.step / 2)}. Any ${nm} from <b>${f(B.lo)}</b> up to, but not including, <b>${f(B.hi)}</b> rounds to ${f(r)}: <b>${U5.fmt(B.lo)} ≤ ${nm} &lt; ${U5.fmt(B.hi)}</b>. There's no largest: ${f(U5.fix(B.hi - md.step / 100))}, ${f(U5.fix(B.hi - md.step / 1000))}… all round to ${f(r)}.`;
+    if (pin === null) q("[data-pin]").innerHTML = `<span class="muted">Drag along the line to test a number.</span>`;
+    else { const rr = U5.roundTo(pin, md.step), ok = Math.abs(rr - r) < 1e-9;
+      q("[data-pin]").innerHTML = `${f(pin, true)} rounds to <b>${f(rr)}</b> ${ok ? `<span style="color:var(--teal);font-weight:800">✓ in the range</span>` : `<span style="color:var(--coral);font-weight:800">✗ not in the range</span>`}`; }
+    host.querySelectorAll("[data-m]").forEach((b) => b.classList.toggle("on", +b.dataset.m === mi));
+  }
+  const setR = (x) => { const md = m(); r = Math.min(md.max, Math.max(md.min, U5.roundTo(x, md.step))); pin = null; draw(); };
+  host.querySelectorAll("[data-m]").forEach((b) => (b.onclick = () => { mi = +b.dataset.m; r = m().start; pin = null; draw(); }));
+  host.querySelectorAll("[data-r]").forEach((b) => (b.onclick = () => setR(r + +b.dataset.r * m().step)));
+  q("[data-in]").addEventListener("change", (e) => { const x = parseNum(e.target.value); if (isFinite(x)) setR(x); e.target.value = ""; });
+  let drag = false;
+  const at = (e) => { const svg = line.querySelector("svg"), rc = svg.getBoundingClientRect(), vb = svg.viewBox.baseVal, px = ((e.clientX - rc.left) / rc.width) * vb.width, pad = vb.width * 0.07, md = m(), lo = r - md.step, hi = r + md.step;
+    pin = U5.fix(Math.round((lo + ((px - pad) / (vb.width - 2 * pad)) * (hi - lo)) / fine()) * fine()); pin = Math.min(Math.max(pin, U5.fix(lo)), U5.fix(hi)); draw(); };
+  line.addEventListener("pointerdown", (e) => { drag = true; line.setPointerCapture(e.pointerId); at(e); });
+  line.addEventListener("pointermove", (e) => { if (drag) at(e); });
+  line.addEventListener("pointerup", () => (drag = false));
+  draw();
+}
+(() => { const st = document.createElement("style"); st.textContent = `.u5b-r { font: 800 26px var(--body); min-width: 110px; text-align: center; background: #fff; border: 2px solid var(--ink); border-radius: 10px; padding: 2px 10px; }`; document.head.appendChild(st); })();
 
 // U5-L1 Rounding using a number line: lesson-specific interactive code
 const { R: rI, pick: pK, fmt: F, money: GBP, roundTo: rnd, below: lowOf, nlFor } = U5;

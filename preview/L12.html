@@ -1096,7 +1096,7 @@ function tex(str) {
   if (str == null) return "";
   return MF.pieces(String(str)).map((p) => {
     if (!p.math) return esc(p.text);
-    if (window.katex) { try { return katex.renderToString(toTex(p.text), { throwOnError: false }); } catch (e) { /* fall through */ } }
+    if (window.katex) { try { return katex.renderToString(toTex(p.text).replace(/(\d),(?=\d{3}(?!\d))/g, "$1{,}"), { throwOnError: false }); } catch (e) { /* fall through */ } }
     return `<span class="m">${esc(p.text)}</span>`;
   }).join("");
 }
@@ -1130,13 +1130,16 @@ function nline(o, px = 300) {
   const minor = o.minor || (o.major || 1) / 10, major = o.major || minor * 10, n = Math.round(span / minor);
   for (let i = 0; i <= n; i++) { const v = o.from + i * minor, big = near(Math.round((v - o.from) / major) * major + o.from, v), x = X(v), h = big ? fs * 0.85 : fs * 0.42;
     g += `<line x1="${x}" y1="${base - h}" x2="${x}" y2="${base + h}" stroke="#23264A" stroke-width="${big ? W / 330 : W / 600}"/>`;
-    if (big && o.labels !== false && !(o.hide || []).some((h2) => near(h2, v))) g += `<text x="${x}" y="${base + fs * 2.1}" font-size="${fs}" text-anchor="middle" font-weight="700" fill="#23264A" font-family="Nunito,sans-serif">${fmt(v)}</text>`; }
+    if (big && o.labels !== false && !(o.hide || []).some((h2) => near(h2, v))) g += `<text x="${Math.min(Math.max(x, fmt(v).length * fs * 0.29 + 4), W - fmt(v).length * fs * 0.29 - 4)}" y="${base + fs * 2.1}" font-size="${fs}" text-anchor="middle" font-weight="700" fill="#23264A" font-family="Nunito,sans-serif">${fmt(v)}</text>`; }
   (o.extra || []).forEach((v) => (g += `<text x="${X(v)}" y="${base + fs * 2.1}" font-size="${fs * 0.85}" text-anchor="middle" font-weight="700" fill="#4A4F75" font-family="Nunito,sans-serif">${fmt(v)}</text>`));
   if (o.half !== undefined) g += `<line x1="${X(o.half)}" y1="${base - fs * 2.2}" x2="${X(o.half)}" y2="${base + fs * 0.9}" stroke="var(--purple)" stroke-width="${W / 300}" stroke-dasharray="${fs * 0.35} ${fs * 0.25}"/><text x="${X(o.half)}" y="${base - fs * 2.5}" font-size="${fs * 0.8}" text-anchor="middle" font-weight="800" fill="var(--purple)" font-family="Nunito,sans-serif">halfway ${o.halfLabel === false ? "" : fmtX(o.half)}</text>`;
-  if (o.bracket) { const b = o.bracket, y = base - fs * 1.6, c = col(b.color, "var(--teal)");
+  // bounds: dashed lines either side (lower and upper bound), each with its own label
+  (o.halves || []).forEach((h) => { const v = typeof h === "object" ? h.v : h, lab = typeof h === "object" && h.label !== undefined ? h.label : "halfway " + fmtX(v), c = col(typeof h === "object" && h.color, "var(--purple)");
+    g += `<line x1="${X(v)}" y1="${base - fs * 2.2}" x2="${X(v)}" y2="${base + fs * 0.9}" stroke="${c}" stroke-width="${W / 300}" stroke-dasharray="${fs * 0.35} ${fs * 0.25}"/>${lab ? `<text x="${X(v)}" y="${base - fs * 2.5}" font-size="${fs * 0.8}" text-anchor="middle" font-weight="800" fill="${c}" font-family="Nunito,sans-serif">${esc(lab)}</text>` : ""}`; });
+  if (o.bracket) { const b = o.bracket, y = base - fs * (b.lift || 1.6), c = col(b.color, "var(--teal)");
     g += `<line x1="${X(b.from)}" y1="${y}" x2="${X(b.to)}" y2="${y}" stroke="${c}" stroke-width="${W / 160}"/>`;
     [["from", b.loOpen], ["to", b.hiOpen]].forEach(([k, open]) => (g += `<circle cx="${X(b[k])}" cy="${y}" r="${fs * 0.32}" fill="${open ? "#fff" : c}" stroke="${c}" stroke-width="${W / 300}"/>`));
-    if (b.label) g += `<text x="${(X(b.from) + X(b.to)) / 2}" y="${y - fs * 0.6}" font-size="${fs * 0.9}" text-anchor="middle" font-weight="800" fill="${c}" font-family="Nunito,sans-serif">${esc(b.label)}</text>`; }
+    if (b.label) g += `<text x="${(X(b.from) + X(b.to)) / 2}" y="${o.halves || o.half !== undefined ? base - fs * 3.45 : y - fs * 0.6}" font-size="${fs * 0.9}" text-anchor="middle" font-weight="800" fill="${c}" font-family="Nunito,sans-serif">${esc(b.label)}</text>`; }
   (o.arrows || []).forEach((a) => { const x1 = X(a.from), x2 = X(a.to), c = col(a.color, "var(--teal)"), up = base - fs * (a.high || 1.4), mx = (x1 + x2) / 2;
     g += `<path d="M ${x1} ${base - fs * 0.5} Q ${mx} ${up - fs * 1.2} ${x2} ${base - fs * 0.6}" fill="none" stroke="${c}" stroke-width="${W / 280}" marker-end="url(#nlar)"/>`; });
   (o.marks || []).forEach((m) => { const x = X(m.v), c = col(m.color, "var(--coral)"), y = base - fs * (m.lift || 1.1);
