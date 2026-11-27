@@ -4960,6 +4960,36 @@ const BOARD = (() => {
 .sb-pop button.on { background: var(--ink); color: #fff; }
 .sb-pop input[type=number] { width: 70px; font: 700 16px var(--body); padding: 4px 6px; border: 2px solid var(--ink); border-radius: 6px; }
 .sb-gpop { width: min(560px, calc(100% - 28px)); } .sb-gpop .gax > span { text-transform: none; letter-spacing: 0; font: 800 14px var(--body); color: var(--ink); } .sb-gpop .gax label { display: flex; flex-direction: column; font: 700 12px var(--body); color: var(--muted); gap: 2px; } .sb-gpop .gax input[type=number] { width: 78px; } .sb-gpop .gax .lbl input { width: 150px; font: 700 15px var(--body); padding: 4px 6px; border: 2px solid var(--ink); border-radius: 6px; }
+.sb-body { flex: 1; min-height: 0; display: flex; }
+.sb-body .sb-stage { flex: 1; min-width: 0; }
+.sb-side { width: 210px; flex: none; overflow: auto; background: #F6F7FB; border-left: 2px solid var(--line); padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+.sb-side[hidden] { display: none; }
+.sb-sh { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; position: sticky; top: -8px; background: #F6F7FB; padding: 4px 0; z-index: 1; } .sb-sh b { flex: 1; font: 800 14px var(--body); }
+.sb-sh button, .sb-view button, .sb-all button { font: 800 13px var(--body); padding: 4px 9px; border: 2px solid var(--ink); border-radius: 8px; background: #fff; cursor: pointer; }
+.sb-sh button.on, .sb-view .sb-mode button.on, .sb-head .sb-mode button.on { background: var(--ink); color: #fff; }
+.sb-head .sb-mode { display: inline-flex; } .sb-head .sb-mode button:first-child, .sb-view .sb-mode button:first-child { border-radius: 8px 0 0 8px; } .sb-head .sb-mode button:last-child, .sb-view .sb-mode button:last-child { border-radius: 0 8px 8px 0; border-left: 0; } .sb-view .sb-mode { display: inline-flex; }
+.sb-tile { background: #fff; border: 2px solid #C9CFDB; border-radius: 10px; padding: 4px; cursor: pointer; }
+.sb-tile:hover { border-color: var(--blue); } .sb-tile.on { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(47,91,211,.3); }
+.sb-tile canvas { width: 100%; aspect-ratio: 16 / 10; display: block; border-radius: 6px; background: #fff; }
+.sb-tile .nm { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font: 700 13px var(--body); padding: 3px 2px 0; } .sb-tile .nm b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-tile .ws { font-size: 11px; color: #8A93A8; } .sb-tile .ws.writing { color: #1F9D55; font-weight: 800; } .sb-tile .ws.done { color: var(--ink); } .sb-tile .gone { font-size: 11px; color: #D93A3A; }
+.sb-tile .rm { border: 0; background: none; color: #8A93A8; font: 800 14px var(--body); cursor: pointer; padding: 0 2px; } .sb-tile .rm:hover { color: var(--coral); }
+.sb-view { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 6px 12px; font: 700 14px var(--body); background: #FFF8D6; border-bottom: 1px solid var(--line); }
+.sb-view:empty { display: none; } .sb-view.all { background: #EAF1FF; } .sb-view.one { background: #FFF1C2; } .sb-view.collab { background: #E5F7EC; } .sb-view.copy { background: #EAF1FF; } .sb-view .sp { flex: 1; }
+.sb-all { position: absolute; inset: 0; z-index: 6; background: #F6F7FB; display: flex; flex-direction: column; }
+.sb-ah { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 2px solid var(--ink); background: #fff; flex-wrap: wrap; } .sb-ah b { font: 800 18px var(--body); } .sb-ah .sp { flex: 1; }
+.sb-ag { flex: 1; overflow: auto; padding: 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; align-content: start; }
+@media (max-width: 820px) { .sb-body { flex-direction: column; } .sb-side { width: auto; height: 132px; border-left: 0; border-top: 2px solid var(--line); flex-direction: row; overflow-x: auto; } .sb-side .sb-tile { width: 140px; flex: none; } .sb-sh { position: static; flex-direction: column; width: 92px; flex: none; } }
+.sb-pick { position: fixed; inset: 0; z-index: 9900; background: rgba(20,24,44,.55); display: flex; align-items: center; justify-content: center; padding: 10px; }
+.sb-pick .pk { background: #fff; border-radius: 14px; width: min(760px, 100%); max-height: 100%; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,.35); }
+.sb-pick .pk-h { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 2px solid var(--ink); } .sb-pick .pk-h b { flex: 1; font: 800 19px var(--body); }
+.sb-pick .pk-b { overflow: auto; padding: 12px 16px; font: 700 15px var(--body); }
+.sb-pick button { font: 800 14px var(--body); padding: 6px 12px; border: 2px solid var(--ink); border-radius: 8px; background: #fff; cursor: pointer; } .sb-pick button.go { background: var(--ink); color: #fff; } .sb-pick button:disabled { opacity: .45; cursor: default; }
+.sb-pick .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 4px 0 14px; } .sb-pick .modes label { border: 2px solid #C9CFDB; border-radius: 10px; padding: 10px 12px; cursor: pointer; font-weight: 600; font-size: 14px; display: block; } .sb-pick .modes label b { display: block; font-size: 16px; font-weight: 800; margin-bottom: 2px; } .sb-pick .modes label:has(input:checked) { border-color: var(--blue); background: #EAF1FF; } .sb-pick .modes input { margin-right: 6px; }
+.sb-pick .who { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; margin-top: 8px; } .sb-pick .who label { display: flex; align-items: center; gap: 8px; border: 2px solid #E1E5EE; border-radius: 8px; padding: 6px 8px; cursor: pointer; } .sb-pick .who label:has(input:checked) { border-color: var(--ink); background: #F6F7FB; } .sb-pick .who small { color: var(--muted); margin-left: auto; }
+.sb-pick .bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; } .sb-pick .bar .sp { flex: 1; }
+@media (max-width: 600px) { .sb-pick .modes { grid-template-columns: 1fr; } }
+.lv-h [data-gb].hot { background: #FFE66D; }
 .sb-pill { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 9700; background: var(--ink); color: #fff; border-radius: 30px; padding: 10px 16px; font: 800 16px var(--body); display: flex; gap: 10px; align-items: center; box-shadow: 0 6px 20px rgba(0,0,0,.3); }
 .sb-pill button { font: 800 15px var(--body); padding: 5px 12px; border-radius: 20px; border: 0; background: #FFE66D; cursor: pointer; }
 `; document.head.appendChild(css);
@@ -5021,34 +5051,67 @@ const BOARD = (() => {
   }
 
   // ---- one board on screen. role: "t" (teacher) or "s" (student) ----
-  // io: { send(who, data), poll() → { t, s, o, on } }, onEnd(), onHide()
+  // Every board is a session with one or more students. Each person writes on their own layer:
+  //   "t"      the teacher's writing that every student on the board sees
+  //   "p:<id>" the teacher's writing on one student's board only
+  //   "s:<id>" a student's writing (in "copy" mode only that student and the teacher see it; in "collab" mode everyone does)
+  //   "o"      the paper and the grids, dot paper and tables (teacher only)
+  // io: { send(layer, data) → { ok, at }, poll(since) → { ok, on, mode, n, me, mem, now, L: { layer: "at|data" } } }
+  // opts: { mode, members: [{ id, name, cls }], ctl: { setMode, add, remove, wipe }, onEnd, onHide, onMin }
   function open(role, title, io, opts = {}) {
-    const T = role === "t", mine = role, theirs = T ? "s" : "t";
-    const S = { paper: "squared", objs: [], [mine]: [], [theirs]: [], v: { t: 0, s: 0, o: 0 } };
-    let pen = (T ? TPEN : SPEN)[T ? 1 : 0], size = 4, tool = "pen", cur = null, hist = [], sel = null, alive = true, pushT = {}, last = { t: "", s: "", o: "" };
+    const T = role === "t";
+    const S = { paper: "squared", objs: [], L: {} };
+    let me = "", mode = opts.mode || "copy", members = opts.members || [], view = "", target = "t";
+    let pen = (T ? TPEN : SPEN)[T ? 1 : 0], size = 4, tool = "pen", cur = null, hist = [], sel = null, alive = true, pushT = {}, last = {}, since = 0, every = 1500;
+    const seenAt = {}, wrote = new Set(), act = {}, dirty = new Set();
+    let wipeSeen = "", objImg = null, allOpen = false;
+    const lay = (n) => S.L[n] || (S.L[n] = []);
+    const myLayer = () => (T ? target : "s:" + me);
+    const nameOf = (id) => { const m = members.find((x) => x.id === id); return m ? m.name : String(id).split("|")[1] || id; };
+    const first = (id) => esc(nameOf(id).split(" ")[0]);
     const ov = document.createElement("div"); ov.className = "sb-ov";
-    ov.innerHTML = `<div class="sb-win" role="dialog" aria-label="Shared board"><div class="sb-head"><b>${esc(title)}</b><span class="st" data-st>Connecting…</span>${T ? `<button type="button" data-end>✕ End for both of us</button>` : `<button type="button" data-hide>✕ Close</button>`}</div>
+    ov.innerHTML = `<div class="sb-win" role="dialog" aria-label="Shared board"><div class="sb-head"><b data-title>${esc(title)}</b><span class="st" data-st>Connecting…</span><span data-hc></span>${T ? `<button type="button" data-min title="Hide the board and go back to the Live class. It stays open on the students' screens.">— Hide</button><button type="button" data-end>✕ End for everyone</button>` : `<button type="button" data-hide>✕ Close</button>`}</div>
       <div class="sb-tools"><button type="button" data-t="pen" class="on">✏️ Pen</button><button type="button" data-t="rub">🧽 Rubber</button>${T ? `<button type="button" data-t="move">✋ Move / resize</button>` : ""}<button type="button" data-u>↶ Undo</button><button type="button" data-clr>🗑 Clear my writing</button>
         <span class="sep"></span><span data-sw></span>${T ? `<span class="sep"></span><button type="button" data-add="grid">➕ Coordinate grid</button><button type="button" data-add="sq">➕ Square dots</button><button type="button" data-add="iso">➕ Isometric dots</button><button type="button" data-add="table">➕ Table</button>` : ""}<span class="sep"></span><button type="button" data-set>⚙ Settings</button></div>
-      <div class="sb-stage"><div class="sb-board"><canvas class="bg"></canvas><svg viewBox="0 0 ${BW} ${BH}" preserveAspectRatio="none"></svg><canvas class="ink"></canvas></div></div></div>`;
+      <div class="sb-view" data-view></div>
+      <div class="sb-body"><div class="sb-stage"><div class="sb-board"><canvas class="bg"></canvas><svg viewBox="0 0 ${BW} ${BH}" preserveAspectRatio="none"></svg><canvas class="ink"></canvas></div></div>${T ? `<aside class="sb-side" data-side hidden></aside>` : ""}</div></div>`;
     document.body.appendChild(ov);
     const q = (x) => ov.querySelector(x), board = q(".sb-board"), bg = q("canvas.bg"), ink = q("canvas.ink"), svg = q("svg"), stage = q(".sb-stage");
     const status = (t, c) => { q("[data-st]").textContent = t; q("[data-st]").style.color = c || ""; };
+    const liveMsg = () => (T ? (members.length === 1 ? "● Live on their screen" : `● Live on ${members.length} screens`) : "● Live with your teacher");
     let k = 1;
-    function fit() { const r = stage.getBoundingClientRect(), sc = Math.min((r.width - 16) / BW, (r.height - 16) / BH); board.style.width = BW * sc + "px"; board.style.height = BH * sc + "px"; const d = window.devicePixelRatio || 1; k = sc * d; [bg, ink].forEach((c) => { c.width = BW * k; c.height = BH * k; }); drawAll(); }
+    function fit() { const r = stage.getBoundingClientRect(), sc = Math.max(0.05, Math.min((r.width - 16) / BW, (r.height - 16) / BH)); board.style.width = BW * sc + "px"; board.style.height = BH * sc + "px"; const d = window.devicePixelRatio || 1; k = sc * d; [bg, ink].forEach((c) => { c.width = BW * k; c.height = BH * k; }); drawAll(); }
+    // which layers this screen shows, bottom to top
+    function visible() {
+      const out = ["t"];
+      if (T) { if (mode === "collab") members.forEach((m) => out.push("s:" + m.id)); else if (view) out.push("s:" + view); if (view) out.push("p:" + view); }
+      else { if (mode === "collab") Object.keys(S.L).forEach((n) => { if (n.startsWith("s:") && n !== "s:" + me) out.push(n); }); out.push("p:" + me, "s:" + me); }
+      return out;
+    }
     function drawAll() { paper(bg.getContext("2d"), S.paper, k); svg.innerHTML = S.objs.map((o) => objSVG(o, T && tool === "move" && sel === o.id)).join(""); inkDraw(); bindObjs(); }
-    function inkDraw() { const c = ink.getContext("2d"); c.clearRect(0, 0, ink.width, ink.height); strokes(c, S[theirs], k); strokes(c, S[mine], k); if (cur) strokes(c, [cur], k); }
+    function inkDraw() { const c = ink.getContext("2d"); c.clearRect(0, 0, ink.width, ink.height); visible().forEach((n) => strokes(c, S.L[n], k)); if (cur) strokes(c, [cur], k); }
     const swatches = () => { q("[data-sw]").innerHTML = (T ? TPEN : SPEN).map((c) => `<button type="button" class="sw${c === pen ? " on" : ""}" data-pen="${c}" style="background:${c}" aria-label="Pen colour"></button>`).join(""); q("[data-sw]").querySelectorAll("[data-pen]").forEach((b) => (b.onclick = () => { pen = b.dataset.pen; if (tool !== "pen") setTool("pen"); swatches(); })); };
     function setTool(t) { tool = t; ov.querySelectorAll("[data-t]").forEach((b) => b.classList.toggle("on", b.dataset.t === t)); board.classList.toggle("moving", t === "move"); ink.style.pointerEvents = t === "move" ? "none" : "auto"; if (t !== "move") sel = null; drawAll(); }
     const pos = (e) => { const r = ink.getBoundingClientRect(); return [Math.round(((e.clientX - r.left) / r.width) * BW), Math.round(((e.clientY - r.top) / r.height) * BH)]; };
-    const snap = () => { hist.push(JSON.stringify({ m: S[mine], o: T ? S.objs : null, p: S.paper })); if (hist.length > 50) hist.shift(); };
-    // send what changed: my writing, and (teacher) the paper and objects
-    function push(what) { clearTimeout(pushT[what]); pushT[what] = setTimeout(async () => { const data = what === "o" ? JSON.stringify({ paper: S.paper, objs: S.objs }) : JSON.stringify(S[mine]); if (data === last[what]) return; try { await io.send(what, data); last[what] = data; status(T ? "● Live on their screen" : "● Live with your teacher", "#1F9D55"); } catch (e) { status("Can't reach the live server. Trying again…", "#D93A3A"); pushT[what] = setTimeout(() => push(what), 2000); } }, 300); }
+    const snap = () => { const n = myLayer(); hist.push(JSON.stringify({ n, m: lay(n), o: T ? S.objs : null, p: S.paper })); if (hist.length > 50) hist.shift(); };
+    // which boards a change to a layer shows up on (for the teacher's thumbnails)
+    const touch = (n) => { if (!T) return; if (n === "t" || n === "o") members.forEach((m) => dirty.add(m.id)); else dirty.add(n.slice(2)); };
+    // send a layer I write; my copy is the one that counts from now on
+    function push(n) {
+      wrote.add(n); touch(n); if (n === "o") objImg = null; clearTimeout(pushT[n]);
+      pushT[n] = setTimeout(async () => { if (!alive) return; const data = n === "o" ? JSON.stringify({ paper: S.paper, objs: S.objs }) : JSON.stringify(lay(n)); if (data === last[n]) return;
+        try { const r = await io.send(n, data);
+          if (r && r.ok) { last[n] = data; if (r.at) seenAt[n] = r.at; status(liveMsg(), "#1F9D55"); }
+          else if (r && r.error === "big") status(T ? "This board is full. Clear some writing to keep sending." : "Your board is full. Rub out or clear some writing.", "#D93A3A");
+          else if (r && r.error === "ended") status("This board has ended.", "#8A93A8");
+          else throw new Error("no"); }
+        catch (e) { status("Can't reach the live server. Trying again…", "#D93A3A"); pushT[n] = setTimeout(() => push(n), 2000); } }, 300);
+    }
     ink.addEventListener("pointerdown", (e) => { if (tool === "move") return; e.preventDefault(); ink.setPointerCapture(e.pointerId); snap(); const [x, y] = pos(e);
-      if (tool === "rub") { cur = { rub: true }; const o = eraseIn(S[mine], x, y, size * 3 + 14); if (o) { S[mine] = o; inkDraw(); } return; }
+      if (tool === "rub") { cur = { rub: true }; const o = eraseIn(lay(myLayer()), x, y, size * 3 + 14); if (o) { S.L[myLayer()] = o; inkDraw(); } return; }
       cur = { c: pen, w: size, p: [x, y] }; inkDraw(); });
-    ink.addEventListener("pointermove", (e) => { if (!cur) return; const [x, y] = pos(e); if (cur.rub) { const o = eraseIn(S[mine], x, y, size * 3 + 14); if (o) { S[mine] = o; inkDraw(); } return; } const n = cur.p.length; if ((cur.p[n - 2] - x) ** 2 + (cur.p[n - 1] - y) ** 2 > 4) { cur.p.push(x, y); inkDraw(); } });
-    const up = () => { if (!cur) return; if (!cur.rub && cur.p.length >= 2) S[mine].push(cur); cur = null; inkDraw(); push(mine); };
+    ink.addEventListener("pointermove", (e) => { if (!cur) return; const [x, y] = pos(e); if (cur.rub) { const o = eraseIn(lay(myLayer()), x, y, size * 3 + 14); if (o) { S.L[myLayer()] = o; inkDraw(); } return; } const n = cur.p.length; if ((cur.p[n - 2] - x) ** 2 + (cur.p[n - 1] - y) ** 2 > 4) { cur.p.push(x, y); inkDraw(); } });
+    const up = () => { if (!cur) return; if (!cur.rub && cur.p.length >= 2) lay(myLayer()).push(cur); cur = null; inkDraw(); push(myLayer()); };
     ink.addEventListener("pointerup", up); ink.addEventListener("pointercancel", up);
     // teacher: move, resize and delete objects
     function bindObjs() {
@@ -5076,7 +5139,7 @@ const BOARD = (() => {
       if (q(".sb-pop")) return q(".sb-pop").remove();
       const p = document.createElement("div"); p.className = "sb-pop";
       p.innerHTML = `<div class="h"><b>⚙ Settings</b><button type="button" data-x>✕ Close</button></div>
-        ${T ? `<div class="row"><span>Paper (for both of you)</span>${PAPERS.map(([v, t]) => `<button type="button" data-paper="${v}" class="${S.paper === v ? "on" : ""}">${t}</button>`).join("")}</div>` : `<div class="row"><span>Paper</span>Your teacher chooses the paper.</div>`}
+        ${T ? `<div class="row"><span>Paper (for everyone on the board)</span>${PAPERS.map(([v, t]) => `<button type="button" data-paper="${v}" class="${S.paper === v ? "on" : ""}">${t}</button>`).join("")}</div>` : `<div class="row"><span>Paper</span>Your teacher chooses the paper.</div>`}
         <div class="row"><span>Pen size</span>${[[2, "Fine"], [4, "Medium"], [7, "Thick"], [11, "Marker"]].map(([v, t]) => `<button type="button" data-size="${v}" class="${size === v ? "on" : ""}">${t}</button>`).join("")}</div>
         <div class="row"><span>Pen colour</span>${(T ? TPEN : SPEN).map((c) => `<button type="button" data-pc="${c}" class="${pen === c ? "on" : ""}" style="width:34px;height:34px;padding:0;border-radius:50%;background:${c};border-color:${pen === c ? "var(--ink)" : "#fff"};box-shadow:0 0 0 2px #C9CFDB" aria-label="Pen colour"></button>`).join("")}</div>
         <div class="row"><span>Rubber</span><button type="button" data-rub>🧽 Use the rubber</button> <span style="width:auto;text-transform:none;letter-spacing:0;font-size:13px">It rubs out only your own writing.</span></div>`;
@@ -5132,32 +5195,115 @@ const BOARD = (() => {
       f("x0").focus();
     }
     ov.querySelectorAll("[data-t]").forEach((b) => (b.onclick = () => setTool(b.dataset.t)));
-    q("[data-u]").onclick = () => { const h = hist.pop(); if (!h) return; const o = JSON.parse(h); S[mine] = o.m; if (T) { S.objs = o.o; S.paper = o.p; push("o"); } drawAll(); push(mine); };
-    q("[data-clr]").onclick = () => { if (!S[mine].length) return; snap(); S[mine] = []; inkDraw(); push(mine); };
+    q("[data-u]").onclick = () => { const h = hist.pop(); if (!h) return; const o = JSON.parse(h); S.L[o.n] = o.m; if (T && JSON.stringify(o.o) !== JSON.stringify(S.objs)) { S.objs = o.o; S.paper = o.p; push("o"); } else if (T && o.p !== S.paper) { S.paper = o.p; push("o"); } drawAll(); push(o.n); };
+    q("[data-clr]").onclick = () => { if (!lay(myLayer()).length) return; snap(); S.L[myLayer()] = []; inkDraw(); push(myLayer()); };
     q("[data-set]").onclick = settings;
     ov.querySelectorAll("[data-add]").forEach((b) => (b.onclick = () => (b.dataset.add === "table" ? tableAsk() : b.dataset.add === "grid" ? gridAsk() : add(b.dataset.add))));
-    if (T) q("[data-end]").onclick = () => { alive = false; ov.remove(); removeEventListener("resize", fit); opts.onEnd && opts.onEnd(); };
+    const shut = () => { alive = false; ov.remove(); removeEventListener("resize", fit); removeEventListener("keydown", keys); };
+    if (T) { q("[data-end]").onclick = () => { if (members.length > 1 && !confirm(`End the board for all ${members.length} students?`)) return; shut(); opts.onEnd && opts.onEnd(); };
+      q("[data-min]").onclick = () => { ov.style.display = "none"; opts.onMin && opts.onMin(); }; }
     else q("[data-hide]").onclick = () => { ov.style.display = "none"; opts.onHide && opts.onHide(); };
-    // the other person's writing (and the teacher's paper and objects) arrive every 1.2 seconds
+
+    // ---- the teacher: mode, who is on the board, and whose board you are looking at ----
+    function head() {
+      if (!T) { q("[data-title]").textContent = mode === "collab" ? "🤝 Class board: everyone writes together" : "🖐 Your teacher's board";
+        const v = q("[data-view]"); v.className = "sb-view " + mode; v.textContent = mode === "collab" ? "Everyone on this board can see what you write." : "Your teacher's writing appears here. What you write stays on your board: only your teacher can see it."; return; }
+      const many = members.length > 1;
+      q("[data-hc]").innerHTML = `${many ? `<span class="sb-mode" role="group" aria-label="How the board works"><button type="button" data-mode="copy" class="${mode === "copy" ? "on" : ""}" title="Your writing goes on every board. Each student's writing stays on their own board.">✍ I do, you do</button><button type="button" data-mode="collab" class="${mode === "collab" ? "on" : ""}" title="Everyone writes on one board and sees everyone's writing.">🤝 Work together</button></span>` : ""}<button type="button" data-addst>➕ Add students</button>`;
+      q("[data-hc]").querySelectorAll("[data-mode]").forEach((b) => (b.onclick = async () => { if (b.dataset.mode === mode) return; const was = mode; mode = b.dataset.mode; head(); banner(); drawAll(); members.forEach((m) => dirty.add(m.id)); tiles();
+        try { const r = await opts.ctl.setMode(mode); if (!r || !r.ok) throw new Error("no"); } catch (e) { mode = was; head(); banner(); drawAll(); status("Couldn't change it. Try again.", "#D93A3A"); } }));
+      q("[data-addst]").onclick = async () => { const got = await opts.ctl.add(members.map((m) => m.id)); if (got && got.length) { got.forEach((m) => { if (!members.find((x) => x.id === m.id)) members.push(m); }); if (members.length > 1 && view && target === "t") target = "p:" + view; head(); side(); banner(); status(liveMsg(), "#1F9D55"); } };
+      q(".sb-side").hidden = !many; q("[data-end]").textContent = many ? "✕ End for everyone" : "✕ End for both of us"; requestAnimationFrame(fit);
+    }
+    function setView(id) {
+      view = id || ""; target = view && members.length > 1 ? "p:" + view : "t"; if (tool === "rub" && !view) setTool("pen");
+      banner(); drawAll(); ov.querySelectorAll(".sb-tile").forEach((t) => t.classList.toggle("on", t.dataset.id === view)); const t = q(`.sb-side .sb-tile[data-id="${CSS.escape(view)}"]`); if (t) t.scrollIntoView({ block: "nearest" });
+    }
+    function banner() {
+      const v = q("[data-view]"); if (!T) return head();
+      if (members.length <= 1) { v.className = "sb-view"; v.innerHTML = members[0] ? `<span>👀 You and <b>${esc(nameOf(members[0].id))}</b> both see everything on this board.</span>` : ""; return; }
+      if (!view) { v.className = "sb-view all"; v.innerHTML = `<span>🧑‍🏫 <b>Your board.</b> What you write goes on all ${members.length} boards. ${mode === "collab" ? "Everyone's writing is shown." : "Students' writing stays on their own boards:"} <b>click a student</b> to look at theirs.</span><span class="sp"></span><button type="button" data-allb>⊞ See all boards</button>`; }
+      else { const i = members.findIndex((m) => m.id === view);
+        v.className = "sb-view one"; v.innerHTML = `<button type="button" data-prev title="Previous student">◀</button><button type="button" data-next title="Next student">▶</button><span>👀 <b>${esc(nameOf(view))}</b>'s board <span class="muted">(${i + 1} of ${members.length})</span> · Your pen writes on</span><span class="sb-mode"><button type="button" data-tg="p" class="${target !== "t" ? "on" : ""}">Only ${first(view)}'s board</button><button type="button" data-tg="t" class="${target === "t" ? "on" : ""}">Everyone's boards</button></span><span class="sp"></span><button type="button" data-wipe title="Remove everything ${first(view)} has written">🗑 Clear ${first(view)}'s writing</button><button type="button" data-allb>⊞ See all</button><button type="button" data-back>✕ Back to my board</button>`;
+        v.querySelectorAll("[data-tg]").forEach((b) => (b.onclick = () => { target = b.dataset.tg === "t" ? "t" : "p:" + view; banner(); }));
+        const step = (d) => { const j = (i + d + members.length) % members.length; setView(members[j].id); };
+        v.querySelector("[data-prev]").onclick = () => step(-1); v.querySelector("[data-next]").onclick = () => step(1);
+        v.querySelector("[data-back]").onclick = () => setView("");
+        v.querySelector("[data-wipe]").onclick = async () => { const id = view; if (!confirm(`Clear everything ${nameOf(id)} has written on the board?`)) return; S.L["s:" + id] = []; touch("s:" + id); inkDraw(); tiles(); try { await opts.ctl.wipe(id); } catch (e) { status("Couldn't clear it. Try again.", "#D93A3A"); } }; }
+      const ab = v.querySelector("[data-allb]"); if (ab) ab.onclick = seeAll;
+    }
+    // live thumbnails of every student's board
+    function drawTile(cv, id) {
+      const kk = cv.width / BW, c = cv.getContext("2d"); paper(c, S.paper, kk);
+      if (S.objs.length) { if (!objImg) { objImg = new Image(); objImg.onload = () => { members.forEach((m) => dirty.add(m.id)); tiles(); }; objImg.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${BW} ${BH}">${S.objs.map((o) => objSVG(o, false)).join("").replace(/var\(--[a-z]+\)/g, "#2F5BD3")}</svg>`); } else if (objImg.complete) c.drawImage(objImg, 0, 0, cv.width, cv.height); }
+      ["t", ...(mode === "collab" ? members.map((m) => "s:" + m.id) : ["s:" + id]), "p:" + id].forEach((n) => strokes(c, S.L[n], kk));
+    }
+    const tileState = (id) => { const t = act[id] || 0, n = (S.L["s:" + id] || []).length; return Date.now() - t < 6000 ? ["writing", "✏️ writing now"] : n ? ["done", "✓ has written"] : ["none", "nothing yet"]; };
+    const tileHTML = (m, big) => `<div class="sb-tile${m.id === view ? " on" : ""}" data-id="${esc(m.id)}" role="button" tabindex="0" title="Look at ${esc(m.name)}'s board"><canvas width="${big ? 480 : 320}" height="${big ? 300 : 200}"></canvas><div class="nm"><b>${esc(m.name)}</b>${m.here === false ? `<span class="gone">closed it</span>` : `<span class="ws"></span>`}${big ? "" : `<button type="button" class="rm" data-rm title="Take ${esc(m.name)} off the board">✕</button>`}</div></div>`;
+    function bindTiles(root, after) {
+      root.querySelectorAll(".sb-tile").forEach((t) => { const go = () => { setView(t.dataset.id); after && after(); }; t.onclick = (e) => { if (e.target.closest("[data-rm]")) return; go(); }; t.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
+        const rm = t.querySelector("[data-rm]"); if (rm) rm.onclick = async (e) => { e.stopPropagation(); const id = t.dataset.id; if (!confirm(`Take ${nameOf(id)} off the board? It closes on their screen.`)) return; try { const r = await opts.ctl.remove(id); if (!r || !r.ok) throw new Error("no"); members = members.filter((m) => m.id !== id); if (view === id) setView(""); head(); side(); banner(); } catch (er) { status("Couldn't take them off. Try again.", "#D93A3A"); } }; });
+    }
+    function side() {
+      const el = q(".sb-side"); if (!el) return;
+      el.innerHTML = `<div class="sb-sh"><b>Students (${members.length})</b><button type="button" data-me class="${view ? "" : "on"}">🧑‍🏫 My board</button></div>${members.map((m) => tileHTML(m)).join("")}`;
+      el.querySelector("[data-me]").onclick = () => { setView(""); side(); };
+      bindTiles(el); members.forEach((m) => dirty.add(m.id)); tiles();
+    }
+    function tiles() {
+      ov.querySelectorAll(".sb-tile").forEach((t) => { const id = t.dataset.id; if (dirty.has(id) || t.closest(".sb-all")) drawTile(t.querySelector("canvas"), id); const ws = t.querySelector(".ws"); if (ws) { const [c, txt] = tileState(id); ws.className = "ws " + c; ws.textContent = txt; } });
+      dirty.clear(); const me2 = q(".sb-side [data-me]"); if (me2) me2.classList.toggle("on", !view);
+    }
+    function seeAll() {
+      if (q(".sb-all")) return; allOpen = true;
+      const w = document.createElement("div"); w.className = "sb-all";
+      w.innerHTML = `<div class="sb-ah"><b>⊞ All ${members.length} boards</b><span class="muted small">Updating live. Click a board to look at it and write on it.</span><span class="sp"></span><button type="button" data-x>✕ Close</button></div><div class="sb-ag">${members.map((m) => tileHTML(m, true)).join("")}</div>`;
+      q(".sb-win").appendChild(w); const close = () => { allOpen = false; w.remove(); };
+      w.querySelector("[data-x]").onclick = close; bindTiles(w, close); tiles();
+    }
+    function keys(e) { if (!T || ov.style.display === "none" || members.length < 2 || /input|textarea/i.test((e.target.tagName || ""))) return; if (e.key === "Escape" && q(".sb-all")) { q(".sb-all [data-x]").click(); return; }
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") { const i = members.findIndex((m) => m.id === view), d = e.key === "ArrowRight" ? 1 : -1; setView(members[i < 0 ? (d > 0 ? 0 : members.length - 1) : (i + d + members.length) % members.length].id); } }
+    addEventListener("keydown", keys);
+
+    // ---- what arrives: other people's writing, the paper and objects, who's on the board, the mode ----
     async function follow() {
       while (alive) {
-        try { const j = await io.poll(); if (!alive) break;
-          if (j && j.ok) { if (!T && !j.on) { alive = false; ov.remove(); removeEventListener("resize", fit); opts.onEnd && opts.onEnd(); break; }
-            let redraw = false;
-            if (j[theirs] !== undefined && j[theirs] !== last["in" + theirs]) { last["in" + theirs] = j[theirs]; try { S[theirs] = JSON.parse(j[theirs] || "[]"); } catch (e) { /* ignore */ } redraw = true; }
-            if (!T && j.o !== undefined && j.o !== last.ino) { last.ino = j.o; try { const o = JSON.parse(j.o || "{}"); S.paper = o.paper || "squared"; S.objs = o.objs || []; } catch (e) { /* ignore */ } fit(); }
-            if (redraw) inkDraw();
-            if (q("[data-st]").textContent === "Connecting…") status(T ? "● Live on their screen" : "● Live with your teacher", "#1F9D55"); } }
+        try { const j = await io.poll(since); if (!alive) break;
+          if (j && j.ok) {
+            if (!j.on) { if (!T) { shut(); opts.onEnd && opts.onEnd(); break; } status("This board has ended.", "#8A93A8"); }
+            else {
+              if (j.me && j.me !== me) { const o2 = "s:" + me, n2 = "s:" + j.me; if (S.L[o2]) { S.L[n2] = S.L[o2]; delete S.L[o2]; if (wrote.has(o2)) wrote.add(n2); } me = j.me; }
+              every = T ? (j.n > 15 ? 2000 : 1500) : (j.n > 8 ? 2500 : 1500);
+              let redraw = false, refit = false;
+              let again = false; if (j.mode && j.mode !== mode && !T) { mode = j.mode; head(); redraw = true; again = true; } // a new mode can show older writing: fetch everything once more
+              if (T && j.mem) { const was = members.map((m) => m.id + (m.here === false ? "-" : "")).join(","); members = j.mem.map((m) => Object.assign({}, members.find((x) => x.id === m.id) || {}, m)); if (members.map((m) => m.id + (m.here === false ? "-" : "")).join(",") !== was) { if (view && !members.find((m) => m.id === view)) view = ""; head(); side(); banner(); } }
+              if (j.now) since = again ? 0 : Math.max(0, j.now - 3000);
+              Object.entries(j.L || {}).forEach(([n, v]) => {
+                const i = v.indexOf("|"), at = v.slice(0, i), data = v.slice(i + 1); if (seenAt[n] === at) return; seenAt[n] = at;
+                const mine2 = T ? n === "t" || n === "o" || n.startsWith("p:") : n === "s:" + me;
+                if (mine2 && wrote.has(n)) { if (!T && at[0] === "w" && at !== wipeSeen) { wipeSeen = at; S.L[n] = []; last[n] = "[]"; redraw = true; } return; } // I'm the one writing this; only a teacher's "clear" overrides it
+                if (n === "o") { try { const o = JSON.parse(data || "{}"); S.paper = o.paper || "squared"; S.objs = o.objs || []; objImg = null; } catch (e) { /* ignore */ } refit = true; touch("o"); return; }
+                try { S.L[n] = JSON.parse(data || "[]"); } catch (e) { return; }
+                if (mine2) { wrote.add(n); last[n] = data; if (at[0] === "w") wipeSeen = at; } // picked up my own earlier work (after a reload)
+                if (n.startsWith("s:") && T) act[n.slice(2)] = Date.now(); touch(n); redraw = true;
+              });
+              if (refit) fit(); else if (redraw) inkDraw();
+              if (T) tiles();
+              if (/Connecting|Trying|ended/.test(q("[data-st]").textContent)) status(liveMsg(), "#1F9D55");
+            } } }
         catch (e) { status("Can't reach the live server. Trying again…", "#D93A3A"); }
-        await new Promise((r) => setTimeout(r, 1200));
+        await new Promise((r) => setTimeout(r, every));
       }
     }
-    addEventListener("resize", fit); swatches(); requestAnimationFrame(() => { fit(); if (T) push("o"); follow(); });
+    addEventListener("resize", fit); swatches(); head(); if (T) { side(); setView(members.length === 1 ? members[0].id : ""); }
+    requestAnimationFrame(() => { fit(); follow(); });
     return {
       show() { ov.style.display = ""; fit(); },
-      close() { alive = false; ov.remove(); removeEventListener("resize", fit); },
-      image() { const c = document.createElement("canvas"), kk = 0.5; c.width = BW * kk; c.height = BH * kk; const x = c.getContext("2d"); paper(x, S.paper, kk);
-        const img = new Image(); return new Promise((res) => { img.onload = () => { x.drawImage(img, 0, 0, c.width, c.height); strokes(x, S.t, kk); strokes(x, S.s, kk); res(c.toDataURL("image/jpeg", 0.75)); }; img.onerror = () => { strokes(x, S.t, kk); strokes(x, S.s, kk); res(c.toDataURL("image/jpeg", 0.75)); };
+      close: shut,
+      get alive() { return alive; },
+      get count() { return members.length; },
+      image() { const c = document.createElement("canvas"), kk = 0.5; c.width = BW * kk; c.height = BH * kk; const x = c.getContext("2d"); paper(x, S.paper, kk); const ink2 = () => visible().forEach((n) => strokes(x, S.L[n], kk));
+        const img = new Image(); return new Promise((res) => { img.onload = () => { x.drawImage(img, 0, 0, c.width, c.height); ink2(); res(c.toDataURL("image/jpeg", 0.75)); }; img.onerror = () => { ink2(); res(c.toDataURL("image/jpeg", 0.75)); };
           img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${BW} ${BH}">${S.objs.map((o) => objSVG(o, false)).join("").replace(/var\(--[a-z]+\)/g, "#2F5BD3")}</svg>`); }); },
     };
   }
@@ -5166,19 +5312,21 @@ const BOARD = (() => {
 
 // the student's side: the teacher has interrupted; show the board over everything until the teacher ends it
 const SBOARD = (() => {
-  let b = null, pill = null, active = false;
-  const id = () => String(state.cls || "").toUpperCase() + "|" + state.name;
-  const io = {
-    send: async (who, data) => { const r = await fetch(LIVE.url, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ t: "brd", lesson: L.id, name: state.name, cls: state.cls, who, data }) }); const j = await r.json(); if (!j.ok) throw new Error("no"); },
-    poll: async () => (await fetch(`${LIVE.url}?t=brd&lesson=${encodeURIComponent(L.id)}&id=${encodeURIComponent(id())}`)).json(),
-  };
+  let b = null, pill = null, active = "";
+  const mk = (bid) => ({
+    send: async (who, data) => (await fetch(LIVE.url, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ t: "gbw", lesson: L.id, b: bid, name: state.name, cls: state.cls, data }) })).json(),
+    poll: async (since) => (await fetch(`${LIVE.url}?` + new URLSearchParams({ t: "gb", lesson: L.id, b: bid, cls: state.cls || "", name: state.name || "", since: since || 0 }))).json(),
+  });
   const showPill = (on) => { if (!on) { if (pill) pill.remove(); pill = null; return; } if (pill) return; pill = document.createElement("div"); pill.className = "sb-pill"; pill.innerHTML = `<span>🖐 Your teacher's board is open</span><button type="button">Open it</button>`; document.body.appendChild(pill); pill.querySelector("button").onclick = () => { showPill(false); b && b.show(); }; };
-  function start() {
-    if (active) return; active = true;
-    b = BOARD.open("s", "🖐 Your teacher's board: write together", io, { onHide: () => showPill(true),
-      onEnd: async () => { active = false; showPill(false); try { const img = await b.image(); state.boards = (state.boards || []).slice(-2); state.boards.push({ at: Date.now(), img }); save(); } catch (e) { /* the picture isn't essential */ } } });
+  function start(bid) {
+    if (b) { b.close(); showPill(false); }
+    active = bid; const me = String(state.cls || "").toUpperCase() + "|" + state.name;
+    const h = BOARD.open("s", "🖐 Your teacher's board", mk(bid), { me, onHide: () => showPill(true),
+      onEnd: async () => { if (active === bid) { active = ""; b = null; showPill(false); } try { const img = await h.image(); state.boards = (state.boards || []).slice(-2); state.boards.push({ at: Date.now(), img }); save(); } catch (e) { /* the picture isn't essential */ } } });
+    b = h;
   }
-  return { check(on) { if (on && !active) start(); }, get active() { return active; } };
+  // the heartbeat says which board (if any) the teacher has put this student on
+  return { check(bid) { if (typeof bid === "string" && bid && bid !== active) start(bid); }, get active() { return !!active; } };
 })();
 
 // ---------- Live class: progress to the teacher's laptop, and hand-in to the teacher's Drive ----------
@@ -5280,7 +5428,7 @@ window.__live = (() => {
     if (t === "bye" && navigator.sendBeacon) { try { if (navigator.sendBeacon(LIVE.url, new Blob([body], { type: "text/plain" }))) return; } catch (e) { /* fall through */ } }
     try {
       fetch(LIVE.url, { method: "POST", headers: { "Content-Type": "text/plain" }, body, keepalive: true })
-        .then((r) => r.json()).then((j) => { if (j && j.ack && state.help && !state.help.seen && j.ack >= state.help.at) { state.help.seen = Date.now(); save(); helpPill(); } if (j && j.fb) NP.pullFeedback(j.fb); if (j && j.wt) NP.watched(j.wt, j.now); if (j && j.rev) applyReveals(j.rev); if (j && j.int) SBOARD.check(true); })
+        .then((r) => r.json()).then((j) => { if (j && j.ack && state.help && !state.help.seen && j.ack >= state.help.at) { state.help.seen = Date.now(); save(); helpPill(); } if (j && j.fb) NP.pullFeedback(j.fb); if (j && j.wt) NP.watched(j.wt, j.now); if (j && j.rev) applyReveals(j.rev); if (j && j.int) SBOARD.check(j.int); })
         .catch(() => fetch(LIVE.url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body }).catch(() => {}));
     } catch (e) { /* offline */ }
   }
@@ -5489,10 +5637,72 @@ function liveStatus(s, now) {
   if (idle >= LIVE_IDLE) return ["idle", `Idle for ${min(idle)}`, "#D9A400"];
   return ["ok", "Working", "#1F9D55"];
 }
+// ---------- Shared boards (teacher) ----------
+let TB = null; // the board the teacher has open: { b, h }
+const TBK = () => `jw-board-${L.id}`;
+function boardBtns() { document.querySelectorAll(".lv-h [data-gb]").forEach((x) => { const on = TB && TB.h.alive; x.textContent = on ? `🖐 Back to the board (${TB.h.count})` : TB && TB.pending ? "🖐 Back to the board" : "🖐 Shared board"; x.classList.toggle("hot", !!(on || (TB && TB.pending))); }); }
+function teacherBoard(b, mode, members, title) {
+  const ctl = {
+    setMode: (m) => livePost({ t: "gb", op: "mode", b, mode: m }),
+    add: async (have) => { const got = await pickStudents({ exclude: have, adding: true }); if (!got) return []; const r = await livePost({ t: "gb", op: "add", b, ids: got.list.map((x) => x.id) }); return r && r.ok ? got.list.filter((x) => r.mem.includes(x.id)) : []; },
+    remove: (id) => livePost({ t: "gb", op: "remove", b, ids: [id] }),
+    wipe: (id) => livePost({ t: "gb", op: "wipe", b, ids: [id] }),
+  };
+  const io = { send: (n, data) => livePost({ t: "gbw", b, who: n, data }), poll: (since) => liveGet({ t: "gb", b, since: since || 0 }) };
+  const h = BOARD.open("t", title, io, { mode, members, ctl, onMin: boardBtns,
+    onEnd: () => { livePost({ t: "gb", op: "end", b }).catch(() => {}); TB = null; try { localStorage.removeItem(TBK()); } catch (e) { /* storage not available */ } boardBtns(); } });
+  TB = { b, h }; try { localStorage.setItem(TBK(), b); } catch (e) { /* storage not available */ } boardBtns();
+}
+async function startBoard(list, mode) {
+  if (TB && TB.h && TB.h.alive) { if (!confirm(`You already have a shared board open with ${TB.h.count} student${TB.h.count === 1 ? "" : "s"}. End it and start this one?`)) return TB.h.show(); TB.h.close(); livePost({ t: "gb", op: "end", b: TB.b }).catch(() => {}); TB = null; }
+  const b = "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  let j; try { j = await livePost({ t: "gb", op: "start", b, mode, ids: list.map((x) => x.id) }); } catch (e) { j = null; }
+  if (!j || !j.ok) return alert(j && j.error === "key" ? "Your teacher key wasn't right." : "Couldn't reach the live server. Check your key and try again.");
+  const mem = list.filter((x) => j.mem.includes(x.id)); if (!mem.length) return alert("Those students aren't connected any more.");
+  teacherBoard(b, mode, mem, mem.length === 1 ? `🖐 Shared board with ${mem[0].name} (${mem[0].cls})` : `🖐 Shared board`);
+}
+// after a page reload: the board is still on the students' screens, so offer to go back to it
+async function rejoinBoard(check) {
+  let b = null; try { b = localStorage.getItem(TBK()); } catch (e) { /* storage not available */ }
+  if (!b || (TB && TB.h && TB.h.alive)) return false;
+  let j = null; try { j = await liveGet({ t: "gb", b, since: 0 }); } catch (e) { return false; }
+  if (!j || !j.ok || !j.on) { try { localStorage.removeItem(TBK()); } catch (e) { /* storage not available */ } TB = null; boardBtns(); return false; }
+  if (check) { TB = { b, pending: true, h: { alive: false } }; boardBtns(); return false; }
+  teacherBoard(b, j.mode, j.mem || [], (j.mem || []).length === 1 ? `🖐 Shared board with ${j.mem[0].name} (${j.mem[0].cls})` : "🖐 Shared board"); return true;
+}
+// choose students (and, for a new board, how it works)
+function pickStudents(o = {}) {
+  return new Promise(async (done) => {
+    const w = document.createElement("div"); w.className = "sb-pick";
+    w.innerHTML = `<div class="pk" role="dialog" aria-label="Choose students"><div class="pk-h"><b>${o.adding ? "➕ Add students to the board" : "🖐 Shared board"}</b><button type="button" data-x>✕ Close</button></div><div class="pk-b">Loading…</div></div>`;
+    document.body.appendChild(w); const body = w.querySelector(".pk-b"), fin = (v) => { w.remove(); done(v); };
+    w.querySelector("[data-x]").onclick = () => fin(null); w.addEventListener("keydown", (e) => { if (e.key === "Escape") fin(null); });
+    let j; try { j = await liveGet({ t: "live" }); } catch (e) { j = null; }
+    if (!j || !j.ok) { body.textContent = "Couldn't reach the live server. Close this and try again."; return; }
+    const now = j.now || Date.now(), ex = new Set(o.exclude || []);
+    const all = Object.entries(j.students || {}).map(([id, s]) => Object.assign({ id }, s)).filter((s) => liveStatus(s, now)[0] !== "gone" && !ex.has(s.id)).sort((a, b2) => a.name.localeCompare(b2.name));
+    const classes = [...new Set(all.map((s) => s.cls))].sort(), chosen = new Set();
+    let cls = classes.includes(o.cls) ? o.cls : classes.length === 1 ? classes[0] : "";
+    body.innerHTML = `${o.adding ? "" : `<div style="margin-bottom:6px">How should the board work?</div><div class="modes"><label><b><input type="radio" name="sbm" value="copy" checked>✍ I do, you do</b>What you write appears on every student's board. What each student writes stays on their own board: only you can see it.</label><label><b><input type="radio" name="sbm" value="collab">🤝 Work together</b>One board for everyone. Everyone sees everyone's writing as it happens.</label></div>`}
+      <div class="bar"><span>Who's on it?</span><label>Class <select data-c><option value="">All</option>${classes.map((c) => `<option${c === cls ? " selected" : ""}>${esc(c)}</option>`).join("")}</select></label><button type="button" data-all>Select all</button><button type="button" data-none>Select none</button></div>
+      <div class="who"></div><div class="muted small" style="margin-top:8px">Only students connected right now are listed.${o.adding ? " Students already on the board aren't shown." : ""}</div>
+      <div class="bar" style="margin-top:12px"><span class="sp"></span><button type="button" class="go" data-go disabled>Start</button></div>`;
+    const who = body.querySelector(".who"), go = body.querySelector("[data-go]");
+    const shown = () => all.filter((s) => !cls || s.cls === cls);
+    const count = () => { const n = [...chosen].filter((id) => shown().some((s) => s.id === id)).length; go.disabled = !n; go.textContent = n ? `${o.adding ? "Add" : "Start the board with"} ${n} student${n === 1 ? "" : "s"}` : "Choose at least one student"; };
+    const list = () => { const sh = shown(); who.innerHTML = sh.length ? sh.map((s) => `<label><input type="checkbox" value="${esc(s.id)}"${chosen.has(s.id) ? " checked" : ""}> ${esc(s.name)}<small>${esc(s.cls)}</small></label>`).join("") : `<div class="muted">Nobody${cls ? " in " + esc(cls) : ""} is connected right now.</div>`;
+      who.querySelectorAll("input").forEach((x) => (x.onchange = () => { x.checked ? chosen.add(x.value) : chosen.delete(x.value); count(); })); count(); };
+    body.querySelector("[data-c]").onchange = (e) => { cls = e.target.value; list(); };
+    body.querySelector("[data-all]").onclick = () => { shown().forEach((s) => chosen.add(s.id)); list(); };
+    body.querySelector("[data-none]").onclick = () => { chosen.clear(); list(); };
+    go.onclick = () => { const picked = shown().filter((s) => chosen.has(s.id)).map((s) => ({ id: s.id, name: s.name, cls: s.cls })); const m = body.querySelector('input[name="sbm"]:checked'); fin({ list: picked, mode: m ? m.value : "copy" }); };
+    list();
+  });
+}
 function openLive() {
   if (!studentBuilt) { studentBuilt = true; buildStudent(); } // so every question's text is known here too
   const ov = document.createElement("div"); ov.className = "lv-ov";
-  ov.innerHTML = `<div class="lv-p" role="dialog" aria-label="Live class"><div class="lv-h"><b class="t">📡 Live class · ${esc(L.id)}</b><label class="small">Class <select data-cls><option value="">All</option></select></label><label class="snd"><input type="checkbox" data-snd checked> 🔔 Sound</label><button type="button" data-wall>📝 Notepads wall</button><button type="button" data-key>🔑 Key</button><button type="button" data-x>✕ Close</button></div><div class="lv-counts"></div><div class="lv-alerts" aria-live="polite"></div><div class="lv-grid"><div class="lv-empty">Connecting…</div></div><div class="lv-det" hidden></div><div class="lv-note">✋ = a student asked for help. ⚠️ = 3 wrong answers in a row on the same question. Click a name in an alert to open their work for that question; ✕ hides an alert. Click a student, then any question, to see their answer and write on their notepad. Updates every 5 seconds.</div></div>`;
+  ov.innerHTML = `<div class="lv-p" role="dialog" aria-label="Live class"><div class="lv-h"><b class="t">📡 Live class · ${esc(L.id)}</b><label class="small">Class <select data-cls><option value="">All</option></select></label><label class="snd"><input type="checkbox" data-snd checked> 🔔 Sound</label><button type="button" data-gb title="Put a board on several students' screens, or the whole class">🖐 Shared board</button><button type="button" data-wall>📝 Notepads wall</button><button type="button" data-key>🔑 Key</button><button type="button" data-x>✕ Close</button></div><div class="lv-counts"></div><div class="lv-alerts" aria-live="polite"></div><div class="lv-grid"><div class="lv-empty">Connecting…</div></div><div class="lv-det" hidden></div><div class="lv-note">✋ = a student asked for help. ⚠️ = 3 wrong answers in a row on the same question. Click a name in an alert to open their work for that question; ✕ hides an alert. Click a student, then any question, to see their answer and write on their notepad. Updates every 5 seconds.</div></div>`;
   document.body.appendChild(ov);
   const grid = ov.querySelector(".lv-grid"), counts = ov.querySelector(".lv-counts"), det = ov.querySelector(".lv-det"), sel = ov.querySelector("[data-cls]"), alerts = ov.querySelector(".lv-alerts");
   const seenAlerts = new Set(); let firstPoll = true, ac = null, title0 = document.title;
@@ -5592,11 +5802,10 @@ function openLive() {
       <div class="lv-qb"><button type="button" data-pad="${i}">📝 ${hasPad ? "Open their notepad" : "Write a note on their notepad"}</button></div></div>`;
   }
   // interrupt one student: a board over their screen that you both write on
+  // a student's detail → board with just them (or add them to the board that's open)
   async function sharedBoard(s) {
-    const id = sid(s), setInt = (on) => livePost({ t: "int", id, on: on ? 1 : 0 });
-    try { const j = await setInt(true); if (!j.ok) throw new Error(j.error); } catch (e) { alert("Couldn't reach the live server. Check your key and try again."); return; }
-    BOARD.open("t", `🖐 Shared board with ${s.name} (${s.cls})`, { send: async (who, data) => { const j = await livePost({ t: "brd", id, who, data }); if (!j.ok) throw new Error("no"); }, poll: () => liveGet({ t: "brd", id }) },
-      { onEnd: () => setInt(false).catch(() => {}) });
+    if (TB && TB.h.alive) { if (confirm(`You have a shared board open with ${TB.h.count} student${TB.h.count === 1 ? "" : "s"}. Add ${s.name} to it?`)) { try { await livePost({ t: "gb", op: "add", b: TB.b, ids: [sid(s)] }); } catch (e) { /* the board shows its own errors */ } TB.h.show(); } return; }
+    startBoard([{ id: sid(s), name: s.name, cls: s.cls }], "copy");
   }
   // every student's latest notepad at a glance, refreshing every few seconds; click one to open it
   function openWall() {
@@ -5634,6 +5843,8 @@ function openLive() {
     tick();
   }
   ov.querySelector("[data-wall]").onclick = () => { if (!liveKey()) return askKey(); openWall(); };
+  ov.querySelector("[data-gb]").onclick = async () => { if (!liveKey()) return askKey(); if (TB && TB.h.alive) return TB.h.show(); if (await rejoinBoard()) return; const got = await pickStudents({ cls: sel.value }); if (got) startBoard(got.list, got.mode); };
+  boardBtns(); rejoinBoard(true);
   sel.onchange = draw;
   ov.querySelector("[data-key]").onclick = () => askKey();
   const close = () => { alive = false; clearTimeout(tm); ov.remove(); document.title = title0; };
