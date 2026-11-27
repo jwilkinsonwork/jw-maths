@@ -2311,9 +2311,34 @@ function nline(o, px = 300) {
   if (o.arrows && o.arrows.length) g = g.replace(`role="img"`, `role="img"`) + `<defs><marker id="nlar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="${fs * 0.5}" markerHeight="${fs * 0.5}" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--teal)"/></marker></defs>`;
   return g + `</svg>`;
 }
+// place value chart: {num: "0.0367", upto: 3 (label the 1st to 3rd significant figures), focus: 2 (pick out one in coral), lead: true (grey the zeros in front and say why), cols: [lowest power, highest power] to widen it}
+function pvchart(o, px = 300) {
+  const raw = String(o.num).replace(/[,\s]/g, ""), [ip, dp = ""] = raw.split("."), intD = ip.split(""), decD = dp.split("");
+  const NAMES = { 6: "millions", 5: "hundred thousands", 4: "ten thousands", 3: "thousands", 2: "hundreds", 1: "tens", 0: "ones", "-1": "tenths", "-2": "hundredths", "-3": "thousandths", "-4": "ten thousandths", "-5": "hundred thousandths", "-6": "millionths" };
+  let cells = [...intD.map((d, i) => ({ d, p: intD.length - 1 - i })), ...(dp || raw.includes(".") ? [{ d: ".", p: null }] : []), ...decD.map((d, i) => ({ d, p: -1 - i }))];
+  if (o.cols) { const [lo, hi] = o.cols; const top = cells[0].p; for (let p = top + 1; p <= hi; p++) cells.unshift({ d: "", p }); const lowP = Math.min(...cells.filter((c) => c.p !== null).map((c) => c.p)); if (lo < 0 && !cells.some((c) => c.d === ".")) { const iO = cells.findIndex((c) => c.p === 0); cells.splice(iO + 1, 0, { d: ".", p: null }); } for (let p = lowP - 1; p >= lo; p--) cells.push({ d: "", p }); }
+  // significant figures: from the first non-zero digit onwards, every digit counts
+  let k = 0, started = false; cells.forEach((c) => { if (c.p === null || c.d === "") return; if (!started && c.d !== "0") started = true; c.lead = !started; if (started) c.sf = ++k; });
+  const n = cells.length, W = px, units = n - (cells.some((c) => c.p === null) ? 0.55 : 0), cw = Math.min(W / units, W * 0.21), H = cw * 2.25 + 4, fs = Math.min(cw * 0.62, 40), hs = Math.min(cw * 0.19, 13), ord = (i) => i + (["th", "st", "nd", "rd"][(i % 100 > 10 && i % 100 < 14) ? 0 : i % 10] || "th");
+  let x = (W - cw * units) / 2, g = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Place value chart of ${esc(o.num)}" style="font-family:Nunito,sans-serif">`; // few digits: keep the boxes a sensible size and centre them
+  cells.forEach((c) => {
+    if (c.p === null) { const w = cw * 0.45; g += `<text x="${x + w / 2}" y="${cw * 0.62 + fs * 0.75}" font-size="${fs}" text-anchor="middle" font-weight="900" fill="var(--ink)">.</text>`; x += w; return; }
+    const isF = o.focus && c.sf === o.focus, on = o.upto && c.sf && c.sf <= o.upto, fill = isF ? "#FFE1DD" : on ? "#E3ECFF" : c.lead && o.lead ? "#F1F2F6" : "#fff", stroke = isF ? "var(--coral)" : on ? "var(--blue)" : "#C9CFDB";
+    const nm = (NAMES[c.p] || "").split(" ");
+    g += `<rect x="${x + 2}" y="${cw * 0.5}" width="${cw - 4}" height="${cw * 1.02}" rx="${cw * 0.12}" fill="${fill}" stroke="${stroke}" stroke-width="${isF || on ? 2.5 : 1.5}"/>`;
+    const fsz = Math.min(hs, ...nm.map((t) => (cw * 0.96) / (t.length * 0.56))); // each heading shrinks to fit its column
+    nm.forEach((t, i) => (g += `<text x="${x + cw / 2}" y="${cw * 0.5 - hs * 0.45 - (nm.length - 1 - i) * hs * 1.05}" font-size="${fsz}" text-anchor="middle" font-weight="700" fill="#6B7390">${t}</text>`));
+    if (c.d) g += `<text x="${x + cw / 2}" y="${cw * 0.5 + cw * 0.51 + fs * 0.36}" font-size="${fs}" text-anchor="middle" font-weight="900" fill="${c.lead && o.lead ? "#A3A9BA" : isF ? "var(--coral)" : "var(--ink)"}">${c.d}</text>`;
+    if (on || isF) g += `<text x="${x + cw / 2}" y="${cw * 1.52 + hs * 1.5}" font-size="${hs * 1.15}" text-anchor="middle" font-weight="900" fill="${isF ? "var(--coral)" : "var(--blue)"}">${ord(c.sf)}</text>`;
+    else if (c.lead && o.lead) g += `<text x="${x + cw / 2}" y="${cw * 1.52 + hs * 1.5}" font-size="${hs}" text-anchor="middle" font-weight="700" fill="#8A93A8">place</text><text x="${x + cw / 2}" y="${cw * 1.52 + hs * 2.6}" font-size="${hs}" text-anchor="middle" font-weight="700" fill="#8A93A8">holder</text>`;
+    x += cw;
+  });
+  return g + `</svg>`;
+}
 function graph(spec = {}, px = 300) {
   if (spec.venn) return venn(spec.venn, px);
   if (spec.nl) return nline(spec.nl, px);
+  if (spec.pvc) return pvchart(spec.pvc, px);
   const [x0, x1, xs] = spec.xr || [-5, 5, 1], [y0, y1, ys] = spec.yr || [-5, 5, 1];
   const pad = 26, W = px, H = px, iw = W - 2 * pad, ih = H - 2 * pad;
   const X = (x) => pad + ((x - x0) / (x1 - x0)) * iw, Y = (y) => H - pad - ((y - y0) / (y1 - y0)) * ih;
@@ -2904,7 +2929,7 @@ function mountBuildUp(host, B, { big = false, store = null } = {}) {
     function judge(s, raw, kind) {
       if (kind === "pick") { const a = typeof s.ans === "function" ? s.ans(ctx) : s.ans; return String(raw) === String(a) ? { ok: true } : { ok: false, msg: (s.why && s.why(raw, ctx)) || "Not that one. Look again." }; }
       if (kind === "num") {
-        const a = typeof s.ans === "function" ? s.ans(ctx) : s.ans, close = (v) => Math.abs(v - a) < 1e-6;
+        const a = typeof s.ans === "function" ? s.ans(ctx) : s.ans, close = (v) => Math.abs(v - a) < (a && Math.abs(a) < 0.01 ? Math.abs(a) * 1e-4 : 1e-6);
         const val = (t) => { t = t.replace(/[−–]/g, "-"); if (s.loneMinus && t === "-") return -1; const m = t.match(/^(-?[\d.]+)([÷×:*])(-?[\d.]+)$/); if (m) { const p = parseNum(m[1]), q = parseNum(m[3]); return m[2] === "×" || m[2] === "*" ? p * q : p / q; } return parseNum(t); };
         const parts = raw.replace(/\s+/g, "").replace(/^[a-z]+=/i, "").split("=").filter((t) => t !== ""), vals = parts.map(val);
         if (!vals.length || vals.some((v) => !isFinite(v))) return { ok: false, form: true, msg: "Type a number, like 3, −2 or 1/2." };
@@ -3031,8 +3056,8 @@ function buildSlides() {
   });
 
   CUR_OBJ = null;
-  const T = L.tiered, pairs = PRACTICE_VIS.items.map((it, i) => `<div class="pp"><b class="pp-n">${esc(it.label)}</b><div class="svgwrap">${graph(it.spec, 300)}</div></div>`).join("");
-  slide("tier", `Tiered practice: ${PRACTICE_VIS.title}`, head("tier", `Tiered practice: ${PRACTICE_VIS.title}`, 15) + `<div class="small muted" style="margin:-8px 0 6px">${tex(PRACTICE_VIS.sub)}</div><div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:10px 24px;flex:1;min-height:0">${pairs}</div>`);
+  const T = L.tiered, PN = PRACTICE_VIS.items.length, pc = Math.min(3, PN), pr = Math.ceil(PN / 3), pairs = PRACTICE_VIS.items.map((it, i) => `<div class="pp"><b class="pp-n">${esc(it.label)}</b><div class="svgwrap">${graph(it.spec, PN === 1 ? 640 : 300)}</div></div>`).join(""); // the grid fits the number of diagrams, so one diagram fills the slide
+  slide("tier", `Tiered practice: ${PRACTICE_VIS.title}`, head("tier", `Tiered practice: ${PRACTICE_VIS.title}`, 15) + `<div class="small muted" style="margin:-8px 0 6px">${tex(PRACTICE_VIS.sub)}</div><div style="display:grid;grid-template-columns:repeat(${pc},minmax(0,1fr));grid-template-rows:repeat(${pr},minmax(0,1fr));gap:10px 24px;flex:1;min-height:0">${pairs}</div>`);
   [["bronze", "Bronze: secure the method", "var(--amber)"], ["silver", "Silver: vary the numbers and the form", "var(--purple)"], ["gold", "Gold: reason, generalise, spot the trap", "var(--pink)"]].forEach(([k, t, c]) => {
     slide("tier", t, head("tier", t) + `<ol class="fit practice-list">${T[k].map(([lo, q, a]) => `<li><span class="chip lo-chip" style="background:${c}">${lo}</span> ${tex(q)}<span class="a rv" style="display:block;color:var(--teal);font-weight:800">${tex(a)}</span></li>`).join("")}</ol>`);
   });
@@ -4022,7 +4047,8 @@ function checkPart(spec, val) {
   switch (spec.t) {
     case "yn": case "choice": return val === spec.v;
     case "num": { const v = parseNum(val); if (isFinite(v) && (spec.alt || []).some((x) => Math.abs(v - x) < 1e-6)) return true; // other acceptable answers (e.g. a different sensible estimate)
-      if (!(isFinite(v) && Math.abs(v - spec.v) < 1e-6)) return false;
+      const tol = spec.v && Math.abs(spec.v) < 0.01 ? Math.abs(spec.v) * 1e-4 : 1e-6; // very small answers (0.000007) need a tighter check
+      if (!(isFinite(v) && Math.abs(v - spec.v) < tol)) return false;
       if (spec.keep) { const t = String(val).trim().replace(/[−–]/g, "-").replace(/\s+/g, "").replace(/^(-?)£/, "$1").replace(/,/g, ""); return t.replace(/^(-?)0+(?=\d)/, "$1") === String(spec.keep).replace(/,/g, ""); } // e.g. 3.40 to 2 d.p.: the zero must be written
       return true; }
     case "eq": { const r = parseLine(val), e = parseLine(spec.v); return !r.error && sameLine(r, e); }
@@ -5174,7 +5200,7 @@ function u5Ext(spec) {
     const d = document.createElement("div"); d.className = "ext u5e" + (big ? " ext-big" : "");
     d.innerHTML = `<div class="ext-ctl"><div class="tierpick" data-g="level"><button class="g" data-v="easy">Easy</button><button class="y" data-v="medium">Medium</button><button class="r" data-v="hard">Hard</button></div><span class="small" data-score></span></div>
       <div class="q"><div class="ext-q" data-q></div><div class="u5e-line" data-line hidden></div>
-      <div class="qactions"><input type="text" data-a inputmode="decimal" aria-label="Your answer" autocomplete="off"><button data-go class="primary">Check</button><button data-nl>Show the number line</button><button data-work>Show working</button><button data-new>Next question</button><span class="fb small"></span></div>
+      <div class="qactions"><input type="text" data-a inputmode="decimal" aria-label="Your answer" autocomplete="off"><button data-go class="primary">Check</button><button data-nl>${esc(spec.visLabel || "Show the number line")}</button><button data-work>Show working</button><button data-new>Next question</button><span class="fb small"></span></div>
       <div class="model hidden" data-w></div></div><p class="small muted ext-note">${spec.note}</p>`;
     let q, tries, helped, done; const fb = d.querySelector(".fb"), w = d.querySelector("[data-w]"), inp = d.querySelector("[data-a]"), ln = d.querySelector("[data-line]");
     const score = () => { d.querySelector("[data-score]").innerHTML = `Correct: <b>${S.correct}</b> · Streak: <b>${S.streak}</b> · Best streak: <b>${S.best}</b>`; };
